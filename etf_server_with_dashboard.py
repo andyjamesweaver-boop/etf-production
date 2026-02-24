@@ -49,6 +49,9 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
             '/api/v1/analytics/top-performers': lambda: self.handle_top_performers(qs),
             '/api/v1/search': lambda: self.handle_search(qs),
             '/api/v1/scrape-status': self.handle_scrape_status,
+            '/api/v1/screener': lambda: self.handle_screener(qs),
+            '/api/v1/compare': lambda: self.handle_compare(qs),
+            '/api/v1/holdings/search': lambda: self.handle_holdings_search(qs),
         }
 
         handler = routes.get(path)
@@ -120,7 +123,8 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
                 '/api/v1/market/overview', '/api/v1/analytics/fund-flows',
                 '/api/v1/analytics/cheapest', '/api/v1/analytics/highest-yield',
                 '/api/v1/analytics/top-performers', '/api/v1/search',
-                '/api/v1/scrape-status',
+                '/api/v1/scrape-status', '/api/v1/screener',
+                '/api/v1/compare', '/api/v1/holdings/search',
             ],
         })
 
@@ -452,6 +456,131 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
         finally:
             conn.close()
 
+    # ----- Screener -----
+    def handle_screener(self, qs):
+        conn = get_db()
+        try:
+            where, params = ['1=1'], []
+            exchange     = self._str(qs, 'exchange')
+            asset_class  = self._str(qs, 'asset_class')
+            issuer       = self._str(qs, 'issuer')
+            max_fee      = self._str(qs, 'max_fee')
+            min_fum      = self._str(qs, 'min_fum')
+            min_ret_1y   = self._str(qs, 'min_return_1y')
+            max_ret_1y   = self._str(qs, 'max_return_1y')
+            min_yield    = self._str(qs, 'min_yield')
+            fx_hedged    = self._str(qs, 'fx_hedged')
+
+            if exchange:
+                where.append("exchange = ?"); params.append(exchange.upper())
+            if asset_class:
+                where.append("asset_class = ?"); params.append(asset_class)
+            if issuer:
+                where.append("issuer = ?"); params.append(issuer)
+            if max_fee is not None:
+                try: where.append("expense_ratio <= ?"); params.append(float(max_fee))
+                except ValueError: pass
+            if min_fum is not None:
+                try: where.append("fund_size_aud_millions >= ?"); params.append(float(min_fum))
+                except ValueError: pass
+            if min_ret_1y is not None:
+                try: where.append("return_1y >= ?"); params.append(float(min_ret_1y))
+                except ValueError: pass
+            if max_ret_1y is not None:
+                try: where.append("return_1y <= ?"); params.append(float(max_ret_1y))
+                except ValueError: pass
+            if min_yield is not None:
+                try: where.append("distribution_yield >= ?"); params.append(float(min_yield))
+                except ValueError: pass
+            if fx_hedged and fx_hedged.lower() in ('1', 'true', 'yes'):
+                where.append("fx_hedged = 1")
+
+            sort_map = {
+                'fum': 'fund_size_aud_millions DESC',
+                'return_1y': 'return_1y DESC',
+                'yield': 'distribution_yield DESC',
+                'expense': 'expense_ratio ASC',
+                'name': 'name ASC',
+                'code': 'code ASC',
+            }
+            sort_by = self._str(qs, 'sort_by', 'fum')
+            order = sort_map.get(sort_by, 'fund_size_aud_millions DESC')
+            limit  = min(self._int(qs, 'limit', 200), 500)
+            offset = self._int(qs, 'offset', 0)
+
+            w = ' AND '.join(where)
+            total = conn.execute(f"SELECT COUNT(*) FROM etfs WHERE {w}", params).fetchone()[0]
+            rows = conn.execute(
+                f"SELECT * FROM etfs WHERE {w} ORDER BY {order} LIMIT ? OFFSET ?",
+                params + [limit, offset]
+            ).fetchall()
+            self.send_json({'data': [dict(r) for r in rows], 'total': total,
+                            'limit': limit, 'offset': offset})
+        except Exception as e:
+            self.send_json({'error': str(e)}, 500)
+        finally:
+            conn.close()
+
+    # ----- Compare -----
+    def handle_compare(self, qs):
+        codes_str = self._str(qs, 'codes', '')
+        if not codes_str:
+            self.send_json({'error': 'codes parameter required'}, 400)
+            return
+        codes = [c.strip().upper() for c in codes_str.split(',') if c.strip()][:5]
+        if not codes:
+            self.send_json({'error': 'No valid codes provided'}, 400)
+            return
+        conn = get_db()
+        try:
+            placeholders = ','.join('?' * len(codes))
+            rows = conn.execute(
+                f"SELECT * FROM etfs WHERE code IN ({placeholders}) "
+                "ORDER BY fund_size_aud_millions DESC",
+                codes
+            ).fetchall()
+            self.send_json({'data': [dict(r) for r in rows]})
+        except Exception as e:
+            self.send_json({'error': str(e)}, 500)
+        finally:
+            conn.close()
+
+    # ----- Holdings search -----
+    def handle_holdings_search(self, qs):
+        q = self._str(qs, 'q', '')
+        if not q:
+            self.send_json({'error': 'q parameter required'}, 400)
+            return
+        try:
+            min_weight = float(self._str(qs, 'min_weight') or '0')
+        except ValueError:
+            min_weight = 0.0
+        conn = get_db()
+        try:
+            pattern = f'%{q.lower()}%'
+            rows = conn.execute(
+                "SELECT h.etf_code, e.name AS etf_name, e.asset_class, e.issuer, "
+                "       h.name AS holding_name, h.ticker, h.weight_pct, h.sector "
+                "FROM etf_holdings h JOIN etfs e ON e.code = h.etf_code "
+                "WHERE (LOWER(h.name) LIKE ? OR LOWER(h.ticker) LIKE ?) "
+                "  AND COALESCE(h.weight_pct, 0) >= ? "
+                "ORDER BY h.weight_pct DESC "
+                "LIMIT 100",
+                (pattern, pattern, min_weight)
+            ).fetchall()
+            etf_codes = list(dict.fromkeys(r['etf_code'] for r in rows))
+            self.send_json({
+                'query': q,
+                'total': len(rows),
+                'etf_count': len(etf_codes),
+                'etfs': etf_codes,
+                'results': [dict(r) for r in rows],
+            })
+        except Exception as e:
+            self.send_json({'error': str(e)}, 500)
+        finally:
+            conn.close()
+
     # ================================================================== DASHBOARD
     def handle_dashboard(self):
         self.send_html(DASHBOARD_HTML)
@@ -514,6 +643,31 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
   /* Stat card hover lift */
   .stat-card { transition: transform .15s, box-shadow .15s; }
   .stat-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,.08); }
+
+  /* Main view tabs */
+  .main-tab { color: #6b7280; padding: 10px 0; font-weight: 500; transition: color .15s;
+              border-bottom: 2px solid transparent; white-space: nowrap; }
+  .main-tab:hover { color: #2563eb; }
+  .main-tab.active { color: #2563eb; border-bottom-color: #2563eb; }
+
+  /* Screener */
+  .sc-check-list { max-height: 130px; overflow-y: auto; }
+  .sc-check-list label { display: flex; align-items: center; gap: 6px; padding: 3px 0;
+                         cursor: pointer; font-size: .8125rem; color: #374151; }
+  .sc-check-list label:hover { color: #2563eb; }
+
+  /* Compare mini-bars */
+  .cmp-bar-wrap { display: flex; align-items: center; gap: 4px; }
+  .cmp-bar { height: 6px; border-radius: 3px; background: #3b82f6; min-width: 2px; }
+  .cmp-bar-neg { background: #ef4444; }
+
+  /* Screener table rows */
+  #screener-table tr { border-bottom: 1px solid #f1f5f9; transition: background .1s; }
+  #screener-table tr:hover { background: #eff6ff; }
+
+  /* Holdings table */
+  #holdings-table tr { border-bottom: 1px solid #f1f5f9; }
+  #holdings-table tr:hover { background: #eff6ff; }
 </style>
 </head>
 <body class="bg-slate-100 min-h-screen text-sm text-gray-800 antialiased">
@@ -587,6 +741,19 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
       <p class="text-gray-400 text-xs mt-1">fund managers</p>
     </div>
   </div>
+
+  <!-- ── Main nav tabs ── -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-5 px-5">
+    <div class="flex gap-8 text-sm overflow-x-auto">
+      <button class="main-tab active" data-view="list">ETF List</button>
+      <button class="main-tab" data-view="screener">Screener</button>
+      <button class="main-tab" data-view="compare">Compare</button>
+      <button class="main-tab" data-view="holdings">Holdings Search</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════ VIEW: ETF List ══════════════════════════════ -->
+  <div id="view-list">
 
   <!-- ── Filter sidebar + table ── -->
   <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-5">
@@ -729,6 +896,210 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
       </div>
     </div>
   </div>
+
+  </div><!-- /view-list -->
+
+  <!-- ══════════════════════════════ VIEW: Screener ══════════════════════════════ -->
+  <div id="view-screener" class="hidden">
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+
+      <!-- Screener filters sidebar -->
+      <aside class="lg:col-span-1">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sticky top-4 space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Screener Filters</h3>
+            <button id="sc-clear"
+                    class="text-xs text-blue-600 hover:underline">Clear All</button>
+          </div>
+
+          <!-- Exchange toggles -->
+          <div>
+            <p class="text-xs text-gray-500 mb-1.5">Exchange</p>
+            <div class="flex gap-1.5">
+              <button class="sc-exch active flex-1 py-1 rounded-lg border text-xs font-medium
+                             bg-blue-600 text-white border-blue-600" data-exch="">All</button>
+              <button class="sc-exch flex-1 py-1 rounded-lg border text-xs font-medium
+                             text-gray-600 border-gray-200 hover:border-blue-400" data-exch="ASX">ASX</button>
+              <button class="sc-exch flex-1 py-1 rounded-lg border text-xs font-medium
+                             text-gray-600 border-gray-200 hover:border-blue-400" data-exch="CXA">CXA</button>
+            </div>
+          </div>
+
+          <!-- Asset class checklist -->
+          <div>
+            <p class="text-xs text-gray-500 mb-1.5">Asset Class</p>
+            <div id="sc-asset-list" class="sc-check-list space-y-0.5 border border-gray-100 rounded-lg p-2"></div>
+          </div>
+
+          <!-- Issuer checklist -->
+          <div>
+            <p class="text-xs text-gray-500 mb-1.5">Issuer</p>
+            <div id="sc-issuer-list" class="sc-check-list space-y-0.5 border border-gray-100 rounded-lg p-2"></div>
+          </div>
+
+          <!-- Max fee slider -->
+          <div>
+            <p class="text-xs text-gray-500 mb-1.5">Max Management Fee: <span id="sc-fee-val" class="font-semibold text-gray-700">2.00%</span></p>
+            <input id="sc-fee" type="range" min="0" max="2" step="0.05" value="2"
+                   class="w-full accent-blue-600">
+          </div>
+
+          <!-- Min FUM -->
+          <div>
+            <p class="text-xs text-gray-500 mb-1">Min Fund Size (AUD M)</p>
+            <input id="sc-fum" type="number" min="0" placeholder="e.g. 100"
+                   class="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm bg-gray-50
+                          focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
+          </div>
+
+          <!-- 1Y Return range -->
+          <div>
+            <p class="text-xs text-gray-500 mb-1">1Y Return (%)</p>
+            <div class="flex gap-2">
+              <input id="sc-ret-min" type="number" placeholder="Min"
+                     class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-gray-50
+                            focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
+              <input id="sc-ret-max" type="number" placeholder="Max"
+                     class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-gray-50
+                            focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
+            </div>
+          </div>
+
+          <!-- Min yield -->
+          <div>
+            <p class="text-xs text-gray-500 mb-1">Min Distribution Yield (%)</p>
+            <input id="sc-yield" type="number" min="0" placeholder="e.g. 3"
+                   class="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm bg-gray-50
+                          focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
+          </div>
+
+          <!-- FX hedged -->
+          <label class="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+            <input id="sc-hedged" type="checkbox" class="accent-blue-600">
+            FX Hedged only
+          </label>
+
+          <p id="sc-count" class="pt-2 border-t text-xs text-gray-400"></p>
+        </div>
+      </aside>
+
+      <!-- Screener results -->
+      <div class="lg:col-span-3">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <h3 class="font-semibold text-gray-700">Screener Results</h3>
+            <span id="sc-result-count" class="text-xs text-gray-400"></span>
+          </div>
+          <div class="overflow-x-auto" style="max-height:600px;overflow-y:auto">
+            <table class="w-full">
+              <thead class="bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wide"
+                     style="position:sticky;top:0;z-index:5">
+                <tr>
+                  <th class="px-3 py-2.5 text-left">ETF</th>
+                  <th class="px-3 py-2.5 text-left">Class</th>
+                  <th class="px-3 py-2.5 text-left">Issuer</th>
+                  <th class="px-3 py-2.5 text-right">Price</th>
+                  <th class="px-3 py-2.5 text-right">FUM</th>
+                  <th class="px-3 py-2.5 text-right">1Y Rtn</th>
+                  <th class="px-3 py-2.5 text-right">Yield</th>
+                  <th class="px-3 py-2.5 text-right">MER</th>
+                </tr>
+              </thead>
+              <tbody id="screener-table" class="text-sm divide-y divide-gray-50"></tbody>
+            </table>
+          </div>
+          <div id="sc-empty" class="hidden py-16 text-center text-gray-400 text-sm">No ETFs match the current filters.</div>
+        </div>
+      </div>
+    </div>
+  </div><!-- /view-screener -->
+
+  <!-- ══════════════════════════════ VIEW: Compare ══════════════════════════════ -->
+  <div id="view-compare" class="hidden">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-4">
+      <h3 class="font-semibold text-gray-700 mb-3">Select ETFs to Compare <span class="text-gray-400 font-normal text-sm">(2–5)</span></h3>
+      <div class="flex gap-3 items-start flex-wrap">
+        <div class="relative w-72">
+          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none"
+               fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+          </svg>
+          <input id="cmp-search" type="text" placeholder="Search ETF code or name…"
+                 autocomplete="off"
+                 class="w-full border border-gray-200 rounded-xl pl-9 pr-3 py-2 text-sm bg-gray-50
+                        focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
+          <div id="cmp-dropdown"
+               class="hidden absolute z-50 top-full mt-1 left-0 right-0 bg-white border border-gray-200
+                      rounded-xl shadow-2xl max-h-60 overflow-y-auto"></div>
+        </div>
+        <div id="cmp-chips" class="flex flex-wrap gap-2 items-center"></div>
+      </div>
+    </div>
+
+    <div id="cmp-table-wrap">
+      <div id="cmp-hint" class="bg-white rounded-xl shadow-sm border border-gray-100 py-16
+                                 text-center text-gray-400 text-sm">
+        Add 2–5 ETFs above to compare them side by side.
+      </div>
+      <div id="cmp-table-container" class="hidden bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
+        <table id="cmp-table" class="w-full text-sm"></table>
+      </div>
+    </div>
+  </div><!-- /view-compare -->
+
+  <!-- ══════════════════════════════ VIEW: Holdings Search ══════════════════════ -->
+  <div id="view-holdings" class="hidden">
+    <!-- Search bar -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-4">
+      <h3 class="font-semibold text-gray-700 mb-3">Holdings Search</h3>
+      <p class="text-sm text-gray-500 mb-3">Find which Australian ETFs hold a particular stock or asset.</p>
+      <div class="flex gap-3 items-center">
+        <div class="relative flex-1 max-w-lg">
+          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none"
+               fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+          </svg>
+          <input id="hs-input" type="text" placeholder="e.g. Apple, BHP, AAPL, NVDA…"
+                 class="w-full border border-gray-200 rounded-xl pl-9 pr-3 py-2.5 text-sm bg-gray-50
+                        focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
+        </div>
+        <div class="flex items-center gap-2 text-sm text-gray-500">
+          <label class="text-xs">Min Weight %</label>
+          <input id="hs-min-weight" type="number" min="0" step="0.1" value="0" placeholder="0"
+                 class="w-20 border border-gray-200 rounded-lg px-2 py-2 text-sm bg-gray-50
+                        focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary + results -->
+    <div id="hs-summary" class="hidden bg-blue-50 border border-blue-100 rounded-xl px-5 py-3 mb-4 text-sm text-blue-800"></div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div id="hs-empty" class="py-16 text-center text-gray-400 text-sm">
+        Enter a company name or ticker to search across all ETF holdings.
+      </div>
+      <div id="hs-table-wrap" class="hidden overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wide"
+                 style="position:sticky;top:0;z-index:5">
+            <tr>
+              <th class="px-3 py-2.5 text-left">ETF</th>
+              <th class="px-3 py-2.5 text-left">ETF Name</th>
+              <th class="px-3 py-2.5 text-left">Holding</th>
+              <th class="px-3 py-2.5 text-left">Ticker</th>
+              <th class="px-3 py-2.5 text-right">Weight</th>
+              <th class="px-3 py-2.5 text-left">Sector</th>
+              <th class="px-3 py-2.5 text-left">Asset Class</th>
+            </tr>
+          </thead>
+          <tbody id="holdings-table" class="divide-y divide-gray-50"></tbody>
+        </table>
+      </div>
+    </div>
+  </div><!-- /view-holdings -->
 
 </main>
 
@@ -1237,6 +1608,416 @@ async function init() {
 
 init();
 setInterval(() => { loadOverview(); loadTable(); }, 120000);
+
+/* ======================================================= main view tabs */
+const VIEWS = ['list', 'screener', 'compare', 'holdings'];
+document.querySelectorAll('.main-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const v = btn.dataset.view;
+    document.querySelectorAll('.main-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    VIEWS.forEach(id => document.getElementById('view-' + id).classList.add('hidden'));
+    document.getElementById('view-' + v).classList.remove('hidden');
+    if (v === 'screener' && !screenerLoaded) initScreener();
+    if (v === 'compare'  && !compareLoaded)  initCompare();
+    if (v === 'holdings') { /* always ready */ }
+  });
+});
+
+/* ============================================================ SCREENER */
+let screenerLoaded = false;
+const scFilters = {
+  exchange: '', assetClasses: new Set(), issuers: new Set(),
+  maxFee: 2, minFum: '', minRet: '', maxRet: '', minYield: '', hedged: false,
+};
+let scTimer;
+
+async function initScreener() {
+  screenerLoaded = true;
+  // Populate checklists from already-loaded filter data
+  const [cats, issuers] = await Promise.all([
+    api('/api/v1/categories'),
+    api('/api/v1/issuers'),
+  ]);
+
+  const assetEl = document.getElementById('sc-asset-list');
+  (cats.categories || []).forEach(c => {
+    const id = 'sca-' + c.asset_class.replace(/\W/g, '_');
+    const label = document.createElement('label');
+    label.innerHTML = `<input type="checkbox" id="${id}" value="${c.asset_class}" class="accent-blue-600">
+      <span class="truncate">${c.asset_class} <span class="text-gray-400">(${c.etf_count})</span></span>`;
+    label.querySelector('input').addEventListener('change', e => {
+      if (e.target.checked) scFilters.assetClasses.add(e.target.value);
+      else scFilters.assetClasses.delete(e.target.value);
+      scDebounceFetch();
+    });
+    assetEl.appendChild(label);
+  });
+
+  const issuerEl = document.getElementById('sc-issuer-list');
+  (issuers.issuers || []).forEach(i => {
+    const id = 'sci-' + i.name.replace(/\W/g, '_');
+    const label = document.createElement('label');
+    label.innerHTML = `<input type="checkbox" id="${id}" value="${i.name}" class="accent-blue-600">
+      <span class="truncate">${i.name} <span class="text-gray-400">(${i.etf_count})</span></span>`;
+    label.querySelector('input').addEventListener('change', e => {
+      if (e.target.checked) scFilters.issuers.add(e.target.value);
+      else scFilters.issuers.delete(e.target.value);
+      scDebounceFetch();
+    });
+    issuerEl.appendChild(label);
+  });
+
+  // Wire exchange toggles
+  document.querySelectorAll('.sc-exch').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.sc-exch').forEach(b => {
+        b.classList.remove('active', 'bg-blue-600', 'text-white', 'border-blue-600');
+        b.classList.add('text-gray-600', 'border-gray-200');
+      });
+      btn.classList.add('active', 'bg-blue-600', 'text-white', 'border-blue-600');
+      btn.classList.remove('text-gray-600', 'border-gray-200');
+      scFilters.exchange = btn.dataset.exch;
+      scDebounceFetch();
+    });
+  });
+
+  // Fee slider
+  const feeSlider = document.getElementById('sc-fee');
+  const feeVal = document.getElementById('sc-fee-val');
+  feeSlider.addEventListener('input', () => {
+    scFilters.maxFee = parseFloat(feeSlider.value);
+    feeVal.textContent = scFilters.maxFee.toFixed(2) + '%';
+    scDebounceFetch();
+  });
+
+  // Numeric inputs
+  const scInputs = {
+    'sc-fum': 'minFum', 'sc-ret-min': 'minRet',
+    'sc-ret-max': 'maxRet', 'sc-yield': 'minYield',
+  };
+  Object.entries(scInputs).forEach(([id, key]) => {
+    document.getElementById(id).addEventListener('input', e => {
+      scFilters[key] = e.target.value;
+      scDebounceFetch();
+    });
+  });
+
+  // Hedged checkbox
+  document.getElementById('sc-hedged').addEventListener('change', e => {
+    scFilters.hedged = e.target.checked;
+    scDebounceFetch();
+  });
+
+  // Clear all
+  document.getElementById('sc-clear').addEventListener('click', () => {
+    scFilters.exchange = ''; scFilters.assetClasses.clear(); scFilters.issuers.clear();
+    scFilters.maxFee = 2; scFilters.minFum = '';
+    scFilters.minRet = ''; scFilters.maxRet = '';
+    scFilters.minYield = ''; scFilters.hedged = false;
+    document.getElementById('sc-fee').value = 2;
+    document.getElementById('sc-fee-val').textContent = '2.00%';
+    ['sc-fum','sc-ret-min','sc-ret-max','sc-yield'].forEach(id =>
+      document.getElementById(id).value = '');
+    document.getElementById('sc-hedged').checked = false;
+    document.querySelectorAll('#sc-asset-list input, #sc-issuer-list input').forEach(cb =>
+      cb.checked = false);
+    document.querySelectorAll('.sc-exch').forEach(b => {
+      b.classList.remove('active','bg-blue-600','text-white','border-blue-600');
+      b.classList.add('text-gray-600','border-gray-200');
+    });
+    document.querySelector('.sc-exch[data-exch=""]').classList.add(
+      'active','bg-blue-600','text-white','border-blue-600');
+    scFetch();
+  });
+
+  scFetch();
+}
+
+function scDebounceFetch() {
+  clearTimeout(scTimer);
+  scTimer = setTimeout(scFetch, 300);
+}
+
+async function scFetch() {
+  const p = new URLSearchParams();
+  if (scFilters.exchange) p.set('exchange', scFilters.exchange);
+  if (scFilters.assetClasses.size === 1)
+    p.set('asset_class', [...scFilters.assetClasses][0]);
+  if (scFilters.issuers.size === 1)
+    p.set('issuer', [...scFilters.issuers][0]);
+  if (scFilters.maxFee < 2) p.set('max_fee', scFilters.maxFee);
+  if (scFilters.minFum)  p.set('min_fum',       scFilters.minFum);
+  if (scFilters.minRet)  p.set('min_return_1y',  scFilters.minRet);
+  if (scFilters.maxRet)  p.set('max_return_1y',  scFilters.maxRet);
+  if (scFilters.minYield) p.set('min_yield',     scFilters.minYield);
+  if (scFilters.hedged)  p.set('fx_hedged',      '1');
+
+  const d = await api('/api/v1/screener?' + p);
+  const data = d.data || [];
+
+  // Client-side multi-filter for multiple asset classes / issuers
+  let rows = data;
+  if (scFilters.assetClasses.size > 1)
+    rows = rows.filter(e => scFilters.assetClasses.has(e.asset_class));
+  if (scFilters.issuers.size > 1)
+    rows = rows.filter(e => scFilters.issuers.has(e.issuer));
+
+  document.getElementById('sc-count').textContent =
+    rows.length + ' ETF' + (rows.length !== 1 ? 's' : '') + ' matching';
+  document.getElementById('sc-result-count').textContent =
+    rows.length.toLocaleString() + ' results';
+
+  const tbody = document.getElementById('screener-table');
+  const emptyEl = document.getElementById('sc-empty');
+  if (!rows.length) {
+    tbody.innerHTML = '';
+    emptyEl.classList.remove('hidden');
+  } else {
+    emptyEl.classList.add('hidden');
+    tbody.innerHTML = rows.map(e => `
+      <tr class="cursor-pointer" data-code="${e.code}"
+          onclick="showDetail('${e.code}');document.querySelector('.main-tab[data-view=list]').click()">
+        <td class="px-3 py-2.5">
+          <div class="font-bold text-gray-900">${e.code}</div>
+          <div class="text-xs text-gray-400 truncate max-w-[160px]">${e.name || ''}</div>
+        </td>
+        <td class="px-3 py-2.5">${acChip(e.asset_class)}</td>
+        <td class="px-3 py-2.5 text-xs text-gray-500 max-w-[100px] truncate">${e.issuer || '—'}</td>
+        <td class="px-3 py-2.5 text-right font-mono">${money(e.current_price)}</td>
+        <td class="px-3 py-2.5 text-right">${fmtFum(e.fund_size_aud_millions)}</td>
+        <td class="px-3 py-2.5 text-right font-semibold ${pctCls(e.return_1y)}">${pct(e.return_1y)}</td>
+        <td class="px-3 py-2.5 text-right text-gray-600">
+          ${e.distribution_yield != null ? e.distribution_yield.toFixed(1) + '%' : '—'}
+        </td>
+        <td class="px-3 py-2.5 text-right text-gray-400">
+          ${e.expense_ratio != null ? e.expense_ratio.toFixed(2) + '%' : '—'}
+        </td>
+      </tr>`).join('');
+  }
+}
+
+/* ============================================================ COMPARE */
+let compareLoaded = false;
+const cmpSet = new Set();
+let cmpTimer;
+
+function initCompare() {
+  compareLoaded = true;
+  const inp = document.getElementById('cmp-search');
+  const dd  = document.getElementById('cmp-dropdown');
+
+  inp.addEventListener('input', () => {
+    clearTimeout(cmpTimer);
+    const q = inp.value.trim();
+    if (!q) { dd.classList.add('hidden'); return; }
+    cmpTimer = setTimeout(async () => {
+      const d = await api('/api/v1/search?q=' + encodeURIComponent(q));
+      if (!d.results || !d.results.length) {
+        dd.innerHTML = '<p class="p-3 text-sm text-gray-400">No results</p>';
+        dd.classList.remove('hidden');
+        return;
+      }
+      dd.innerHTML = d.results.slice(0, 8).map(r => `
+        <div class="px-3 py-2 hover:bg-blue-50 cursor-pointer flex justify-between items-center
+                    border-b last:border-b-0 ${cmpSet.has(r.code) ? 'bg-blue-50' : ''}"
+             data-code="${r.code}" data-name="${r.name || ''}">
+          <div>
+            <span class="font-bold text-gray-900">${r.code}</span>
+            <span class="text-gray-500 text-xs ml-2">${(r.name || '').slice(0,40)}</span>
+          </div>
+          <span class="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">${r.exchange || 'ASX'}</span>
+        </div>`).join('');
+      dd.classList.remove('hidden');
+      dd.querySelectorAll('[data-code]').forEach(node =>
+        node.addEventListener('click', () => {
+          const code = node.dataset.code;
+          if (cmpSet.size >= 5 && !cmpSet.has(code)) {
+            alert('Maximum 5 ETFs for comparison.'); return;
+          }
+          if (cmpSet.has(code)) cmpSet.delete(code);
+          else cmpSet.add(code);
+          dd.classList.add('hidden');
+          inp.value = '';
+          renderCmpChips();
+          if (cmpSet.size >= 2) cmpFetch();
+          else renderCmpHint();
+        })
+      );
+    }, 250);
+  });
+
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#cmp-search') && !e.target.closest('#cmp-dropdown'))
+      dd.classList.add('hidden');
+  });
+}
+
+function renderCmpChips() {
+  const el = document.getElementById('cmp-chips');
+  el.innerHTML = [...cmpSet].map(code => `
+    <span class="inline-flex items-center gap-1 bg-blue-100 text-blue-800 text-xs font-semibold
+                 px-2.5 py-1 rounded-full">
+      ${code}
+      <button onclick="cmpRemove('${code}')"
+              class="ml-0.5 text-blue-500 hover:text-blue-800 font-bold text-sm leading-none">×</button>
+    </span>`).join('');
+}
+
+function cmpRemove(code) {
+  cmpSet.delete(code);
+  renderCmpChips();
+  if (cmpSet.size >= 2) cmpFetch();
+  else renderCmpHint();
+}
+
+function renderCmpHint() {
+  document.getElementById('cmp-hint').classList.remove('hidden');
+  document.getElementById('cmp-table-container').classList.add('hidden');
+}
+
+async function cmpFetch() {
+  if (cmpSet.size < 2) return;
+  const codes = [...cmpSet].join(',');
+  const d = await api('/api/v1/compare?codes=' + codes);
+  renderCmpTable(d.data || []);
+}
+
+function miniBar(val, maxVal, neg) {
+  if (val == null || maxVal == 0) return '—';
+  const w = Math.max(4, Math.round(Math.abs(val) / maxVal * 80));
+  const cls = neg && val < 0 ? 'cmp-bar cmp-bar-neg' : 'cmp-bar';
+  return `<div class="cmp-bar-wrap">
+    <div class="${cls}" style="width:${w}px"></div>
+    <span class="${neg ? pctCls(val) : 'text-gray-700'} text-xs font-semibold whitespace-nowrap">
+      ${neg ? pct(val) : val.toFixed(2) + '%'}
+    </span>
+  </div>`;
+}
+
+function renderCmpTable(etfs) {
+  if (!etfs.length) return;
+  document.getElementById('cmp-hint').classList.add('hidden');
+  document.getElementById('cmp-table-container').classList.remove('hidden');
+
+  const maxFee   = Math.max(...etfs.map(e => e.expense_ratio || 0));
+  const maxYield = Math.max(...etfs.map(e => e.distribution_yield || 0));
+  const maxRet1y = Math.max(...etfs.map(e => Math.abs(e.return_1y || 0)));
+
+  const rows = [
+    { label: 'Name',          fmt: e => `<span class="font-medium text-gray-800 text-xs">${e.name || '—'}</span>` },
+    { label: 'Issuer',        fmt: e => e.issuer || '—' },
+    { label: 'Exchange',      fmt: e => `<span class="badge-${(e.exchange||'asx').toLowerCase()} px-1.5 py-0.5 rounded text-xs font-medium">${e.exchange || '—'}</span>` },
+    { label: 'Asset Class',   fmt: e => acChip(e.asset_class) },
+    { label: 'FUM',           fmt: e => fmtFum(e.fund_size_aud_millions) },
+    { label: 'Mgmt Fee',      fmt: e => miniBar(e.expense_ratio, maxFee, false), bar: true },
+    { label: 'Dist. Yield',   fmt: e => miniBar(e.distribution_yield, maxYield, false), bar: true },
+    { label: '1M Return',     fmt: e => `<span class="${pctCls(e.return_1m)}">${pct(e.return_1m)}</span>` },
+    { label: '1Y Return',     fmt: e => miniBar(e.return_1y, maxRet1y, true), bar: true },
+    { label: '3Y Return',     fmt: e => `<span class="${pctCls(e.return_3y)}">${pct(e.return_3y)}</span>` },
+    { label: '5Y Return',     fmt: e => `<span class="${pctCls(e.return_5y)}">${pct(e.return_5y)}</span>` },
+    { label: 'Price',         fmt: e => money(e.current_price) },
+    { label: '52W High',      fmt: e => money(e.year_high) },
+    { label: '52W Low',       fmt: e => money(e.year_low) },
+    { label: 'Spread',        fmt: e => e.bid_ask_spread_pct != null ? e.bid_ask_spread_pct + '%' : '—' },
+    { label: 'Inception',     fmt: e => e.inception_date || '—' },
+    { label: 'FX Hedged',     fmt: e => e.fx_hedged ? '<span class="text-emerald-600 font-medium">Yes</span>' : '<span class="text-gray-400">No</span>' },
+    { label: 'Sec. Lending',  fmt: e => e.securities_lending ? '<span class="text-emerald-600 font-medium">Yes</span>' : '<span class="text-gray-400">No</span>' },
+  ];
+
+  const thCols = etfs.map(e => `
+    <th class="px-4 py-3 text-center min-w-[140px]">
+      <div class="font-bold text-blue-700 text-base">${e.code}</div>
+      <button onclick="cmpRemove('${e.code}')"
+              class="text-xs text-gray-400 hover:text-red-500 mt-0.5">Remove</button>
+    </th>`).join('');
+
+  const bodyRows = rows.map((row, i) => {
+    const bg = i % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+    const cells = etfs.map(e =>
+      `<td class="px-4 py-2.5 text-sm text-center text-gray-700">${row.fmt(e)}</td>`
+    ).join('');
+    return `<tr class="${bg}">
+      <td class="px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide
+                 bg-gray-50 border-r border-gray-100 whitespace-nowrap w-28">${row.label}</td>
+      ${cells}
+    </tr>`;
+  }).join('');
+
+  document.getElementById('cmp-table').innerHTML = `
+    <thead class="bg-gray-50 border-b border-gray-200">
+      <tr>
+        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase w-28">Metric</th>
+        ${thCols}
+      </tr>
+    </thead>
+    <tbody>${bodyRows}</tbody>`;
+}
+
+/* ============================================================ HOLDINGS SEARCH */
+let hsTimer;
+document.getElementById('hs-input').addEventListener('input', hsDebounce);
+document.getElementById('hs-min-weight').addEventListener('input', hsDebounce);
+
+function hsDebounce() {
+  clearTimeout(hsTimer);
+  hsTimer = setTimeout(hsFetch, 400);
+}
+
+async function hsFetch() {
+  const q = document.getElementById('hs-input').value.trim();
+  const minW = document.getElementById('hs-min-weight').value || '0';
+  if (!q) {
+    document.getElementById('hs-empty').classList.remove('hidden');
+    document.getElementById('hs-table-wrap').classList.add('hidden');
+    document.getElementById('hs-summary').classList.add('hidden');
+    return;
+  }
+
+  const d = await api('/api/v1/holdings/search?q=' + encodeURIComponent(q)
+                      + '&min_weight=' + encodeURIComponent(minW));
+
+  const sumEl = document.getElementById('hs-summary');
+  const tblWrap = document.getElementById('hs-table-wrap');
+  const emptyEl = document.getElementById('hs-empty');
+
+  if (!d.results || !d.results.length) {
+    sumEl.classList.add('hidden');
+    tblWrap.classList.add('hidden');
+    emptyEl.textContent = `No ETF holdings match "${q}".`;
+    emptyEl.classList.remove('hidden');
+    return;
+  }
+
+  emptyEl.classList.add('hidden');
+  sumEl.classList.remove('hidden');
+  sumEl.innerHTML = `Found <strong>${d.total}</strong> holding${d.total !== 1 ? 's' : ''} across
+    <strong>${d.etf_count}</strong> ETF${d.etf_count !== 1 ? 's' : ''}
+    &nbsp;·&nbsp; ${d.etfs.map(c => `<span class="font-mono font-bold">${c}</span>`).join(', ')}`;
+
+  tblWrap.classList.remove('hidden');
+  const maxW = Math.max(...d.results.map(r => r.weight_pct || 0));
+  document.getElementById('holdings-table').innerHTML = d.results.map(r => `
+    <tr class="cursor-pointer" onclick="showDetail('${r.etf_code}');document.querySelector('.main-tab[data-view=list]').click()">
+      <td class="px-3 py-2.5 font-bold text-blue-700">${r.etf_code}</td>
+      <td class="px-3 py-2.5 text-gray-600 max-w-[160px] truncate text-xs">${r.etf_name || ''}</td>
+      <td class="px-3 py-2.5 font-medium text-gray-800 max-w-[180px] truncate">${r.holding_name || ''}</td>
+      <td class="px-3 py-2.5 font-mono text-xs text-gray-500">${r.ticker || '—'}</td>
+      <td class="px-3 py-2.5 text-right">
+        <div class="flex items-center justify-end gap-2">
+          <div class="w-16 bg-gray-100 rounded-full h-1.5 overflow-hidden">
+            <div class="h-full bg-blue-400 rounded-full"
+                 style="width:${maxW > 0 ? (r.weight_pct / maxW * 100).toFixed(1) : 0}%"></div>
+          </div>
+          <span class="font-bold text-blue-700 text-xs w-12 text-right">
+            ${r.weight_pct != null ? r.weight_pct.toFixed(2) + '%' : '—'}
+          </span>
+        </div>
+      </td>
+      <td class="px-3 py-2.5 text-xs text-gray-500 max-w-[120px] truncate">${r.sector || '—'}</td>
+      <td class="px-3 py-2.5">${acChip(r.asset_class)}</td>
+    </tr>`).join('');
+}
 </script>
 </body>
 </html>'''
