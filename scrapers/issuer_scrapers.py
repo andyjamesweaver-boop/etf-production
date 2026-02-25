@@ -7,6 +7,7 @@ from ASX/Cboe sources: holdings, sector allocations, returns, fees, etc.
 
 import re
 import json
+import html as html_module
 import logging
 from datetime import datetime
 
@@ -519,6 +520,121 @@ def scrape_vanguard(db_path=None) -> int:
 # iShares (BlackRock)
 # ====================================================================
 
+def _scrape_ishares_product_page(conn, code: str, product_url: str) -> bool:
+    """
+    Fetch all holdings for a single iShares ETF from its BlackRock product page.
+
+    BlackRock product pages embed AJAX endpoint URLs of the form:
+        /au/products/{productId}/fund/{ajaxId}.ajax
+    We find the holdings-specific endpoint (identified by a 'holdings' filename
+    in the download link) and call it with tab=all&fileType=json.
+
+    JSON response shape:
+        {"aaData": [[ticker, name, sector, asset_class, market_value, weight,
+                     country, currency], ...]}
+    where weight is either a plain float or {"raw": 10.83, "display": "10.83"}.
+
+    Returns True if any holdings were stored.
+    """
+    resp = fetch(product_url)
+    if not resp:
+        return False
+
+    # Find the holdings AJAX base path from the CSV download link embedded in the page.
+    # Example: /au/products/251852/fund/1478358644060.ajax?fileType=csv&fileName=IOZ_holdings
+    holdings_match = re.search(
+        r'(/au/products/\d+/fund/(\d+)\.ajax)[^"\']*fileName=[^"\']*[Hh]olding',
+        resp.text,
+    )
+    if not holdings_match:
+        logger.debug(f"iShares {code}: holdings ajax URL not found in product page")
+        return False
+
+    base_ajax_path = holdings_match.group(1)
+    json_url = f'https://www.blackrock.com{base_ajax_path}?tab=all&fileType=json'
+
+    # BlackRock returns UTF-8 with BOM — strip it before JSON parsing
+    json_resp = fetch(json_url)
+    if not json_resp:
+        logger.debug(f"iShares {code}: no response from holdings URL")
+        return False
+    try:
+        data = json.loads(json_resp.text.lstrip('\ufeff'))
+    except (ValueError, json.JSONDecodeError):
+        logger.debug(f"iShares {code}: invalid JSON in holdings response")
+        return False
+    if 'aaData' not in data:
+        logger.debug(f"iShares {code}: no aaData in holdings response")
+        return False
+
+    # Row format (15 columns):
+    #   0:ticker  1:name  2:sector  3:asset_class  4:market_value  5:weight
+    #   6:notional  7:shares  8:security_code  9:ISIN  10:exchange_code
+    #   11:price  12:country  13:exchange  14:currency
+    holdings = []
+    for row in data['aaData']:
+        if len(row) < 6:
+            continue
+        ticker = str(row[0]).strip() or None
+        name   = str(row[1]).strip() or None
+        sector = str(row[2]).strip() or None
+        # Weight is at index 5: {"raw": 10.82906, "display": "10.83"} or plain value
+        weight_raw = row[5]
+        if isinstance(weight_raw, dict):
+            weight = _safe_float(weight_raw.get('raw') or weight_raw.get('display'))
+        else:
+            weight = _safe_float(weight_raw)
+        # Country position varies by fund type (equity: index 12, fixed income: index 13+)
+        # Scan from index 12 for the first plain string that looks like a country name
+        country = None
+        for idx in range(12, min(16, len(row))):
+            val = row[idx]
+            if isinstance(val, str) and val not in ('-', 'N/A', '') and not val.isdigit():
+                country = val.strip()
+                break
+
+        if not name or name == '-':
+            continue
+        if weight is None or not (0 < weight < 100):
+            continue
+
+        holdings.append({
+            'ticker':     ticker if ticker and ticker != '-' else None,
+            'name':       name,
+            'sector':     sector if sector and sector not in ('-', 'N/A') else None,
+            'weight_pct': weight,
+            'country':    country if country and country not in ('-', 'N/A') else None,
+        })
+
+    if not holdings:
+        return False
+
+    # Deduplicate by name (merge weights for same-name entries e.g. dual-listed shares)
+    merged: dict[str, dict] = {}
+    for h in holdings:
+        key = h['name']
+        if key in merged:
+            merged[key]['weight_pct'] = (merged[key]['weight_pct'] or 0) + (h['weight_pct'] or 0)
+        else:
+            merged[key] = dict(h)
+
+    upsert_holdings(conn, code, list(merged.values()), commit=False)
+
+    # Aggregate sector allocations from holdings (skip cash/derivatives for sector summary)
+    sector_weights: dict[str, float] = {}
+    for h in merged.values():
+        s = h.get('sector')
+        w = h.get('weight_pct') or 0
+        if s and s != 'Cash and/or Derivatives':
+            sector_weights[s] = sector_weights.get(s, 0) + w
+    if sector_weights:
+        sectors = [{'sector': s, 'weight_pct': round(w, 6)} for s, w in sector_weights.items()]
+        upsert_sectors(conn, code, sectors, commit=False)
+
+    logger.debug(f"iShares {code}: stored {len(merged)} holdings, {len(sector_weights)} sectors")
+    return True
+
+
 def scrape_ishares(db_path=None) -> int:
     """Scrape iShares/BlackRock Australia ETF data."""
     started = datetime.utcnow()
@@ -646,9 +762,35 @@ def scrape_ishares(db_path=None) -> int:
                                 break
 
     conn.commit()
+
+    # ---- Phase 2: holdings from individual product pages ----
+    holdings_count = 0
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT code, issuer_url FROM etfs "
+            "WHERE issuer = 'iShares' "
+            "AND issuer_url LIKE 'https://www.blackrock.com/au/products/%'"
+        )
+        product_rows = cur.fetchall()
+    except Exception as e:
+        logger.warning(f"iShares: could not query product URLs: {e}")
+        product_rows = []
+
+    for row in product_rows:
+        code_h, url_h = row['code'], row['issuer_url']
+        try:
+            if _scrape_ishares_product_page(conn, code_h, url_h):
+                holdings_count += 1
+        except Exception as e:
+            logger.warning(f"iShares holdings {code_h}: {e}")
+        conn.commit()
+
+    logger.info(f"iShares: fetched holdings for {holdings_count}/{len(product_rows)} ETFs")
+
     duration = (datetime.utcnow() - started).total_seconds()
-    log_scrape(conn, source, 'success' if updated else 'no_data',
-               records_affected=updated, duration_secs=duration,
+    log_scrape(conn, source, 'success' if (updated or holdings_count) else 'no_data',
+               records_affected=updated + holdings_count, duration_secs=duration,
                started_at=started.isoformat())
     conn.close()
     logger.info(f"iShares: updated {updated} ETFs")
@@ -709,20 +851,40 @@ def scrape_spdr(db_path=None) -> int:
                 if name_match:
                     name = name_match.group(1).strip()
 
-        # MER from fee percentages on the page
-        mer = None
-        fee_matches = re.findall(r'management.fee[^0-9]*(\d+\.\d+)\s*%', resp.text, re.I)
-        for val_str in fee_matches:
-            val = _safe_float(val_str)
-            if val and 0 < val < 3:
-                mer = val
-                break
+        # SSGA pages embed data as HTML-entity-encoded JSON — decode once for all extractions
+        decoded = html_module.unescape(resp.text)
 
-        # Inception date from URL-encoded JSON embedded in the page
+        # MER from "total-expense-ratio" embedded JSON key
+        mer = None
+        mer_match = re.search(
+            r'"total-expense-ratio"\s*:\s*\{[^}]*"value"\s*:\s*"([0-9.]+)\s*%',
+            decoded,
+        )
+        if mer_match:
+            mer = _safe_float(mer_match.group(1))
+            if mer and not (0 < mer < 5):
+                mer = None
+
+        # Inception date
         inception = None
-        inc_match = re.search(r'inception-date[^:]*:.*?value.*?(\d{1,2}[- ]\w{3}[- ]\d{4})', resp.text, re.I)
+        inc_match = re.search(r'"inception-date"[^}]*"value"\s*:\s*"([^"]+)"', decoded)
         if inc_match:
-            inception = inc_match.group(1)
+            inception = inc_match.group(1).strip() or None
+
+        # Sector allocations from attrArray (picks the first occurrence)
+        sectors = []
+        sector_block = re.search(r'"attrArray"\s*:\s*(\[[^\]]+\])', decoded)
+        if sector_block:
+            try:
+                attr_list = json.loads(sector_block.group(1))
+                for entry in attr_list:
+                    sector_name = (entry.get('name') or {}).get('value', '').strip()
+                    weight_str  = (entry.get('weight') or {}).get('originalValue', '')
+                    weight = _safe_float(weight_str)
+                    if sector_name and weight is not None and 0 < weight < 100:
+                        sectors.append({'sector': sector_name, 'weight_pct': weight})
+            except (ValueError, json.JSONDecodeError, AttributeError):
+                pass
 
         etf = {
             'code': code,
@@ -737,6 +899,8 @@ def scrape_spdr(db_path=None) -> int:
         }
         etf = {k: v for k, v in etf.items() if v is not None}
         upsert_etf(conn, etf)
+        if sectors:
+            upsert_sectors(conn, code, sectors, commit=False)
         updated += 1
 
     conn.commit()

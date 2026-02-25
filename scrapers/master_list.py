@@ -54,6 +54,18 @@ def build_master_list(db_path=None) -> int:
         WHERE fund_size_aud_millions IS NULL AND rank_by_fum IS NULL
     ''')
 
+    # Propagate sector allocations from holdings for ETFs that don't yet have sector rows.
+    # Aggregates sector weights from etf_holdings.sector for each fund, skipping cash.
+    conn.execute('''
+        INSERT OR REPLACE INTO etf_sectors (etf_code, sector, weight_pct)
+        SELECT etf_code, sector, ROUND(SUM(weight_pct), 6)
+        FROM etf_holdings
+        WHERE sector IS NOT NULL
+          AND sector NOT IN ('Cash and/or Derivatives', 'Cash', 'Derivatives')
+          AND etf_code NOT IN (SELECT DISTINCT etf_code FROM etf_sectors)
+        GROUP BY etf_code, sector
+    ''')
+
     # Update issuer stats
     update_issuer_stats(conn)
 
