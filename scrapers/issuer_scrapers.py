@@ -6,10 +6,11 @@ from ASX/Cboe sources: holdings, sector allocations, returns, fees, etc.
 """
 
 import re
+import io
 import json
 import html as html_module
 import logging
-from datetime import datetime
+from datetime import datetime, date
 
 from scrapers.config import ISSUER_URLS, SPDR_AU_FUNDS, VANGUARD_AU_FUNDS, VANGUARD_AU_PORT_IDS, normalise_asset_class, CXA_ISSUER_URLS
 from scrapers.base_scraper import fetch, fetch_json
@@ -59,15 +60,22 @@ def _scrape_betashares_fund_page(conn, slug: str, soup) -> str | None:
     Title format: "NDQ ASX | Nasdaq 100 ETF | Betashares"
     Holdings table rows: <th>COMPANY NAME</th><td>weight</td>
     """
-    # ASX code from <title>
+    # ASX code from <title> — handles multiple formats:
+    #   "NDQ ASX | Nasdaq 100 ETF | Betashares"  (old)
+    #   "ASX A200 | Australia 200 ETF | Betashares"  (new)
+    #   "AGVT ETF | Australian Government Bond ETF | Betashares"  (new alt)
     title = soup.title.string if soup.title else ''
-    code_match = re.match(r'^([A-Z0-9]{2,6})\s+ASX', title)
+    code_match = (
+        re.match(r'^([A-Z0-9]{2,6})\s+ASX\s*\|', title) or   # old: CODE ASX |
+        re.match(r'^ASX\s+([A-Z0-9]{2,6})\s*[\|\s]', title) or  # new: ASX CODE |
+        re.match(r'^([A-Z0-9]{2,6})\s+ETF\s*\|', title)          # new alt: CODE ETF |
+    )
     if not code_match:
         return None
     code = code_match.group(1)
 
     # Fund name from title
-    name_match = re.match(r'^[A-Z0-9]+\s+ASX\s+\|\s+(.+?)\s+\|\s+', title)
+    name_match = re.search(r'(?:ASX\s+)?[A-Z0-9]+\s+(?:ASX\s+)?\|\s+(.+?)\s+\|\s+', title)
     name = name_match.group(1) if name_match else None
 
     # MER from the "Management fee and cost" table row
@@ -798,6 +806,123 @@ def scrape_ishares(db_path=None) -> int:
 
 
 # ====================================================================
+# SSGA Holdings (shared by SPDR + StateStreet)
+# ====================================================================
+
+def _parse_ssga_holdings_excel(content: bytes) -> list[dict]:
+    """
+    Parse an SSGA holdings-daily Excel file.
+    URL pattern: https://www.ssga.com/library-content/products/fund-data/etfs/apac/holdings-daily-au-en-{ticker}.xlsx
+    Structure:
+      Row 0-2: metadata (Fund Name, Ticker, Holdings date)
+      Row 4:   header (ISIN, SEDOL, Ticker, Name, Currency, Shares, Weight(%), Country, Price, Sector, Industry)
+      Row 5+:  holdings rows
+    Returns list of {name, ticker, isin, weight_pct, sector, country}.
+    """
+    try:
+        import openpyxl
+    except ImportError:
+        logger.error("openpyxl required for SSGA holdings parsing")
+        return []
+
+    try:
+        wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+    except Exception as e:
+        logger.warning(f"SSGA Excel parse error: {e}")
+        return []
+
+    ws = wb.active
+    header_row = None
+    col = {}
+    holdings = []
+
+    for row_idx, row in enumerate(ws.iter_rows(values_only=True)):
+        # Find header row (contains 'Weight' or 'Name')
+        if header_row is None:
+            row_lower = [str(v or '').strip().lower() for v in row]
+            if any('weight' in c for c in row_lower):
+                header_row = row_idx
+                for i, h in enumerate(row_lower):
+                    if 'name' in h and 'fund' not in h:
+                        col.setdefault('name', i)
+                    elif 'ticker' in h or 'symbol' in h:
+                        col.setdefault('ticker', i)
+                    elif 'isin' in h:
+                        col.setdefault('isin', i)
+                    elif 'weight' in h:
+                        col.setdefault('weight', i)
+                    elif 'sector' in h and 'industry' not in h:
+                        col.setdefault('sector', i)
+                    elif 'country' in h or 'trade country' in h:
+                        col.setdefault('country', i)
+            continue
+
+        if header_row is None or not col:
+            continue
+
+        def gcol(key):
+            idx = col.get(key)
+            return row[idx] if idx is not None and idx < len(row) else None
+
+        name = str(gcol('name') or '').strip()
+        if not name or name.lower() in ('cash', '-', 'n/a', ''):
+            continue
+
+        weight = _safe_float(gcol('weight'))
+        if weight is None or weight <= 0:
+            continue
+
+        holdings.append({
+            'name':       name,
+            'ticker':     str(gcol('ticker') or '').strip() or None,
+            'isin':       str(gcol('isin') or '').strip() or None,
+            'weight_pct': weight,
+            'sector':     str(gcol('sector') or '').strip() or None,
+            'country':    str(gcol('country') or '').strip() or None,
+        })
+
+    return holdings
+
+
+def _scrape_ssga_holdings(conn, code: str) -> bool:
+    """
+    Download and upsert SSGA holdings for a single ETF code.
+    Returns True if holdings were found and saved.
+    """
+    url = f'https://www.ssga.com/library-content/products/fund-data/etfs/apac/holdings-daily-au-en-{code.lower()}.xlsx'
+    resp = fetch(url)
+    if not resp or resp.status_code != 200:
+        return False
+
+    rows = _parse_ssga_holdings_excel(resp.content)
+    if not rows:
+        return False
+
+    # Deduplicate by name
+    merged: dict[str, dict] = {}
+    for h in rows:
+        n = h['name']
+        if n in merged:
+            merged[n]['weight_pct'] = (merged[n]['weight_pct'] or 0) + (h['weight_pct'] or 0)
+        else:
+            merged[n] = h
+
+    upsert_holdings(conn, code, list(merged.values()), commit=False)
+
+    # Aggregate sector allocations
+    sector_weights: dict[str, float] = {}
+    for h in merged.values():
+        s = h.get('sector')
+        if s and s.lower() not in ('cash', 'cash and/or derivatives', '-', 'n/a', ''):
+            sector_weights[s] = sector_weights.get(s, 0) + (h.get('weight_pct') or 0)
+    if sector_weights:
+        sectors = [{'sector': s, 'weight_pct': round(w, 4)} for s, w in sector_weights.items()]
+        upsert_sectors(conn, code, sectors, commit=False)
+
+    return True
+
+
+# ====================================================================
 # SPDR (State Street)
 # ====================================================================
 
@@ -901,9 +1026,12 @@ def scrape_spdr(db_path=None) -> int:
         upsert_etf(conn, etf)
         if sectors:
             upsert_sectors(conn, code, sectors, commit=False)
+
+        # Holdings from SSGA daily Excel
+        _scrape_ssga_holdings(conn, code)
+        conn.commit()
         updated += 1
 
-    conn.commit()
     duration = (datetime.utcnow() - started).total_seconds()
     log_scrape(conn, source, 'success' if updated else 'no_data',
                records_affected=updated, duration_secs=duration,
@@ -914,204 +1042,263 @@ def scrape_spdr(db_path=None) -> int:
 
 
 # ====================================================================
+# StateStreet
+# ====================================================================
+
+# StateStreet ETFs listed on ASX/Cboe (not branded as SPDR)
+_STATESTREET_AU_CODES = [
+    'SPY', 'SSO', 'E200', 'SYI', 'QMIX', 'WXOZ', 'WXHG', 'OZR', 'OZF', 'WEMG',
+]
+
+
+def scrape_statestreet(db_path=None) -> int:
+    """
+    Download SSGA daily holdings Excel for each StateStreet AU ETF.
+    Metadata (name, MER) comes from the ASX/Cboe reports; this adds holdings + sectors.
+    """
+    started = datetime.utcnow()
+    source = 'statestreet'
+    updated = 0
+
+    conn = get_connection(db_path)
+
+    # Fetch known StateStreet codes from DB (may be more than the hardcoded list)
+    db_codes = [r[0] for r in conn.execute(
+        "SELECT code FROM etfs WHERE issuer='StateStreet' ORDER BY code"
+    ).fetchall()]
+    codes = db_codes or _STATESTREET_AU_CODES
+
+    for code in codes:
+        if _scrape_ssga_holdings(conn, code):
+            conn.commit()
+            updated += 1
+            logger.info(f"StateStreet: got holdings for {code}")
+        else:
+            logger.debug(f"StateStreet: no SSGA holdings for {code}")
+
+    duration = (datetime.utcnow() - started).total_seconds()
+    log_scrape(conn, source, 'success' if updated else 'no_data',
+               records_affected=updated, duration_secs=duration,
+               started_at=started.isoformat())
+    conn.close()
+    logger.info(f"StateStreet: updated {updated} ETFs")
+    return updated
+
+
+# ====================================================================
 # Global X
 # ====================================================================
 
+_GLOBALX_STRAPI_BASE = 'https://d255kjlej81hb4.cloudfront.net'
+_GLOBALX_FUNDS_PAGE  = 'https://www.globalxetfs.com.au/funds/ndq/'
+_GLOBALX_CHUNK_RE    = re.compile(r'/_next/static/chunks/([^"\'?\s]+\.js)')
+_GLOBALX_TOKEN_RE    = re.compile(
+    r'Authorization.*?Bearer.*?concat\("([a-f0-9]{60,})', re.DOTALL
+)
+
+# Global X Strapi category name → canonical asset class
+_GLOBALX_CATEGORY_MAP = {
+    'core':              'Australian Equities',
+    'income':            'Fixed Income',
+    'international':     'International Equities',
+    'thematic':          'Thematic',
+    'commodities':       'Commodities',
+    'crypto':            'Digital Assets',
+    'leveraged and inverse': 'Alternatives',
+    'leveraged':         'Alternatives',
+}
+
+
+def _globalx_get_token() -> str | None:
+    """
+    Discover the Global X Strapi bearer token from the Next.js JS bundles.
+    The token is embedded in one of the static chunks (stable across page loads).
+    """
+    page = fetch(_GLOBALX_FUNDS_PAGE)
+    if not page:
+        return None
+    chunks = _GLOBALX_CHUNK_RE.findall(page.text)
+    for chunk in chunks:
+        chunk_url = f'https://www.globalxetfs.com.au/_next/static/chunks/{chunk}'
+        resp = fetch(chunk_url)
+        if not resp:
+            continue
+        m = _GLOBALX_TOKEN_RE.search(resp.text)
+        if m:
+            return m.group(1)
+    return None
+
+
+def _parse_globalx_pcf(content: bytes, code: str) -> list[dict]:
+    """
+    Parse a Global X PCF (Portfolio Composition File) Excel.
+    Structure:
+      Header row: '#', 'Component Name', 'ISIN', 'SEDOL', 'Bloomberg Ticker',
+                  'Number of Shares', 'Local CCY', 'Local CCY Price',
+                  'Market Value (Base CCY)', 'Weight', 'Sector', 'Country'
+    Weight is a decimal fraction (0.121 = 12.1%) — multiply by 100.
+    """
+    try:
+        import openpyxl
+    except ImportError:
+        return []
+    try:
+        wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+    except Exception as e:
+        logger.warning(f"Global X PCF parse error for {code}: {e}")
+        return []
+
+    ws = wb.active
+    col = {}
+    holdings = []
+    for row in ws.iter_rows(values_only=True):
+        vals = list(row)
+        # Header row detection
+        if not col:
+            row_lower = [str(v or '').strip().lower() for v in vals]
+            if 'component name' in row_lower or 'name' in row_lower:
+                for i, h in enumerate(row_lower):
+                    if h in ('component name', 'name'):
+                        col.setdefault('name', i)
+                    elif 'weight' in h and 'market' not in h:
+                        col.setdefault('weight', i)
+                    elif h == 'sector':
+                        col.setdefault('sector', i)
+                    elif h == 'country':
+                        col.setdefault('country', i)
+                    elif 'isin' in h:
+                        col.setdefault('isin', i)
+                    elif 'bloomberg' in h or 'ticker' in h:
+                        col.setdefault('ticker', i)
+            continue
+
+        def gcol(key):
+            idx = col.get(key)
+            return vals[idx] if idx is not None and idx < len(vals) else None
+
+        name = str(gcol('name') or '').strip()
+        if not name or name.lower() in ('cash', '-', 'n/a', ''):
+            continue
+        weight_raw = _safe_float(gcol('weight'))
+        if weight_raw is None or weight_raw <= 0:
+            continue
+        # Weight is stored as a decimal fraction (e.g. 0.121 = 12.1%)
+        weight_pct = weight_raw * 100 if weight_raw < 1.5 else weight_raw
+
+        holdings.append({
+            'name':       name,
+            'ticker':     str(gcol('ticker') or '').strip() or None,
+            'isin':       str(gcol('isin') or '').strip() or None,
+            'weight_pct': round(weight_pct, 4),
+            'sector':     str(gcol('sector') or '').strip() or None,
+            'country':    str(gcol('country') or '').strip() or None,
+        })
+    return holdings
+
+
 def scrape_globalx(db_path=None) -> int:
-    """Scrape Global X Australia ETF list and fund details."""
+    """
+    Scrape Global X Australia via their Strapi CMS API + PCF holdings files.
+    API:  GET https://d255kjlej81hb4.cloudfront.net/api/products?populate=*
+    PCF:  each product.pcf is a direct xlsx download URL
+    """
     started = datetime.utcnow()
     source = 'globalx'
     updated = 0
 
-    try:
-        from bs4 import BeautifulSoup
-    except ImportError:
-        logger.error("beautifulsoup4 required for issuer scrapers")
+    conn = get_connection(db_path)
+
+    # Step 1: Get auth token
+    token = _globalx_get_token()
+    if not token:
+        logger.error("Global X: could not discover bearer token — skipping")
+        log_scrape(conn, source, 'error', records_affected=0,
+                   duration_secs=0, started_at=started.isoformat())
+        conn.close()
         return 0
 
-    conn = get_connection(db_path)
-    urls = ISSUER_URLS.get('Global X', {})
+    auth_headers = {'Authorization': f'Bearer {token}'}
 
-    # --- Try WordPress REST API (Global X uses WordPress) ---
-    wp_endpoints = [
-        'https://www.globalxetfs.com.au/wp-json/globalx/v1/funds?per_page=100',
-        'https://www.globalxetfs.com.au/wp-json/wp/v2/fund?per_page=100&_fields=id,title,link,acf',
-        'https://www.globalxetfs.com.au/wp-json/wp/v2/etf?per_page=100&_fields=id,title,link,acf',
-        'https://www.globalxetfs.com.au/wp-json/wp/v2/posts?categories=etf&per_page=100',
-    ]
+    # Step 2: Fetch all products from Strapi
+    api_url = f'{_GLOBALX_STRAPI_BASE}/api/products?populate=*&pagination[limit]=100'
+    resp = fetch(api_url, headers=auth_headers)
+    if not resp:
+        logger.error("Global X: Strapi API request failed")
+        conn.close()
+        return 0
 
-    for api_url in wp_endpoints:
-        data = fetch_json(api_url)
-        if not data or not isinstance(data, list):
+    try:
+        payload = resp.json()
+        products = payload.get('data', [])
+    except Exception as e:
+        logger.error(f"Global X: Strapi JSON parse error: {e}")
+        conn.close()
+        return 0
+
+    logger.info(f"Global X: {len(products)} products from Strapi API")
+
+    for product in products:
+        ticker = str(product.get('ticker') or '').strip().upper()
+        if not ticker or not re.match(r'^[A-Z][A-Z0-9]{1,5}$', ticker):
             continue
 
-        for fund in data:
-            if not isinstance(fund, dict):
-                continue
-            acf = fund.get('acf') or {}
+        name = str(product.get('name') or '').strip() or None
+        mer  = _safe_float(product.get('manageCosts'))
+        inception = str(product.get('inceptionDate') or '').strip() or None
+        slug = str(product.get('pageSlug') or ticker.lower())
+        issuer_url = f'https://www.globalxetfs.com.au/funds/{slug}/'
 
-            code = (
-                acf.get('asx_code') or acf.get('ticker') or acf.get('exchange_code') or
-                fund.get('asx_code') or fund.get('ticker') or ''
-            ).strip().upper()
-            if not code or not re.match(r'^[A-Z0-9]{2,6}$', code):
-                continue
+        # Asset class from Strapi category
+        cat_name = ((product.get('category') or {}).get('name') or '').strip().lower()
+        asset_class = _GLOBALX_CATEGORY_MAP.get(cat_name) or normalise_asset_class(cat_name) or None
 
-            raw_name = (
-                (fund.get('title') or {}).get('rendered') or
-                fund.get('name') or acf.get('fund_name') or ''
-            )
-            name = re.sub(r'<[^>]+>', '', raw_name).strip() or None
+        etf = {
+            'code':         ticker,
+            'name':         name,
+            'issuer':       'Global X',
+            'expense_ratio': mer,
+            'management_fee': mer,
+            'asset_class':  asset_class,
+            'inception_date': inception,
+            'data_source':  'globalx',
+            'issuer_url':   issuer_url,
+            'exchange':     'ASX',
+        }
+        etf = {k: v for k, v in etf.items() if v is not None}
+        upsert_etf(conn, etf)
 
-            mer = _safe_float(
-                acf.get('management_fee') or acf.get('mer') or acf.get('expense_ratio') or
-                acf.get('annual_fee') or acf.get('mgt_fee')
-            )
+        # Step 3: Download PCF for holdings
+        pcf_url = str(product.get('pcf') or '').strip()
+        if pcf_url:
+            pcf_resp = fetch(pcf_url)
+            if pcf_resp and pcf_resp.status_code == 200:
+                rows = _parse_globalx_pcf(pcf_resp.content, ticker)
+                if rows:
+                    # Deduplicate by name
+                    merged: dict[str, dict] = {}
+                    for h in rows:
+                        n = h['name']
+                        if n in merged:
+                            merged[n]['weight_pct'] = round(
+                                (merged[n]['weight_pct'] or 0) + (h['weight_pct'] or 0), 4
+                            )
+                        else:
+                            merged[n] = h
+                    upsert_holdings(conn, ticker, list(merged.values()), commit=False)
 
-            asset_class_raw = (
-                acf.get('asset_class') or acf.get('category') or acf.get('fund_type') or
-                fund.get('category')
-            )
+                    # Sector aggregation
+                    sector_wt: dict[str, float] = {}
+                    for h in merged.values():
+                        s = h.get('sector')
+                        if s and s.lower() not in ('cash', '-', 'n/a', ''):
+                            sector_wt[s] = round(sector_wt.get(s, 0) + (h.get('weight_pct') or 0), 4)
+                    if sector_wt:
+                        upsert_sectors(conn, ticker,
+                                       [{'sector': s, 'weight_pct': w} for s, w in sector_wt.items()],
+                                       commit=False)
 
-            etf = {
-                'code': code,
-                'name': name,
-                'issuer': 'Global X',
-                'expense_ratio': mer,
-                'asset_class': normalise_asset_class(asset_class_raw),
-                'inception_date': acf.get('inception_date') or acf.get('listing_date'),
-                'benchmark': acf.get('benchmark') or acf.get('index'),
-                'distribution_yield': _safe_float(acf.get('distribution_yield') or acf.get('yield')),
-                'data_source': 'globalx',
-                'issuer_url': fund.get('link') or f"https://www.globalxetfs.com.au/funds/{code.lower()}/",
-            }
-            etf = {k: v for k, v in etf.items() if v is not None}
-            upsert_etf(conn, etf)
-            updated += 1
-
-        if updated:
-            conn.commit()
-            break  # Stop trying other endpoints
-
-    # --- HTML fallback: fund list page ---
-    if updated == 0:
-        resp = fetch(urls.get('fund_list', 'https://www.globalxetfs.com.au/funds/'))
-        if resp:
-            soup = BeautifulSoup(resp.text, 'html.parser')
-
-            # Try script-embedded JSON first
-            json_data = _find_json_in_script(soup, ['asx_code', 'globalx', 'management_fee'])
-            if json_data:
-                funds = json_data if isinstance(json_data, list) else json_data.get('funds', json_data.get('data', []))
-                for fund in funds:
-                    if not isinstance(fund, dict):
-                        continue
-                    code = (fund.get('asx_code') or fund.get('ticker') or '').strip().upper()
-                    if not re.match(r'^[A-Z0-9]{2,6}$', code):
-                        continue
-                    etf = {
-                        'code': code,
-                        'name': fund.get('name') or fund.get('fund_name'),
-                        'issuer': 'Global X',
-                        'expense_ratio': _safe_float(fund.get('management_fee') or fund.get('mer')),
-                        'asset_class': normalise_asset_class(fund.get('asset_class') or fund.get('category')),
-                        'data_source': 'globalx',
-                    }
-                    etf = {k: v for k, v in etf.items() if v is not None}
-                    upsert_etf(conn, etf)
-                    updated += 1
-            else:
-                # Parse fund cards — Global X uses card-based layout
-                card_selectors = [
-                    '.fund-card', '.etf-card', '[class*="fund-item"]',
-                    'article.fund', '.product-card', '[data-asx-code]',
-                    '.funds-listing article', '.fund-listing__item',
-                    '[class*="FundCard"]', '[class*="fund_card"]',
-                ]
-                cards = []
-                for sel in card_selectors:
-                    cards = soup.select(sel)
-                    if cards:
-                        break
-
-                # If no cards found, try rows with data attributes
-                if not cards:
-                    cards = [el for el in soup.find_all(attrs={'data-asx-code': True})]
-                    cards += [el for el in soup.find_all(attrs={'data-ticker': True})]
-
-                seen_codes: set[str] = set()
-                for card in cards:
-                    # Find ASX code
-                    code = ''
-                    code_el = card.select_one(
-                        '.asx-code, [class*="ticker"], [class*="asx-code"], '
-                        '.code-badge, [data-asx-code], [data-ticker]'
-                    )
-                    if code_el:
-                        code = (code_el.get('data-asx-code') or code_el.get('data-ticker') or
-                                code_el.get_text(strip=True))
-                    else:
-                        code = card.get('data-asx-code', card.get('data-ticker', ''))
-
-                    code = re.sub(r'[^A-Z0-9]', '', code.upper())
-                    if not re.match(r'^[A-Z0-9]{2,6}$', code) or code in seen_codes:
-                        continue
-                    seen_codes.add(code)
-
-                    # Name
-                    name_el = card.select_one('h2, h3, h4, [class*="fund-name"], [class*="title"]')
-                    name = name_el.get_text(strip=True) if name_el else None
-                    if name and name.upper() == code:
-                        name = None  # Skip if name is just the ticker
-
-                    # MER
-                    mer = None
-                    for el in card.select('[class*="fee"], [class*="mer"], [class*="expense"], [class*="cost"]'):
-                        text = el.get_text(strip=True)
-                        val = _safe_float(re.sub(r'[^0-9.]', '', text))
-                        if val and 0 < val < 5:
-                            mer = val
-                            break
-
-                    # Asset class from card text
-                    card_text = card.get_text(separator=' ', strip=True).lower()
-                    asset_class = None
-                    for keyword, ac in [
-                        ('australian equit', 'Australian Equities'),
-                        ('fixed income', 'Fixed Income'), ('bond', 'Fixed Income'),
-                        ('international equit', 'International Equities'),
-                        ('global equit', 'International Equities'),
-                        ('commodit', 'Commodities'), ('gold', 'Commodities'),
-                        ('crypto', 'Digital Assets'), ('bitcoin', 'Digital Assets'),
-                        ('digital asset', 'Digital Assets'),
-                        ('property', 'Property'), ('reit', 'Property'),
-                        ('cash', 'Cash'), ('alternative', 'Alternatives'),
-                    ]:
-                        if keyword in card_text:
-                            asset_class = ac
-                            break
-
-                    # Link
-                    issuer_url = None
-                    link_el = card.find('a', href=True)
-                    if link_el:
-                        href = link_el['href']
-                        issuer_url = href if href.startswith('http') else f"https://www.globalxetfs.com.au{href}"
-
-                    etf = {
-                        'code': code,
-                        'name': name,
-                        'issuer': 'Global X',
-                        'expense_ratio': mer,
-                        'asset_class': asset_class,
-                        'data_source': 'globalx',
-                        'issuer_url': issuer_url,
-                    }
-                    etf = {k: v for k, v in etf.items() if v is not None}
-                    upsert_etf(conn, etf)
-                    updated += 1
-
-            conn.commit()
+        conn.commit()
+        updated += 1
 
     duration = (datetime.utcnow() - started).total_seconds()
     log_scrape(conn, source, 'success' if updated else 'no_data',
@@ -1350,6 +1537,7 @@ def scrape_all_issuers(db_path=None) -> int:
         ('Vanguard', scrape_vanguard),
         ('iShares', scrape_ishares),
         ('SPDR', scrape_spdr),
+        ('StateStreet', scrape_statestreet),
         ('Global X', scrape_globalx),
         ('CXA Issuers', scrape_cxa_issuers),
     ]
