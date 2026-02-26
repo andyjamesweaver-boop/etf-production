@@ -1357,22 +1357,41 @@ async function showTab(tab) {
     el.innerHTML = '<div class="flex justify-center py-10"><div class="spinner"></div></div>';
     const h = await api('/api/v1/etfs/' + selectedCode + '/holdings');
     if (!h.holdings || !h.holdings.length) {
-      el.innerHTML = '<p class="text-gray-400 text-sm text-center py-10">No holdings data available.</p>';
+      el.innerHTML = '<p class="text-gray-400 text-sm text-center py-10">No holdings data available for this ETF.</p>';
       return;
     }
-    const maxW = Math.max(...h.holdings.map(x => x.weight_pct || 0));
+    const all = h.holdings;
+    const maxW = Math.max(...all.map(x => x.weight_pct || 0));
+    const top10Wt = all.slice(0, 10).reduce((s, x) => s + (x.weight_pct || 0), 0);
+    const byCountry = {};
+    all.forEach(r => { const c = r.country || 'Other'; byCountry[c] = (byCountry[c] || 0) + (r.weight_pct || 0); });
+    const topCountries = Object.entries(byCountry).sort((a, b) => b[1] - a[1]).slice(0, 4);
+
     el.innerHTML = `
-      <p class="text-xs text-gray-400 mb-3">${h.holdings.length} holdings · sorted by weight</p>
-      <div class="space-y-2">
-        ${h.holdings.slice(0, 30).map(r => `
-          <div class="flex items-center gap-3">
+      <div class="flex flex-wrap items-center gap-2 mb-3">
+        <span class="bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full text-xs font-semibold">${all.length} holdings</span>
+        <span class="text-xs text-gray-500">Top 10 concentration:
+          <strong class="text-gray-700">${top10Wt.toFixed(1)}%</strong></span>
+        ${topCountries.length > 1 ? `<span class="text-xs text-gray-400">·</span>
+          <span class="text-xs text-gray-500">${topCountries.map(([c, w]) =>
+            `<strong class="text-gray-600">${c}</strong> ${w.toFixed(0)}%`).join(' &middot; ')}</span>` : ''}
+      </div>
+      <input id="holding-filter" type="text" placeholder="Filter by name or ticker…"
+        class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-200">
+      <div class="text-xs text-gray-400 grid gap-x-3 mb-1 pr-1"
+           style="grid-template-columns:3.5rem 1fr 7rem 5rem">
+        <span class="text-right">Ticker</span><span>Name</span><span>Sector</span><span class="hidden sm:block">Country</span>
+      </div>
+      <div id="holdings-list" class="space-y-1 overflow-y-auto" style="max-height:440px">
+        ${all.map((r, i) => `
+          <div class="holding-row flex items-center gap-3 py-0.5 hover:bg-slate-50 rounded ${i >= 50 ? 'hidden extra-holding' : ''}"
+               data-name="${(r.name || '').toLowerCase().replace(/"/g, '')}"
+               data-ticker="${(r.ticker || '').toLowerCase()}">
             <div class="w-14 text-xs font-mono text-gray-400 shrink-0 text-right">${r.ticker || ''}</div>
             <div class="flex-1 min-w-0">
-              <div class="flex items-center justify-between mb-1">
+              <div class="flex items-center justify-between mb-0.5">
                 <span class="text-xs font-medium text-gray-700 truncate">${r.name || ''}</span>
-                <span class="text-xs font-bold text-blue-700 ml-2 shrink-0">
-                  ${r.weight_pct != null ? r.weight_pct.toFixed(2) + '%' : '—'}
-                </span>
+                <span class="text-xs font-bold text-blue-700 ml-2 shrink-0">${r.weight_pct != null ? r.weight_pct.toFixed(2) + '%' : '—'}</span>
               </div>
               <div class="h-1.5 bg-gray-100 rounded-full overflow-hidden">
                 <div class="h-full bg-blue-400 rounded-full pbar"
@@ -1380,10 +1399,26 @@ async function showTab(tab) {
               </div>
             </div>
             <div class="text-xs text-gray-400 w-28 shrink-0 truncate">${r.sector || ''}</div>
+            <div class="text-xs text-gray-300 w-20 shrink-0 truncate hidden sm:block">${r.country || ''}</div>
           </div>`).join('')}
-        ${h.holdings.length > 30 ?
-          `<p class="text-xs text-gray-400 pt-2 text-center">+${h.holdings.length - 30} more holdings</p>` : ''}
-      </div>`;
+      </div>
+      ${all.length > 50 ? `
+        <button id="show-all-holdings"
+          class="mt-2 w-full text-xs text-blue-600 hover:text-blue-800 hover:underline py-1.5 border-t border-gray-100">
+          Show all ${all.length} holdings ↓
+        </button>` : ''}`;
+
+    document.getElementById('holding-filter')?.addEventListener('input', function () {
+      const q = this.value.trim().toLowerCase();
+      document.querySelectorAll('.holding-row').forEach(row => {
+        const vis = !q || row.dataset.name.includes(q) || row.dataset.ticker.includes(q);
+        row.classList.toggle('hidden', !vis);
+      });
+    });
+    document.getElementById('show-all-holdings')?.addEventListener('click', function () {
+      document.querySelectorAll('.extra-holding').forEach(r => r.classList.remove('hidden', 'extra-holding'));
+      this.remove();
+    });
 
   } else if (tab === 'sectors') {
     el.innerHTML = '<div class="flex justify-center py-10"><div class="spinner"></div></div>';
@@ -1392,48 +1427,128 @@ async function showTab(tab) {
       el.innerHTML = '<p class="text-gray-400 text-sm text-center py-10">No sector data available.</p>';
       return;
     }
-    const max = Math.max(...s.sectors.map(x => x.weight_pct || 0));
-    el.innerHTML = '<div class="space-y-3">' + s.sectors.map((r, i) => `
-      <div class="flex items-center gap-3">
-        <div class="w-2.5 h-2.5 rounded-sm shrink-0" style="background:${PALETTE[i % PALETTE.length]}"></div>
-        <span class="text-sm text-gray-700 w-44 truncate">${r.sector}</span>
-        <div class="flex-1 bg-gray-100 rounded-full h-2.5 overflow-hidden">
-          <div class="h-full rounded-full pbar"
-               style="width:${(r.weight_pct / max * 100).toFixed(0)}%;background:${PALETTE[i % PALETTE.length]}">
+    const totalWt = s.sectors.reduce((sum, r) => sum + (r.weight_pct || 0), 0);
+    el.innerHTML = `
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 items-start">
+        <div class="flex justify-center">
+          <div style="position:relative;width:200px;height:200px">
+            <canvas id="sector-chart" width="200" height="200"></canvas>
           </div>
         </div>
-        <span class="text-sm font-semibold text-gray-700 w-14 text-right">
-          ${r.weight_pct != null ? r.weight_pct.toFixed(1) + '%' : '—'}
-        </span>
-      </div>`).join('') + '</div>';
+        <div>
+          <div class="space-y-2.5">
+            ${s.sectors.map((r, i) => `
+              <div class="flex items-center gap-2.5">
+                <div class="w-2.5 h-2.5 rounded-sm shrink-0" style="background:${PALETTE[i % PALETTE.length]}"></div>
+                <span class="text-sm text-gray-700 flex-1 truncate min-w-0">${r.sector}</span>
+                <div class="w-20 bg-gray-100 rounded-full h-2 overflow-hidden shrink-0">
+                  <div class="h-full rounded-full pbar"
+                       style="width:${totalWt > 0 ? (r.weight_pct / totalWt * 100).toFixed(0) : 0}%;background:${PALETTE[i % PALETTE.length]}"></div>
+                </div>
+                <span class="text-sm font-semibold text-gray-700 w-12 text-right shrink-0">
+                  ${r.weight_pct != null ? r.weight_pct.toFixed(1) + '%' : '—'}
+                </span>
+              </div>`).join('')}
+          </div>
+          <p class="text-xs text-gray-400 mt-3 pt-2 border-t border-gray-100">
+            Coverage: <strong>${totalWt.toFixed(1)}%</strong> of portfolio
+          </p>
+        </div>
+      </div>`;
+
+    new Chart(document.getElementById('sector-chart'), {
+      type: 'doughnut',
+      data: {
+        labels: s.sectors.map(r => r.sector),
+        datasets: [{
+          data: s.sectors.map(r => r.weight_pct),
+          backgroundColor: s.sectors.map((_, i) => PALETTE[i % PALETTE.length]),
+          borderWidth: 2, borderColor: '#fff'
+        }]
+      },
+      options: {
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${Number(ctx.raw).toFixed(1)}%` } }
+        },
+        cutout: '60%'
+      }
+    });
 
   } else if (tab === 'dividends') {
     el.innerHTML = '<div class="flex justify-center py-10"><div class="spinner"></div></div>';
-    const dv = await api('/api/v1/etfs/' + selectedCode + '/dividends');
+    const [dv, etf] = await Promise.all([
+      api('/api/v1/etfs/' + selectedCode + '/dividends'),
+      api('/api/v1/etfs/' + selectedCode)
+    ]);
+
+    const yieldPct = etf.distribution_yield;
+    const price    = etf.current_price;
+    const incomePerUnit  = (yieldPct != null && price != null) ? (yieldPct / 100 * price) : null;
+    const incomePerTenK  = (yieldPct != null && price != null && price > 0)
+                           ? (10000 / price * incomePerUnit) : null;
+
+    const yieldBar = (yieldPct != null) ? `
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+        <div class="bg-green-50 rounded-lg p-3 border border-green-100">
+          <p class="text-xs text-green-600 font-medium">Distribution Yield</p>
+          <p class="text-xl font-bold text-green-700 mt-0.5">${yieldPct.toFixed(2)}%</p>
+        </div>
+        ${price != null ? `<div class="bg-slate-50 rounded-lg p-3 border border-gray-100">
+          <p class="text-xs text-gray-400 font-medium">Unit Price</p>
+          <p class="text-xl font-bold text-gray-800 mt-0.5">${money(price)}</p>
+        </div>` : ''}
+        ${incomePerUnit != null ? `<div class="bg-slate-50 rounded-lg p-3 border border-gray-100">
+          <p class="text-xs text-gray-400 font-medium">Income / Unit</p>
+          <p class="text-xl font-bold text-gray-800 mt-0.5">${money(incomePerUnit)}</p>
+        </div>` : ''}
+        ${incomePerTenK != null ? `<div class="bg-blue-50 rounded-lg p-3 border border-blue-100">
+          <p class="text-xs text-blue-600 font-medium">Est. Income / $10K</p>
+          <p class="text-xl font-bold text-blue-700 mt-0.5">${money(incomePerTenK)}<span class="text-xs font-normal text-blue-400">/yr</span></p>
+        </div>` : ''}
+      </div>` : '';
+
     if (!dv.dividends || !dv.dividends.length) {
-      el.innerHTML = '<p class="text-gray-400 text-sm text-center py-10">No dividend data available.</p>';
+      el.innerHTML = yieldBar + `
+        <div class="text-center py-6 text-gray-400 text-sm border border-dashed border-gray-200 rounded-lg">
+          <p class="font-medium text-gray-500 mb-1">No dividend history in database</p>
+          <p class="text-xs">Historical distribution data isn't collected yet.</p>
+        </div>`;
       return;
     }
-    el.innerHTML = `<div class="overflow-x-auto">
-      <table class="w-full text-sm">
-        <thead><tr class="text-left text-xs text-gray-400 font-semibold uppercase tracking-wide border-b pb-2">
-          <th class="pb-2">Ex Date</th>
-          <th class="pb-2">Pay Date</th>
-          <th class="pb-2 text-right">Amount</th>
-          <th class="pb-2 text-right">Franking</th>
-          <th class="pb-2">Type</th>
-        </tr></thead>
-        <tbody class="divide-y divide-gray-100">
-          ${dv.dividends.map(r => `<tr>
-            <td class="py-2">${r.ex_date || ''}</td>
-            <td class="py-2 text-gray-500">${r.pay_date || ''}</td>
-            <td class="py-2 text-right font-mono">${r.amount != null ? '$' + r.amount.toFixed(4) : '—'}</td>
-            <td class="py-2 text-right">${r.franking_pct != null ? r.franking_pct + '%' : '—'}</td>
-            <td class="py-2 text-gray-500">${r.type || ''}</td>
-          </tr>`).join('')}
-        </tbody>
-      </table>
-    </div>`;
+
+    const totalAmt = dv.dividends.reduce((s, r) => s + (r.amount || 0), 0);
+    el.innerHTML = yieldBar + `
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-left text-xs text-gray-400 font-semibold uppercase tracking-wide border-b">
+              <th class="pb-2 pr-3">Ex Date</th>
+              <th class="pb-2 pr-3">Pay Date</th>
+              <th class="pb-2 pr-3 text-right">Amount</th>
+              <th class="pb-2 pr-3 text-right">Franking</th>
+              <th class="pb-2">Type</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            ${dv.dividends.map(r => `
+              <tr class="hover:bg-slate-50">
+                <td class="py-2 pr-3 font-medium">${r.ex_date || ''}</td>
+                <td class="py-2 pr-3 text-gray-500">${r.pay_date || ''}</td>
+                <td class="py-2 pr-3 text-right font-mono font-medium">${r.amount != null ? '$' + r.amount.toFixed(4) : '—'}</td>
+                <td class="py-2 pr-3 text-right">${r.franking_pct != null ? r.franking_pct + '%' : '—'}</td>
+                <td class="py-2 text-gray-500 capitalize">${r.type || ''}</td>
+              </tr>`).join('')}
+          </tbody>
+          <tfoot class="border-t-2 border-gray-200">
+            <tr>
+              <td colspan="2" class="pt-2 text-xs text-gray-400">${dv.dividends.length} distribution${dv.dividends.length !== 1 ? 's' : ''}</td>
+              <td class="pt-2 text-right font-mono font-bold text-gray-700">$${totalAmt.toFixed(4)}</td>
+              <td colspan="2"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>`;
   }
 }
 
