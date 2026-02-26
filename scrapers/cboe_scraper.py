@@ -12,7 +12,7 @@ from datetime import datetime, date
 from scrapers.config import (
     CBOE_FUNDS_URL, CBOE_API_URL, MARKETINDEX_ETFS_URL,
     CBOE_MONTHLY_REPORT_CDN_BASE, DATA_DIR,
-    CXA_ISSUER_URLS,
+    CXA_ISSUER_URLS, ASSET_CLASS_MAP,
     normalise_issuer, normalise_asset_class,
 )
 from scrapers.base_scraper import fetch, fetch_json, download_file
@@ -383,10 +383,8 @@ def _scrape_cboe_monthly_report() -> list[dict]:
         # Section header rows: no ticker but col 1 has category text
         if first_val is None:
             second_val = str(row_vals[1] or '').strip() if len(row_vals) > 1 else ''
-            if second_val:
-                mapped = normalise_asset_class(second_val)
-                if mapped != second_val:  # successful mapping
-                    current_asset_class = mapped
+            if second_val and second_val.strip().lower() in ASSET_CLASS_MAP:
+                current_asset_class = ASSET_CLASS_MAP[second_val.strip().lower()]
             continue
 
         code = str(first_val).strip().upper()
