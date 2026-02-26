@@ -160,18 +160,21 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
             if asset_class or category:
                 where.append("asset_class = ?"); params.append(asset_class or category)
 
-            sort_map = {
-                'fum': 'fund_size_aud_millions DESC',
-                'price': 'current_price DESC',
-                'return_1y': 'return_1y DESC',
-                'yield': 'distribution_yield DESC',
-                'expense': 'expense_ratio ASC',
-                'name': 'name ASC',
-                'code': 'code ASC',
-                'rank': 'rank_by_fum ASC',
+            sort_field_map = {
+                'fum':      ('fund_size_aud_millions', 'DESC'),
+                'price':    ('current_price',          'DESC'),
+                'return_1y':('return_1y',              'DESC'),
+                'yield':    ('distribution_yield',     'DESC'),
+                'expense':  ('expense_ratio',          'ASC'),
+                'name':     ('name',                   'ASC'),
+                'code':     ('code',                   'ASC'),
+                'rank':     ('rank_by_fum',            'ASC'),
             }
-            sort_by = self._str(qs, 'sort_by', 'rank')
-            order = sort_map.get(sort_by, 'rank_by_fum ASC')
+            sort_by  = self._str(qs, 'sort_by',  'rank')
+            sort_dir = self._str(qs, 'sort_dir', '').upper()
+            field, default_dir = sort_field_map.get(sort_by, ('rank_by_fum', 'ASC'))
+            direction = sort_dir if sort_dir in ('ASC', 'DESC') else default_dir
+            order = f'{field} {direction} NULLS LAST'
 
             limit = min(self._int(qs, 'limit', 100), 500)
             offset = self._int(qs, 'offset', 0)
@@ -820,17 +823,17 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         </div>
         <div class="overflow-x-auto" style="max-height:520px;overflow-y:auto">
           <table class="w-full">
-            <thead class="bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wide"
+            <thead id="etf-thead" class="bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wide"
                    style="position:sticky;top:0;z-index:5">
               <tr>
-                <th class="px-3 py-2.5 text-left w-8">#</th>
-                <th class="px-3 py-2.5 text-left">ETF</th>
-                <th class="px-3 py-2.5 text-left">Class</th>
-                <th class="px-3 py-2.5 text-right">Price</th>
-                <th class="px-3 py-2.5 text-right">FUM</th>
-                <th class="px-3 py-2.5 text-right">1Y Rtn</th>
-                <th class="px-3 py-2.5 text-right">Yield</th>
-                <th class="px-3 py-2.5 text-right">MER</th>
+                <th class="px-3 py-2.5 text-left w-8 cursor-pointer select-none hover:text-gray-700" data-sort="rank">#</th>
+                <th class="px-3 py-2.5 text-left cursor-pointer select-none hover:text-gray-700" data-sort="code">ETF</th>
+                <th class="px-3 py-2.5 text-left select-none text-gray-400">Class</th>
+                <th class="px-3 py-2.5 text-right cursor-pointer select-none hover:text-gray-700" data-sort="price">Price</th>
+                <th class="px-3 py-2.5 text-right cursor-pointer select-none hover:text-gray-700" data-sort="fum">FUM</th>
+                <th class="px-3 py-2.5 text-right cursor-pointer select-none hover:text-gray-700" data-sort="return_1y">1Y Rtn</th>
+                <th class="px-3 py-2.5 text-right cursor-pointer select-none hover:text-gray-700" data-sort="yield">Yield</th>
+                <th class="px-3 py-2.5 text-right cursor-pointer select-none hover:text-gray-700" data-sort="expense">MER</th>
               </tr>
             </thead>
             <tbody id="etf-table" class="text-sm divide-y divide-gray-50"></tbody>
@@ -1107,6 +1110,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
 /* ======================================================= state */
 const API = '';
 let page = 0, pageSize = 50, selectedCode = null;
+let tableSortKey = 'rank', tableSortDir = 'asc';
 let chartAsset = null, chartFlows = null;
 
 const PALETTE = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6',
@@ -1207,16 +1211,47 @@ async function loadTable() {
   const ex  = document.getElementById('f-exchange').value;
   const iss = document.getElementById('f-issuer').value;
   const ac  = document.getElementById('f-asset').value;
-  const srt = document.getElementById('f-sort').value;
-  if (ex)  params.set('exchange',   ex);
-  if (iss) params.set('issuer',     iss);
+  if (ex)  params.set('exchange',    ex);
+  if (iss) params.set('issuer',      iss);
   if (ac)  params.set('asset_class', ac);
-  params.set('sort_by', srt);
-  params.set('limit',   pageSize);
-  params.set('offset',  page * pageSize);
+  params.set('sort_by',  tableSortKey);
+  params.set('sort_dir', tableSortDir);
+  params.set('limit',    pageSize);
+  params.set('offset',   page * pageSize);
+
+  // Keep sidebar dropdown in sync
+  const fSort = document.getElementById('f-sort');
+  if (fSort) fSort.value = tableSortKey;
+
+  renderSortHeaders();
 
   const d = await api('/api/v1/etfs?' + params);
   renderTable(d.data || [], d.total || 0);
+}
+
+function renderSortHeaders() {
+  document.querySelectorAll('#etf-thead th[data-sort]').forEach(th => {
+    const key = th.dataset.sort;
+    const isActive = key === tableSortKey;
+    const arrow = isActive ? (tableSortDir === 'asc' ? ' ▲' : ' ▼') : ' ⇅';
+    // Strip any existing indicator and re-add
+    th.textContent = th.textContent.replace(/\s[▲▼⇅]$/, '') + arrow;
+    th.classList.toggle('text-blue-600', isActive);
+    th.classList.toggle('text-gray-500', !isActive);
+  });
+}
+
+function sortTable(key) {
+  // Default directions per column
+  const defaultDir = { rank: 'asc', code: 'asc', name: 'asc', expense: 'asc' };
+  if (tableSortKey === key) {
+    tableSortDir = tableSortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    tableSortKey = key;
+    tableSortDir = defaultDir[key] || 'desc';
+  }
+  page = 0;
+  loadTable();
 }
 
 function renderTable(etfs, total) {
@@ -1600,14 +1635,29 @@ document.addEventListener('click', e => {
 });
 
 /* ======================================================= filter wiring */
-['f-exchange', 'f-issuer', 'f-asset', 'f-sort'].forEach(id =>
+['f-exchange', 'f-issuer', 'f-asset'].forEach(id =>
   document.getElementById(id).addEventListener('change', () => { page = 0; loadTable(); })
 );
-document.getElementById('btn-reset').addEventListener('click', () => {
-  ['f-exchange', 'f-issuer', 'f-asset'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('f-sort').value = 'rank';
+// Sidebar sort dropdown — update column sort state then reload
+document.getElementById('f-sort').addEventListener('change', function () {
+  tableSortKey = this.value;
+  const defaultDir = { rank: 'asc', code: 'asc', name: 'asc', expense: 'asc' };
+  tableSortDir = defaultDir[tableSortKey] || 'desc';
   page = 0;
   loadTable();
+});
+document.getElementById('btn-reset').addEventListener('click', () => {
+  ['f-exchange', 'f-issuer', 'f-asset'].forEach(id => document.getElementById(id).value = '');
+  tableSortKey = 'rank';
+  tableSortDir = 'asc';
+  page = 0;
+  loadTable();
+});
+
+// Column header click-to-sort
+document.getElementById('etf-thead').addEventListener('click', e => {
+  const th = e.target.closest('th[data-sort]');
+  if (th) sortTable(th.dataset.sort);
 });
 
 /* ======================================================= analytics */
