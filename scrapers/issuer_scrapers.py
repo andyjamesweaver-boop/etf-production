@@ -93,6 +93,21 @@ def _scrape_betashares_fund_page(conn, slug: str, soup) -> str | None:
                     break
             break
 
+    # Benchmark from the "Index" table row
+    benchmark = None
+    for table in soup.find_all('table'):
+        for row in table.find_all('tr'):
+            cells = row.find_all(['td', 'th'])
+            if len(cells) >= 2:
+                label = cells[0].get_text(strip=True).lower()
+                if label in ('index', 'underlying index', 'benchmark index', 'benchmark'):
+                    val = cells[1].get_text(strip=True)
+                    if val and len(val) > 3:
+                        benchmark = val
+                        break
+        if benchmark:
+            break
+
     # Holdings — rows are <tr><th>COMPANY NAME</th><td>weight%</td></tr>
     holdings = []
     for table in soup.find_all('table'):
@@ -114,6 +129,7 @@ def _scrape_betashares_fund_page(conn, slug: str, soup) -> str | None:
         'issuer': 'BetaShares',
         'expense_ratio': mer,
         'management_fee': mer,
+        'benchmark': benchmark,
         'data_source': 'betashares',
         'issuer_url': f"https://www.betashares.com.au/fund/{slug}/",
     }
@@ -295,6 +311,29 @@ def _scrape_vaneck_snapshot(conn, code: str, snapshot_url: str) -> None:
                         break
             if 'inception_date' in update:
                 break
+
+    # Benchmark — two patterns:
+    # 1. Structured: <h4>Underlying Index:</h4><p>{name}</p>
+    # 2. Prose: "the benchmark, the {Index Name}"
+    if 'benchmark' not in update:
+        for el in soup.find_all(string=re.compile(r'Underlying\s+Index', re.I)):
+            parent = el.parent
+            for sib in parent.next_siblings:
+                sib_text = sib.get_text(strip=True) if hasattr(sib, 'get_text') else ''
+                if sib_text and len(sib_text) > 3:
+                    update['benchmark'] = sib_text
+                    break
+            if 'benchmark' in update:
+                break
+    if 'benchmark' not in update:
+        bench_m = re.search(
+            r'the benchmark,\s+the\s+([A-Z][^\n<.]{5,100}Index)',
+            resp.text,
+        )
+        if bench_m:
+            bench_val = bench_m.group(1).strip()
+            if len(bench_val) > 5 and 'Index' in bench_val:
+                update['benchmark'] = bench_val
 
     # Returns table fallback
     for table in soup.find_all('table'):
@@ -996,6 +1035,17 @@ def scrape_spdr(db_path=None) -> int:
         if inc_match:
             inception = inc_match.group(1).strip() or None
 
+        # Benchmark from HTML table row: <td>Benchmark</td><td>{index name}</td>
+        benchmark = None
+        for td in soup.find_all('td'):
+            if td.get_text(strip=True) == 'Benchmark':
+                next_td = td.find_next_sibling('td')
+                if next_td:
+                    val = next_td.get_text(strip=True)
+                    if val and len(val) > 3:
+                        benchmark = val
+                        break
+
         # Sector allocations from attrArray (picks the first occurrence)
         sectors = []
         sector_block = re.search(r'"attrArray"\s*:\s*(\[[^\]]+\])', decoded)
@@ -1018,6 +1068,7 @@ def scrape_spdr(db_path=None) -> int:
             'expense_ratio': mer,
             'management_fee': mer,
             'inception_date': inception,
+            'benchmark': benchmark,
             'exchange': 'ASX',
             'data_source': 'spdr',
             'issuer_url': url,

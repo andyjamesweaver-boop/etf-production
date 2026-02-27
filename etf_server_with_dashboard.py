@@ -152,6 +152,7 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
             issuer = self._str(qs, 'issuer')
             asset_class = self._str(qs, 'asset_class')
             category = self._str(qs, 'category')  # alias
+            benchmark = self._str(qs, 'benchmark')
 
             if exchange:
                 where.append("exchange = ?"); params.append(exchange.upper())
@@ -159,6 +160,8 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
                 where.append("issuer = ?"); params.append(issuer)
             if asset_class or category:
                 where.append("asset_class = ?"); params.append(asset_class or category)
+            if benchmark:
+                where.append("benchmark LIKE ?"); params.append(f'%{benchmark}%')
 
             sort_field_map = {
                 'fum':      ('fund_size_aud_millions', 'DESC'),
@@ -433,11 +436,11 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
         try:
             pattern = f'%{q}%'
             rows = conn.execute(
-                "SELECT code, name, issuer, asset_class, exchange, "
+                "SELECT code, name, issuer, asset_class, exchange, benchmark, "
                 "current_price, fund_size_aud_millions, return_1y "
-                "FROM etfs WHERE code LIKE ? OR name LIKE ? OR issuer LIKE ? "
+                "FROM etfs WHERE code LIKE ? OR name LIKE ? OR issuer LIKE ? OR benchmark LIKE ? "
                 "ORDER BY fund_size_aud_millions DESC LIMIT 50",
-                (pattern, pattern, pattern)
+                (pattern, pattern, pattern, pattern)
             ).fetchall()
             self.send_json({'query': q, 'results': [dict(r) for r in rows]})
         except Exception as e:
@@ -789,6 +792,12 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
                            focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
               <option value="">All Asset Classes</option>
             </select>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Benchmark / Index</label>
+            <input id="f-benchmark" type="text" placeholder="e.g. MSCI, S&amp;P/ASX…"
+                   class="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm bg-gray-50
+                          focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none"/>
           </div>
           <div>
             <label class="block text-xs text-gray-500 mb-1">Sort By</label>
@@ -1208,12 +1217,14 @@ async function loadOverview() {
 /* ======================================================= table */
 async function loadTable() {
   const params = new URLSearchParams();
-  const ex  = document.getElementById('f-exchange').value;
-  const iss = document.getElementById('f-issuer').value;
-  const ac  = document.getElementById('f-asset').value;
+  const ex   = document.getElementById('f-exchange').value;
+  const iss  = document.getElementById('f-issuer').value;
+  const ac   = document.getElementById('f-asset').value;
+  const bm   = document.getElementById('f-benchmark').value.trim();
   if (ex)  params.set('exchange',    ex);
   if (iss) params.set('issuer',      iss);
   if (ac)  params.set('asset_class', ac);
+  if (bm)  params.set('benchmark',   bm);
   params.set('sort_by',  tableSortKey);
   params.set('sort_dir', tableSortDir);
   params.set('limit',    pageSize);
@@ -1267,6 +1278,7 @@ function renderTable(etfs, total) {
       <td class="px-3 py-2.5 max-w-0">
         <div class="font-bold text-gray-900">${e.code}</div>
         <div class="text-xs text-gray-400 truncate">${e.name || ''}</div>
+        ${e.benchmark ? `<div class="text-xs text-indigo-400 truncate" title="${e.benchmark}">&#8594; ${e.benchmark}</div>` : ''}
       </td>
       <td class="px-3 py-2.5">${acChip(e.asset_class)}</td>
       <td class="px-3 py-2.5 text-right font-mono">${money(e.current_price)}</td>
@@ -1359,11 +1371,19 @@ function renderOverviewTab(d) {
     ['Bid/Ask',       d.bid_ask_spread_pct != null ? d.bid_ask_spread_pct + '%' : '—'],
     ['Inception',     d.inception_date || '—'],
     ['Asset Class',   d.asset_class || '—'],
-    ['Benchmark',     d.benchmark || '—'],
     ['Exchange',      d.exchange || '—'],
     ['Currency',      'AUD'],
   ];
+  const benchmarkRow = d.benchmark ? `
+    <div class="bg-indigo-50 border border-indigo-100 rounded-lg px-4 py-3 mb-3 flex items-center gap-2">
+      <span class="text-indigo-300 text-lg">&#8594;</span>
+      <div>
+        <p class="text-indigo-400 text-xs font-medium uppercase tracking-wide">Tracked Index</p>
+        <p class="font-semibold text-indigo-900 text-sm">${d.benchmark}</p>
+      </div>
+    </div>` : '';
   document.getElementById('tab-content').innerHTML = `
+    ${benchmarkRow}
     <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
       ${cards.map(([label, val, num]) => `
         <div class="bg-slate-50 rounded-lg p-3 border border-gray-100">
@@ -1638,6 +1658,12 @@ document.addEventListener('click', e => {
 ['f-exchange', 'f-issuer', 'f-asset'].forEach(id =>
   document.getElementById(id).addEventListener('change', () => { page = 0; loadTable(); })
 );
+// Benchmark text filter — debounced
+let bmTimer;
+document.getElementById('f-benchmark').addEventListener('input', () => {
+  clearTimeout(bmTimer);
+  bmTimer = setTimeout(() => { page = 0; loadTable(); }, 350);
+});
 // Sidebar sort dropdown — update column sort state then reload
 document.getElementById('f-sort').addEventListener('change', function () {
   tableSortKey = this.value;
@@ -1648,6 +1674,7 @@ document.getElementById('f-sort').addEventListener('change', function () {
 });
 document.getElementById('btn-reset').addEventListener('click', () => {
   ['f-exchange', 'f-issuer', 'f-asset'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-benchmark').value = '';
   tableSortKey = 'rank';
   tableSortDir = 'asc';
   page = 0;
