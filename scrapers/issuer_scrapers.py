@@ -12,7 +12,7 @@ import html as html_module
 import logging
 from datetime import datetime, date
 
-from scrapers.config import ISSUER_URLS, SPDR_AU_FUNDS, VANGUARD_AU_FUNDS, VANGUARD_AU_PORT_IDS, normalise_asset_class, CXA_ISSUER_URLS
+from scrapers.config import ISSUER_URLS, ISHARES_AU_PRODUCTS, SPDR_AU_FUNDS, VANGUARD_AU_FUNDS, VANGUARD_AU_PORT_IDS, normalise_asset_class, CXA_ISSUER_URLS
 from scrapers.base_scraper import fetch, fetch_json
 from scrapers.db_writer import (
     get_connection, upsert_etf, upsert_holdings, upsert_sectors,
@@ -783,157 +783,45 @@ def _scrape_ishares_product_page(conn, code: str, product_url: str) -> bool:
 
 
 def scrape_ishares(db_path=None) -> int:
-    """Scrape iShares/BlackRock Australia ETF data."""
+    """
+    Scrape iShares/BlackRock Australia ETF holdings via individual product pages.
+
+    Phase 1: Upsert base ETF records using the hardcoded ISHARES_AU_PRODUCTS map,
+             setting issuer_url = https://www.blackrock.com/au/products/{product_id}/
+    Phase 2: For each ETF with a blackrock.com/au/products/ URL, scrape holdings
+             via the AJAX endpoint embedded in the product page HTML.
+    """
     started = datetime.utcnow()
     source = 'ishares'
     updated = 0
 
     conn = get_connection(db_path)
 
-    # Try multiple known API patterns for BlackRock AU
-    api_attempts = [
-        ('https://www.blackrock.com/au/individual/products/product-list?productView=etf&iShares=true&country=au&domicileCountry=au&type=ishares&dataType=fund', {}),
-        ('https://www.blackrock.com/au/individual/products/fund-list', {'Accept': 'application/json'}),
-        ('https://www.blackrock.com/cache/api/fund/getfundlist/?productView=etf&country=au&iShares=true', {}),
-    ]
-
-    for api_url, extra_headers in api_attempts:
-        headers = {'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0'}
-        headers.update(extra_headers)
-        data = fetch_json(api_url, headers=headers)
-        if not data:
-            continue
-
-        funds_raw = None
-        if isinstance(data, list):
-            funds_raw = data
-        elif isinstance(data, dict):
-            for key in ('data', 'funds', 'products', 'fundData', 'aaData'):
-                if key in data:
-                    funds_raw = data[key]
-                    break
-
-        if not funds_raw:
-            continue
-
-        for fund in funds_raw:
-            if not isinstance(fund, dict):
-                continue
-            code = (fund.get('localExchangeTicker') or fund.get('ticker') or
-                    fund.get('fundCode') or fund.get('asx_code') or '').strip().upper()
-            if not code or not re.match(r'^[A-Z0-9]{2,6}$', code) or code.isdigit():
-                continue
-
-            etf = {
-                'code': code,
-                'name': fund.get('fundName') or fund.get('name'),
-                'issuer': 'iShares',
-                'expense_ratio': _safe_float(fund.get('totalExpenseRatio') or fund.get('mer') or fund.get('managementFee')),
-                'asset_class': normalise_asset_class(fund.get('assetClass') or fund.get('asset_class')),
-                'benchmark': fund.get('benchmark') or fund.get('benchmarkName'),
-                'inception_date': fund.get('inceptionDate') or fund.get('fundInceptionDate'),
-                'fund_size_aud_millions': _safe_float(fund.get('totalNetAssets') or fund.get('aum')),
-                'return_1y': _safe_float(fund.get('return1yr') or fund.get('return1y') or fund.get('annualReturn1yr')),
-                'return_3y': _safe_float(fund.get('return3yr') or fund.get('return3y')),
-                'return_5y': _safe_float(fund.get('return5yr') or fund.get('return5y')),
-                'data_source': 'ishares',
-            }
-            etf = {k: v for k, v in etf.items() if v is not None}
-            upsert_etf(conn, etf)
-            updated += 1
-
-        if updated:
-            break  # Stop trying other API endpoints
-
-    # HTML fallback — parse fund list page and extract inline JSON
-    if updated == 0:
-        try:
-            from bs4 import BeautifulSoup
-        except ImportError:
-            pass
-        else:
-            fund_list_url = 'https://www.blackrock.com/au/individual/products/investment-funds#categoryId=702702&tab=overview'
-            resp = fetch(fund_list_url)
-            if resp:
-                soup = BeautifulSoup(resp.text, 'html.parser')
-
-                # BlackRock sometimes embeds fund data in a JS variable
-                json_data = _find_json_in_script(soup, ['localExchangeTicker', 'fundName', 'iShares'])
-                if json_data:
-                    funds = json_data if isinstance(json_data, list) else json_data.get('data', [])
-                    for fund in funds:
-                        if not isinstance(fund, dict):
-                            continue
-                        code = (fund.get('localExchangeTicker') or fund.get('ticker') or '').strip().upper()
-                        if not re.match(r'^[A-Z0-9]{2,6}$', code) or code.isdigit():
-                            continue
-                        etf = {
-                            'code': code,
-                            'name': fund.get('fundName') or fund.get('name'),
-                            'issuer': 'iShares',
-                            'expense_ratio': _safe_float(fund.get('totalExpenseRatio') or fund.get('mer')),
-                            'asset_class': normalise_asset_class(fund.get('assetClass')),
-                            'data_source': 'ishares',
-                        }
-                        etf = {k: v for k, v in etf.items() if v is not None}
-                        upsert_etf(conn, etf)
-                        updated += 1
-                else:
-                    # Last resort: extract ticker-like codes from links to fund pages.
-                    # Require at least one letter — BlackRock numeric product IDs like
-                    # /products/251852/ must not be treated as ASX ticker codes.
-                    for link in soup.find_all('a', href=True):
-                        href = link['href']
-                        if '/products/' not in href and '/funds/' not in href:
-                            continue
-                        # iShares AU product page patterns — [A-Z] anchor prevents
-                        # matching pure-numeric BlackRock internal product IDs.
-                        for pattern in [
-                            r'/products/([A-Z][A-Z0-9]{1,5})/',
-                            r'ticker=([A-Z][A-Z0-9]{1,5})',
-                            r'/etf/([A-Z][A-Z0-9]{1,5})$',
-                        ]:
-                            match = re.search(pattern, href, re.IGNORECASE)
-                            if match:
-                                code = match.group(1).upper()
-                                name = link.get_text(strip=True)
-                                if name and 3 < len(name) < 100:
-                                    etf = {
-                                        'code': code,
-                                        'name': name,
-                                        'issuer': 'iShares',
-                                        'data_source': 'ishares',
-                                    }
-                                    upsert_etf(conn, etf)
-                                    updated += 1
-                                break
-
+    # ---- Phase 1: upsert base records with correct product page URLs ----
+    for code, product_id in ISHARES_AU_PRODUCTS.items():
+        issuer_url = f'https://www.blackrock.com/au/products/{product_id}/'
+        upsert_etf(conn, {
+            'code': code,
+            'issuer': 'iShares',
+            'issuer_url': issuer_url,
+            'data_source': 'ishares',
+        })
+        updated += 1
     conn.commit()
 
     # ---- Phase 2: holdings from individual product pages ----
     holdings_count = 0
-    try:
-        cur = conn.cursor()
-        cur.execute(
-            "SELECT code, issuer_url FROM etfs "
-            "WHERE issuer = 'iShares' "
-            "AND issuer_url LIKE 'https://www.blackrock.com/au/products/%'"
-        )
-        product_rows = cur.fetchall()
-    except Exception as e:
-        logger.warning(f"iShares: could not query product URLs: {e}")
-        product_rows = []
-
-    for row in product_rows:
-        code_h, url_h = row['code'], row['issuer_url']
+    for code, product_id in ISHARES_AU_PRODUCTS.items():
+        url = f'https://www.blackrock.com/au/products/{product_id}/'
         try:
-            if _scrape_ishares_product_page(conn, code_h, url_h):
+            if _scrape_ishares_product_page(conn, code, url):
                 holdings_count += 1
+                logger.info(f"iShares: got holdings for {code}")
         except Exception as e:
-            logger.warning(f"iShares holdings {code_h}: {e}")
+            logger.warning(f"iShares holdings {code}: {e}")
         conn.commit()
 
-    logger.info(f"iShares: fetched holdings for {holdings_count}/{len(product_rows)} ETFs")
+    logger.info(f"iShares: fetched holdings for {holdings_count}/{updated} ETFs")
 
     duration = (datetime.utcnow() - started).total_seconds()
     log_scrape(conn, source, 'success' if (updated or holdings_count) else 'no_data',
