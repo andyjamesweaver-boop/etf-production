@@ -515,51 +515,151 @@ def scrape_vaneck(db_path=None) -> int:
 # Vanguard
 # ====================================================================
 
+_VANGUARD_API_BASE = 'https://www.vanguard.com.au/personal/api/data/products'
+_VANGUARD_API_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+    'Accept': 'application/json',
+}
+# Max holdings rows to store per ETF (caps very large bond funds like VBND with 14k rows)
+_VANGUARD_MAX_HOLDINGS = 500
+
+
 def scrape_vanguard(db_path=None) -> int:
     """
-    Seed Vanguard Australia ETF data from the known fund list.
-    (Vanguard AU website is an Angular SPA — no accessible server-side API.)
-    Upserts the known fund list and preserves any richer data already in DB.
+    Scrape Vanguard Australia ETF holdings and sector data via the public REST API.
+
+    API base: https://www.vanguard.com.au/personal/api/data/products/{endpoint}/{portId}
+    Key endpoints used:
+      - /fund-profile-type/{portId}  → fund name confirmation
+      - /holdings-download/{portId}  → full holdings list with weight, sector, country
+
+    Sectors are aggregated from holdings (sectorName field).
+    portId map is maintained in config.VANGUARD_AU_PORT_IDS.
     """
     started = datetime.utcnow()
     source = 'vanguard'
     updated = 0
+    holdings_count = 0
 
     conn = get_connection(db_path)
 
-    # Seed from known list (preserves existing data via COALESCE upsert)
-    for code, name in VANGUARD_AU_FUNDS.items():
-        port_id = VANGUARD_AU_PORT_IDS.get(code)
-        issuer_url = (
-            f"https://www.vanguard.com.au/personal/invest-with-us/etf?portId={port_id}"
-            if port_id else None
-        )
-        etf = {
-            'code': code,
-            'name': name,
-            'issuer': 'Vanguard',
-            'exchange': 'ASX',
-            'data_source': 'vanguard',
-        }
-        if issuer_url:
-            etf['issuer_url'] = issuer_url
-        upsert_etf(conn, etf)
-        updated += 1
-
-    # Fix issuer_url for all Vanguard ETFs already in the DB using the portId mapping
+    # Deduplicate portIds (e.g. VLUE and VVLU share portId 8202)
+    seen_port_ids: set[str] = set()
+    # Order: process codes in VANGUARD_AU_PORT_IDS order
     for code, port_id in VANGUARD_AU_PORT_IDS.items():
-        conn.execute("""
-            UPDATE etfs
-            SET issuer_url = ?
-            WHERE code = ? AND issuer = 'Vanguard'
-        """, (f"https://www.vanguard.com.au/personal/invest-with-us/etf?portId={port_id}", code))
+        issuer_url = f'https://www.vanguard.com.au/personal/invest-with-us/etf?portId={port_id}'
 
-    conn.commit()
+        # Always upsert basic metadata for every code
+        etf_base = {
+            'code':       code,
+            'issuer':     'Vanguard',
+            'exchange':   'ASX',
+            'data_source': 'vanguard',
+            'issuer_url': issuer_url,
+        }
+
+        # If this portId has already been fetched for another code (share-class pair),
+        # just upsert the base row and skip the API fetch
+        if port_id in seen_port_ids:
+            upsert_etf(conn, etf_base)
+            updated += 1
+            continue
+        seen_port_ids.add(port_id)
+
+        try:
+            # --- Fund profile: confirmed name ---
+            profile_url = f'{_VANGUARD_API_BASE}/fund-profile-type/{port_id}'
+            profile_resp = fetch_json(profile_url, headers=_VANGUARD_API_HEADERS)
+            if profile_resp:
+                profiles = profile_resp.get('data', [])
+                if profiles and isinstance(profiles, list):
+                    api_name = profiles[0].get('fundName') or profiles[0].get('longName')
+                    if api_name:
+                        etf_base['name'] = api_name
+
+            upsert_etf(conn, etf_base)
+            updated += 1
+
+            # --- Holdings: ticker, name, weight, sector, country ---
+            holdings_url = f'{_VANGUARD_API_BASE}/holdings-download/{port_id}'
+            holdings_resp = fetch_json(holdings_url, headers=_VANGUARD_API_HEADERS)
+            if not holdings_resp:
+                conn.commit()
+                continue
+
+            raw_holdings = holdings_resp.get('data', [])
+            if not isinstance(raw_holdings, list) or not raw_holdings:
+                conn.commit()
+                continue
+
+            # Sort by weight descending and cap at max
+            raw_holdings = sorted(
+                raw_holdings,
+                key=lambda h: h.get('marketValPercent') or 0,
+                reverse=True
+            )[:_VANGUARD_MAX_HOLDINGS]
+
+            holdings = []
+            sector_weights: dict[str, float] = {}
+
+            for h in raw_holdings:
+                weight = _safe_float(h.get('marketValPercent'))
+                if weight is None or weight <= 0:
+                    continue
+                name = (h.get('name') or h.get('longName') or '').strip()
+                if not name:
+                    continue
+                ticker  = (h.get('ticker') or '').strip() or None
+                sec_raw = (h.get('sectorName') or '').strip()
+                # '—' means no sector (common in bond funds)
+                sector  = sec_raw if sec_raw and sec_raw != '—' else None
+                country = (h.get('countryCode') or '').strip() or None
+
+                holdings.append({
+                    'name':       name,
+                    'ticker':     ticker,
+                    'weight_pct': weight,
+                    'sector':     sector,
+                    'country':    country,
+                })
+
+                if sector:
+                    sector_weights[sector] = sector_weights.get(sector, 0) + weight
+
+            if holdings:
+                # Deduplicate by name (merge weights for any same-name entries)
+                merged: dict[str, dict] = {}
+                for h in holdings:
+                    key = h['name']
+                    if key in merged:
+                        merged[key]['weight_pct'] = (merged[key]['weight_pct'] or 0) + (h['weight_pct'] or 0)
+                    else:
+                        merged[key] = h
+                upsert_holdings(conn, code, list(merged.values()), commit=False)
+                holdings_count += len(merged)
+
+            if sector_weights:
+                sectors = [
+                    {'sector': s, 'weight_pct': round(w, 6)}
+                    for s, w in sector_weights.items()
+                ]
+                upsert_sectors(conn, code, sectors, commit=False)
+
+            conn.commit()
+            logger.info(f"Vanguard: {code} — {len(holdings)} holdings, {len(sector_weights)} sectors")
+
+        except Exception as e:
+            logger.warning(f"Vanguard: error scraping {code} (portId={port_id}): {e}")
+            conn.rollback()
+            upsert_etf(conn, etf_base)
+            conn.commit()
+
     duration = (datetime.utcnow() - started).total_seconds()
-    log_scrape(conn, source, 'success', records_affected=updated,
-               duration_secs=duration, started_at=started.isoformat())
+    log_scrape(conn, source, 'success' if updated else 'no_data',
+               records_affected=updated, duration_secs=duration,
+               started_at=started.isoformat())
     conn.close()
-    logger.info(f"Vanguard: seeded {updated} ETFs from known fund list")
+    logger.info(f"Vanguard: updated {updated} ETFs, {holdings_count} holdings total")
     return updated
 
 
