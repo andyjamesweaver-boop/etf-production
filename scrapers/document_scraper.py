@@ -20,7 +20,9 @@ import pdfplumber
 import requests
 from bs4 import BeautifulSoup
 
-from scrapers.config import DB_PATH, ISHARES_AU_PRODUCTS
+import anthropic
+
+from scrapers.config import DB_PATH, ISHARES_AU_PRODUCTS, VANGUARD_AU_PORT_IDS
 from scrapers.db_writer import get_connection, log_scrape, upsert_etf
 
 logger = logging.getLogger(__name__)
@@ -262,14 +264,132 @@ def _discover_globalx(code: str, issuer_url: str | None) -> dict:
     return _discover_html_links(page_url, _LABEL_HINTS)
 
 
+_VANGUARD_DOC_API = "https://www.vanguard.com.au/personal/api/products/personal/fund"
+_VANGUARD_STATIC  = "https://static.vanguard.com.au/content/dam/intl-pdfs/australia/products"
+
+# Code → kebab-case slug used in Vanguard's static CDN filenames.
+# e.g. TMD URL: {_VANGUARD_STATIC}/tmd/en/vanguard-{slug}-tmd-en-au.pdf
+_VANGUARD_SLUGS: dict[str, str] = {
+    'VAS':  'australian-shares-index-etf',
+    'VGS':  'msci-index-international-shares-etf',
+    'VGAD': 'msci-index-international-shares-hedged-etf',
+    'VGE':  'ftse-emerging-markets-shares-etf',
+    'VHY':  'australian-shares-high-yield-etf',
+    'VAP':  'australian-property-securities-index-etf',
+    'VAF':  'australian-fixed-interest-index-etf',
+    'VGB':  'australian-government-bond-index-etf',
+    'VACF': 'australian-corporate-fixed-interest-index-etf',
+    'VLC':  'msci-australian-large-companies-index-etf',
+    'VSO':  'msci-australian-small-companies-index-etf',
+    'VEQ':  'ftse-europe-shares-etf',
+    'VAE':  'ftse-asia-ex-japan-shares-index-etf',
+    'VIF':  'international-fixed-interest-index-hedged-etf',
+    'VCF':  'international-credit-securities-index-hedged-etf',
+    'VDBA': 'diversified-balanced-index-etf',
+    'VDCO': 'diversified-conservative-index-etf',
+    'VDGR': 'diversified-growth-index-etf',
+    'VDHG': 'diversified-high-growth-index-etf',
+    'VDAL': 'diversified-all-growth-index-etf',
+    'VDIF': 'diversified-income-etf',
+    'VEFI': 'ethically-conscious-global-aggregate-bond-index-hedged-etf',
+    'VESG': 'ethically-conscious-international-shares-index-etf',
+    'VETH': 'ethically-conscious-australian-shares-etf',
+    'VISM': 'msci-international-small-companies-index-etf',
+    'VBLD': 'global-infrastructure-index-etf',
+    'VBND': 'global-aggregate-bond-index-hedged-etf',
+    'VMIN': 'global-minimum-volatility-active-etf',
+    'VLUE': 'global-value-equity-active-etf',
+    'VVLU': 'global-value-equity-active-etf',
+    'VEU':  'all-world-ex-us-shares-index-etf',
+    'VTS':  'us-total-market-shares-index-etf',
+}
+
+
 def _discover_vanguard(code: str) -> dict:
     """
-    Vanguard Australia's website is a fully JavaScript-rendered Angular SPA.
-    Document URLs are not accessible via static HTTP requests.
-    Returns empty dict — Vanguard ETFs are skipped for document ingestion.
+    Discover document URLs for a Vanguard Australia ETF.
+
+    Strategy 1 — Vanguard documents REST API:
+        GET /personal/api/products/personal/fund/{portId}/documents
+        Returns a JSON list of {type, url} objects.
+
+    Strategy 2 — static CDN URL probing:
+        https://static.vanguard.com.au/content/dam/intl-pdfs/australia/products/
+        Uses the _VANGUARD_SLUGS mapping; probes TMD, PDS, and product-profile URLs.
     """
-    logger.debug(f"[{code}] Vanguard SPA — document discovery not supported without headless browser")
-    return {}
+    result: dict = {}
+    port_id = VANGUARD_AU_PORT_IDS.get(code)
+
+    # ── Strategy 1: Vanguard fund API → documentDetails ─────────────────────
+    # The /documents endpoint returns the full fund record; documents live in
+    # data[0].documentDetails as [{type, path, ...}].
+    # type codes: "TMD", "PDS", "FS" (factsheet), "AR", "SD", "LIR", ...
+    if port_id:
+        try:
+            api_url = f"{_VANGUARD_DOC_API}/{port_id}/documents"
+            resp = requests.get(
+                api_url,
+                headers={**_HEADERS, "Accept": "application/json"},
+                timeout=20,
+            )
+            if resp.status_code == 200:
+                body = resp.json()
+                fund_records = body.get("data") or []
+                doc_details = (
+                    fund_records[0].get("documentDetails") or []
+                    if isinstance(fund_records, list) and fund_records
+                    else []
+                )
+                for doc in doc_details:
+                    doc_type = (doc.get("type") or "").upper()
+                    path = doc.get("path") or ""
+                    if not path:
+                        continue
+                    if doc_type == "TMD":
+                        result.setdefault("tmd_url", path)
+                    elif doc_type == "PDS":
+                        result.setdefault("pds_url", path)
+                    elif doc_type == "FS":
+                        result.setdefault("factsheet_url", path)
+                logger.debug(f"[{code}] Vanguard API: found {list(result.keys())}")
+        except Exception as e:
+            logger.debug(f"[{code}] Vanguard API documents endpoint failed: {e}")
+
+    if len(result) == 3:
+        return result
+
+    # ── Strategy 2: static CDN probing ──────────────────────────────────────
+    slug = _VANGUARD_SLUGS.get(code)
+    if not slug:
+        logger.debug(f"[{code}] No Vanguard slug — skipping CDN probe")
+        return result
+
+    cdn_candidates: dict[str, list[str]] = {
+        "tmd_url": [
+            f"{_VANGUARD_STATIC}/tmd/en/vanguard-{slug}-tmd-en-au.pdf",
+            f"{_VANGUARD_STATIC}/tmd/vanguard-{slug}-tmd-en-au.pdf",
+        ],
+        "pds_url": [
+            f"{_VANGUARD_STATIC}/pds/en/vanguard-{slug}-pds-en-au.pdf",
+            f"{_VANGUARD_STATIC}/pds/vanguard-{slug}-pds-en-au.pdf",
+        ],
+        "factsheet_url": [
+            f"{_VANGUARD_STATIC}/productProfile/en/vanguard-{slug}-product-profile-en-au.pdf",
+            f"{_VANGUARD_STATIC}/productProfile/vanguard-{slug}-product-profile-en-au.pdf",
+            f"{_VANGUARD_STATIC}/factsheet/en/vanguard-{slug}-factsheet-en-au.pdf",
+        ],
+    }
+
+    for key, urls in cdn_candidates.items():
+        if key in result:
+            continue
+        for url in urls:
+            if _head_ok(url):
+                result[key] = url
+                logger.debug(f"[{code}] Found {key} via CDN: {url}")
+                break
+
+    return result
 
 
 def discover_documents(code: str, issuer: str | None, row: dict) -> dict:
@@ -405,69 +525,48 @@ def _parse_claude_json(raw: str) -> dict | None:
 
 def summarise_with_claude(code: str, name: str, text: str) -> dict | None:
     """
-    Call Claude Haiku via requests to generate a structured summary.
-    Returns parsed dict or None on failure.
+    Call Claude Haiku via the Anthropic SDK to generate a structured summary.
+    Returns a parsed dict or None on failure.
     """
     if not ANTHROPIC_API_KEY:
         logger.warning("ANTHROPIC_API_KEY not set — skipping summarisation")
         return None
 
     messages, system = _build_prompt(code, name, text)
-
-    payload = {
-        "model": CLAUDE_MODEL,
-        "max_tokens": 1024,
-        "system": system,
-        "messages": messages,
-    }
-
-    headers = {
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-    }
-
-    backoff_by_status = {
-        429: [30, 60, 90],
-        500: [10, 20, 30],
-        529: [10, 20, 30],
-    }
+    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
     for attempt in range(3):
         try:
-            resp = requests.post(
-                "https://api.anthropic.com/v1/messages",
-                json=payload,
-                headers=headers,
-                timeout=60,
+            response = client.messages.create(
+                model=CLAUDE_MODEL,
+                max_tokens=1024,
+                system=system,
+                messages=messages,
             )
+            raw_text = response.content[0].text
+            result = _parse_claude_json(raw_text)
+            if result:
+                return result
+            logger.warning(f"[{code}] Claude returned unparseable JSON (attempt {attempt + 1}/3)")
 
-            if resp.status_code != 200:
-                status = resp.status_code
-                waits = backoff_by_status.get(status, [10, 20, 30])
-                wait = waits[attempt] if attempt < len(waits) else waits[-1]
-                logger.warning(
-                    f"Claude API HTTP {status} for {code} "
-                    f"(attempt {attempt + 1}/3) — waiting {wait}s"
-                )
-                if attempt < 2:
-                    time.sleep(wait)
-                continue
-
-            body = resp.json()
-            raw_text = body["content"][0]["text"]
-            return _parse_claude_json(raw_text)
-
-        except Exception as e:
-            logger.warning(f"Claude API error for {code} (attempt {attempt + 1}/3): {e}")
+        except anthropic.RateLimitError:
+            wait = [30, 60, 90][min(attempt, 2)]
+            logger.warning(f"[{code}] Claude rate limit (attempt {attempt + 1}/3) — waiting {wait}s")
             if attempt < 2:
-                time.sleep(10)
+                time.sleep(wait)
+
+        except anthropic.APIStatusError as e:
+            wait = 10 * (attempt + 1)
+            logger.warning(f"[{code}] Claude API error {e.status_code} (attempt {attempt + 1}/3) — waiting {wait}s")
+            if attempt < 2:
+                time.sleep(wait)
+
         except Exception as e:
-            logger.warning(f"Claude API error for {code} (attempt {attempt + 1}/3): {e}")
+            logger.warning(f"[{code}] Claude unexpected error (attempt {attempt + 1}/3): {e}")
             if attempt < 2:
                 time.sleep(10)
 
-    logger.error(f"All Claude API retries failed for {code}")
+    logger.error(f"[{code}] All Claude API retries failed")
     return None
 
 
