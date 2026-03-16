@@ -464,6 +464,12 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
                 "ORDER BY return_1y DESC LIMIT 1"
             ).fetchone()
 
+            avg_pd_row = conn.execute(
+                "SELECT ROUND(AVG(premium_discount_pct), 2) FROM nav_history "
+                "WHERE date = (SELECT MAX(date) FROM nav_history) "
+                "AND premium_discount_pct IS NOT NULL"
+            ).fetchone()
+
             cats = conn.execute(
                 "SELECT asset_class as category, COUNT(*) as count, "
                 "COALESCE(SUM(fund_size_aud_millions),0) as total_fum "
@@ -477,6 +483,7 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
                 'avg_return_1y': round(stats['avg_return_1y'], 2),
                 'avg_expense_ratio': round(stats['avg_expense_ratio'], 3),
                 'top_performer': dict(top) if top else None,
+                'avg_premium_discount': avg_pd_row[0] if avg_pd_row else None,
                 'categories': [dict(c) for c in cats],
                 'last_updated': datetime.now().isoformat(),
             })
@@ -1475,7 +1482,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
 <main class="max-w-[1400px] mx-auto px-5 py-5">
 
   <!-- ── Stat cards ── -->
-  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
+  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 mb-5">
     <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer" onclick="goCard('fum')" title="View FUM breakdown by asset class">
       <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Total FUM</p>
       <p id="c-fum" class="text-2xl font-bold text-gray-900 mt-1 leading-tight">—</p>
@@ -1505,6 +1512,11 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
       <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Issuers</p>
       <p id="c-issuers" class="text-2xl font-bold text-gray-900 mt-1 leading-tight">—</p>
       <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">fund managers <span class="text-blue-300">›</span></p>
+    </div>
+    <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer" onclick="goCard('nav')" title="Premium / Discount to NAV analysis">
+      <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Prem / Disc</p>
+      <p id="c-nav" class="text-2xl font-bold text-gray-900 mt-1 leading-tight">—</p>
+      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">vs NAV <span class="text-blue-300">›</span></p>
     </div>
   </div>
 
@@ -2182,6 +2194,12 @@ async function loadOverview() {
       m.top_performer.code + ' ' + pct(m.top_performer.return_1y);
     topPerformerCode = m.top_performer.code;
   }
+  if (m.avg_premium_discount != null) {
+    const navEl = document.getElementById('c-nav');
+    const v = m.avg_premium_discount;
+    navEl.textContent = (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
+    navEl.className = 'text-2xl font-bold mt-1 leading-tight ' + (v >= 0 ? 'text-green-600' : 'text-red-500');
+  }
   const now = new Date().toLocaleTimeString();
   document.getElementById('subtitle').textContent =
     `${(m.total_etfs || 0).toLocaleString()} ETFs · ${fmtFum(m.total_fum_millions)} FUM · ${now}`;
@@ -2197,6 +2215,7 @@ function goCard(type) {
     case 'expense':  window.location.href = '/insights/expense';   break;
     case 'top':      window.location.href = '/insights/returns';   break;
     case 'issuers':  window.location.href = '/insights/issuers';   break;
+    case 'nav':      window.location.href = '/insights/nav';       break;
   }
 }
 
