@@ -70,6 +70,8 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
             '/admin/sync-db':     self.handle_sync_db,
             # Articles
             '/articles':          self.handle_articles_list,
+            # Preferences screener
+            '/screener/preferences': self.handle_screener_preferences_page,
         }
 
         handler = routes.get(path)
@@ -110,8 +112,11 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
 
     def do_POST(self):
         parsed = urllib.parse.urlparse(self.path)
-        if parsed.path.rstrip('/') == '/admin/sync-db':
+        path = parsed.path.rstrip('/')
+        if path == '/admin/sync-db':
             self.handle_sync_db()
+        elif path == '/api/v1/screener/preferences':
+            self.handle_screener_preferences_api()
         else:
             self.send_json({'error': 'Not found'}, 404)
 
@@ -1587,6 +1592,10 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
       <a href="/articles" class="main-tab flex items-center gap-1" style="text-decoration:none">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
         Articles
+      </a>
+      <a href="/screener/preferences" class="main-tab flex items-center gap-1" style="text-decoration:none">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+        Portfolio Builder
       </a>
     </div>
   </div>
@@ -4192,9 +4201,32 @@ def _handle_article_detail(self, slug):
     self.send_html(html)
 
 
+def _handle_screener_preferences_page(self):
+    from screener_preferences import SCREENER_HTML
+    self.send_html(SCREENER_HTML)
+
+
+def _handle_screener_preferences_api(self):
+    import screener_preferences as sp
+    try:
+        length = int(self.headers.get('Content-Length', 0))
+        body = self.rfile.read(length) if length else b'{}'
+        prefs = json.loads(body.decode('utf-8'))
+    except Exception:
+        self.send_json({'error': 'Invalid JSON body'}, 400)
+        return
+    try:
+        portfolio = sp.build_portfolio(prefs, DB_PATH)
+        self.send_json(portfolio)
+    except Exception as e:
+        self.send_json({'error': str(e)}, 500)
+
+
 # Attach to the real handler class (defined earlier in the file)
 ETFAPIHandler.handle_articles_list = _handle_articles_list
 ETFAPIHandler.handle_article_detail = _handle_article_detail
+ETFAPIHandler.handle_screener_preferences_page = _handle_screener_preferences_page
+ETFAPIHandler.handle_screener_preferences_api = _handle_screener_preferences_api
 
 
 # ===================================================================== main
