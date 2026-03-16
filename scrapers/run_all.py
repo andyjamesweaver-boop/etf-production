@@ -70,12 +70,18 @@ def run_master():
     return build_master_list(DB_PATH)
 
 
+def run_documents():
+    from scrapers.document_scraper import scrape_documents
+    return scrape_documents(DB_PATH)
+
+
 SOURCES = {
     'asx_report': ('ASX Monthly Report', run_asx_report),
     'cboe': ('Cboe Australia', run_cboe),
     'asx_api': ('ASX Live Prices', run_asx_api),
     'issuers': ('Issuer Websites', run_issuers),
     'master': ('Master List Builder', run_master),
+    'documents': ('Document Ingestion & AI Summaries', run_documents),
 }
 
 
@@ -154,7 +160,8 @@ Sources:
   asx_api     Fetch live prices from ASX JSON API
   issuers     Scrape issuer websites (BetaShares, VanEck, Vanguard, iShares, SPDR, Global X)
   master      Rebuild FUM rankings and issuer stats
-  all         Run all of the above in order (default)
+  documents   Discover PDS/TMD/factsheet URLs and generate AI summaries (slow, costs money)
+  all         Run all of the above except 'documents' (default)
         """
     )
     parser.add_argument(
@@ -186,11 +193,13 @@ Sources:
         ensure_db()
 
     if args.source == 'all':
+        # documents excluded from default daily run (slow + API costs)
         sources = ['asx_report', 'cboe', 'issuers', 'asx_api', 'master']
     else:
         sources = [args.source]
-        # Always run master list after individual scrapers
-        if args.source not in ('master',) and 'master' not in sources:
+        # Always run master list after individual scrapers, except for
+        # 'master' itself and 'documents' (which is standalone)
+        if args.source not in ('master', 'documents') and 'master' not in sources:
             sources.append('master')
 
     run_pipeline(sources)
