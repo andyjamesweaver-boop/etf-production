@@ -288,41 +288,73 @@ CXA_ISSUER_URLS = {
     'Talaria':           'https://www.talariacapital.com.au/',
 }
 
-# Map ASX report category names to our asset_class values
+# Map raw source category strings to canonical asset_class values.
+# Keys are lowercased; values are the exact canonical strings used throughout the platform.
 ASSET_CLASS_MAP = {
-    'australian equities': 'Australian Equities',
-    'australian shares': 'Australian Equities',
-    'international equities': 'International Equities',
-    'international shares': 'International Equities',
-    'global equities': 'International Equities',
-    'fixed income': 'Fixed Income',
-    'bonds': 'Fixed Income',
-    'australian fixed interest': 'Fixed Income',
+    # ASX report categories
+    'australian equities':          'Australian Equities',
+    'australian shares':            'Australian Equities',
+    'international equities':       'International Equities',
+    'international shares':         'International Equities',
+    'global equities':              'International Equities',
+    'global shares':                'International Equities',
+    'fixed income':                 'Fixed Income',
+    'bonds':                        'Fixed Income',
+    'australian fixed interest':    'Fixed Income',
     'international fixed interest': 'Fixed Income',
-    'cash': 'Cash',
-    'commodities': 'Commodities',
-    'commodity': 'Commodities',
-    'property': 'Property',
-    'real estate': 'Property',
-    'infrastructure': 'Infrastructure',
-    'diversified': 'Diversified',
-    'multi-asset': 'Diversified',
-    'currency': 'Currency',
-    'alternatives': 'Alternatives',
-    'crypto': 'Digital Assets',
-    'digital assets': 'Digital Assets',
-    'thematic': 'Thematic',
+    'fixed interest':               'Fixed Income',
+    'cash':                         'Cash',
+    'cash and fixed income':        'Fixed Income',
+    'commodities':                  'Commodities',
+    'commodity':                    'Commodities',
+    'precious metals':              'Commodities',
+    'property':                     'Property',
+    'real estate':                  'Property',
+    'listed property':              'Property',
+    'infrastructure':               'Infrastructure',
+    'listed infrastructure':        'Infrastructure',
+    'diversified':                  'Diversified',
+    'multi-asset':                  'Diversified',
+    'multi asset':                  'Diversified',
+    'balanced':                     'Diversified',
+    'currency':                     'Currency',
+    'currencies':                   'Currency',
+    'alternatives':                 'Alternatives',
+    'alternative':                  'Alternatives',
+    'leveraged & inverse':          'Alternatives',
+    'leveraged and inverse':        'Alternatives',
+    'crypto':                       'Digital Assets',
+    'cryptocurrency':               'Digital Assets',
+    'digital assets':               'Digital Assets',
+    'crypto assets':                'Digital Assets',
+    'thematic':                     'Thematic',
+    'sector':                       'Thematic',
     # Cboe monthly report section names
-    'equity - domestic': 'Australian Equities',
-    'equity - international': 'International Equities',
-    'infrastructure & property': 'Property',
-    'fixed income - domestic': 'Fixed Income',
+    'equity - domestic':            'Australian Equities',
+    'equity - international':       'International Equities',
+    # Note: Cboe lumps these together; the migration re-separates by name keywords
+    'infrastructure & property':    'Property',
+    'fixed income - domestic':      'Fixed Income',
     'fixed income - international': 'Fixed Income',
-    'cash products': 'Cash',
-    'mixed asset': 'Diversified',
-    'currencies': 'Currency',
-    'crypto-assets': 'Digital Assets',
-    'commodities': 'Commodities',
+    'cash products':                'Cash',
+    'mixed asset':                  'Diversified',
+    'crypto-assets':                'Digital Assets',
+}
+
+# Canonical asset_class values — the only strings that should appear in the DB
+CANONICAL_ASSET_CLASSES = {
+    'Australian Equities',
+    'International Equities',
+    'Fixed Income',
+    'Commodities',
+    'Property',
+    'Infrastructure',
+    'Diversified',
+    'Cash',
+    'Digital Assets',
+    'Currency',
+    'Alternatives',
+    'Thematic',
 }
 
 
@@ -335,8 +367,242 @@ def normalise_issuer(raw):
 
 
 def normalise_asset_class(raw):
-    """Map a raw category / asset class string to our canonical name."""
+    """Map a raw category / asset class string to a canonical asset_class."""
     if not raw:
         return None
     key = raw.strip().lower()
-    return ASSET_CLASS_MAP.get(key, raw.strip())
+    mapped = ASSET_CLASS_MAP.get(key)
+    if mapped:
+        return mapped
+    # Already a canonical value?
+    stripped = raw.strip()
+    if stripped in CANONICAL_ASSET_CLASSES:
+        return stripped
+    # Fall back to title-cased raw value rather than raw garbage
+    return stripped
+
+
+def classify_sub_category(code, name, asset_class):
+    """
+    Derive a sub_category for an ETF given its code, name, and (canonical) asset_class.
+
+    Rules are keyword-based on the lower-cased ETF name + code combined.
+    More specific patterns must appear before general fallbacks within each block.
+    Returns None if asset_class is unrecognised.
+    """
+    if not asset_class:
+        return None
+
+    text = ((name or '') + ' ' + (code or '')).lower()
+
+    def has(*keywords):
+        return any(k in text for k in keywords)
+
+    # ── Australian Equities ──────────────────────────────────────────────────
+    if asset_class == 'Australian Equities':
+        if has('small cap', 'smallcap', 'small-cap', 'mid cap', 'micro cap',
+               'emerging companies', 'ex-20', 'ex 20', 'ex20', 'small companies',
+               'smaller companies', 'small & mid'):
+            return 'Small / Mid Cap'
+        if has('esg', 'ethical', 'responsible investing', 'sustainable', 'sustainability',
+               'climate', 'impact', 'carbon', 'net zero', 'environmental'):
+            return 'ESG & Responsible'
+        if has('dividend', 'high yield', 'income fund', 'dividend income', 'dividend yield'):
+            return 'Dividend & Income'
+        if has('financ', ' bank', 'banking'):
+            return 'Sector — Financials'
+        if has('resource', 'mining', 'materials', 'energy sector', 'oil', 'gas'):
+            return 'Sector — Resources'
+        if has('property', 'reit', 'real estate'):
+            return 'Sector — Property'
+        if has('health', 'biotech', 'pharma', 'medical', 'life science'):
+            return 'Sector — Healthcare'
+        if has('tech', 'digital', 'innovation', 'software', 'internet', 'semiconductor'):
+            return 'Sector — Technology'
+        return 'Broad Market'
+
+    # ── International Equities ───────────────────────────────────────────────
+    if asset_class == 'International Equities':
+        if has('s&p 500', 's&p500', 'nasdaq', 'dow jones', 'russell 2000', 'russell 1000',
+               'united states equit', 'us equit', 'us share', 'us market', 'american',
+               'nyse', 'new york'):
+            return 'US Market'
+        if has('emerging market', 'china', 'india', 'bric', 'em equit', 'emerging share',
+               'korea', 'taiwan', 'brazil', 'vietnam', 'frontier'):
+            return 'Emerging Markets'
+        if has('asia pacific', 'asia ex', 'japan', 'asian equit', 'apac', 'hong kong',
+               'singapore', 'southeast asia'):
+            return 'Asia Pacific'
+        if has('europ', 'ftse 100', 'dax', 'cac 40', 'stoxx', 'euro stoxx',
+               'uk equit', 'german', 'french'):
+            return 'Europe'
+        if has('quality', 'high quality') or code.lower() in ('qual', 'qlty', 'qmix', 'qpon', 'vqual'):
+            return 'Factor — Quality'
+        if has('value fund', 'value etf', 'fundamental index', 'deep value',
+               'price-to-book', 'price to book'):
+            return 'Factor — Value'
+        if has('momentum', 'trend following', 'relative strength'):
+            return 'Factor — Momentum'
+        if has('low volatility', 'low vol', 'minimum variance', 'min variance',
+               'defensive equity', 'low risk equit'):
+            return 'Factor — Low Volatility'
+        if has('dividend', 'income', 'high yield equit', 'equity income'):
+            return 'Dividend & Income'
+        if has('esg', 'ethical', 'responsible', 'sustainable', 'sustainability',
+               'climate', 'impact', 'carbon', 'net zero', 'paris aligned', 'sri'):
+            return 'ESG & Responsible'
+        # Specific thematic sub-sectors — checked before broad sector keywords
+        if has('uranium', 'nuclear') or code.lower() in ('atom', 'urnm', 'uran'):
+            return 'Uranium & Nuclear'
+        if (has('clean energy', 'renewable energy', 'solar energy', 'wind energy',
+                'green energy', 'clean power') and not has('uranium', 'nuclear')):
+            return 'Clean Energy'
+        if (has('copper', 'lithium', 'battery tech', 'battery material',
+                'energy transition', 'green metal', 'critical mineral') or
+                code.lower() in ('wire', 'xmet', 'gmtl', 'acdc')):
+            return 'Energy Transition Metals'
+        if has('cyber', 'cybersecurity', 'data security', 'network security'):
+            return 'Sector — Cybersecurity'
+        if has('artificial intelligence', ' ai fund', 'machine learning', 'robotics',
+               'automation', 'big data'):
+            return 'Sector — Technology'
+        if has('tech', 'information technology', 'semiconductor', 'software', 'internet',
+               'fang', 'innovation', 'cloud', 'digital economy'):
+            return 'Sector — Technology'
+        if has('health', 'biotech', 'pharma', 'medical', 'life science', 'genomic',
+               'biolog'):
+            return 'Sector — Healthcare'
+        if has('financ', 'bank', 'banking'):
+            return 'Sector — Financials'
+        if has('resource', 'mining', 'metal', 'material', 'gold miner', 'silver miner'):
+            return 'Sector — Resources'
+        return 'Developed Markets'
+
+    # ── Fixed Income ─────────────────────────────────────────────────────────
+    if asset_class == 'Fixed Income':
+        if has('high yield', 'sub-investment grade', 'non-investment grade', 'junk bond'):
+            return 'High Yield'
+        if has('inflation', ' cpi ', 'tips', 'index-linked', 'real return', 'inflation-linked'):
+            return 'Inflation Linked'
+        if has('emerging market', 'em debt', 'em bond', 'local currency bond',
+               'hard currency bond'):
+            return 'Emerging Market Debt'
+        if has('floating rate', 'bbsw', 'variable rate', 'bank loan', 'senior loan'):
+            return 'Floating Rate'
+        if (has('government', 'treasury', 'sovereign') and
+                has('australia', 'australian', 'domestic', 'agb')):
+            return 'Australian Government'
+        if (has('corporate', 'credit') and
+                has('australia', 'australian', 'domestic')):
+            return 'Australian Corporate'
+        if has('government', 'treasury', 'sovereign'):
+            return 'Global Government'
+        if has('corporate', 'credit', 'investment grade') and not has('australia'):
+            return 'Global Corporate'
+        if (has('australia', 'australian', 'domestic') and
+                not has('global', 'international', 'world', 'foreign')):
+            return 'Australian Diversified'
+        return 'Global Diversified'
+
+    # ── Commodities ──────────────────────────────────────────────────────────
+    if asset_class == 'Commodities':
+        if has('gold') or code.lower() in ('gold', 'nugg', 'qau', 'zgol', 'pmgold', 'mnrs', 'gdx'):
+            return 'Gold'
+        if has('silver') or code.lower() in ('etpmag',):
+            return 'Silver'
+        if has('platinum', 'palladium') or code.lower() in ('etpmpd', 'etpmpt'):
+            return 'Precious Metals — Other'
+        if (has('copper', 'lithium', 'nickel', 'cobalt', 'battery metal', 'green metal',
+               'energy transition metal', 'strategic metal') or
+                code.lower() in ('wire', 'xmet', 'gmtl')):
+            return 'Green / Industrial Metals'
+        if has('oil', 'crude', 'petroleum', 'natural gas', 'brent', 'wti'):
+            return 'Oil & Energy'
+        if has('agriculture', 'wheat', 'corn', 'soy', 'grain', 'food', 'livestock',
+               'soft commodity'):
+            return 'Agriculture'
+        return 'Diversified'
+
+    # ── Property ─────────────────────────────────────────────────────────────
+    if asset_class == 'Property':
+        if has('australia', 'australian', 'domestic', 'a-reit', 'areit', ' asx '):
+            return 'Australian REITs'
+        return 'Global REITs'
+
+    # ── Infrastructure ───────────────────────────────────────────────────────
+    if asset_class == 'Infrastructure':
+        if has('australia', 'australian', 'domestic'):
+            return 'Australian Infrastructure'
+        return 'Global Infrastructure'
+
+    # ── Diversified ──────────────────────────────────────────────────────────
+    if asset_class == 'Diversified':
+        if has('conservative', 'defensive', 'capital stable', 'low risk', 'capital secure'):
+            return 'Conservative'
+        if has('high growth', 'aggressive', 'high risk', 'very high growth'):
+            return 'High Growth'
+        if has('growth') and not has('high growth'):
+            return 'Growth'
+        if has('balance', 'moderate'):
+            return 'Balanced'
+        return 'Balanced'
+
+    # ── Cash ─────────────────────────────────────────────────────────────────
+    if asset_class == 'Cash':
+        return 'Cash & Money Market'
+
+    # ── Digital Assets ───────────────────────────────────────────────────────
+    if asset_class == 'Digital Assets':
+        if has('bitcoin', ' btc'):
+            return 'Bitcoin'
+        if has('ethereum', 'ether', ' eth '):
+            return 'Ethereum'
+        return 'Diversified Crypto'
+
+    # ── Currency ─────────────────────────────────────────────────────────────
+    if asset_class == 'Currency':
+        if has('australian', 'aud'):
+            return 'AUD Strategies'
+        return 'FX Strategies'
+
+    # ── Alternatives ─────────────────────────────────────────────────────────
+    if asset_class == 'Alternatives':
+        if has('leveraged', 'geared', '2x', '3x', 'bull fund', 'ultra'):
+            return 'Leveraged'
+        if has(' short ', 'bear ', 'inverse', ' put ', 'short sell'):
+            return 'Inverse'
+        return 'Absolute Return'
+
+    # ── Thematic ─────────────────────────────────────────────────────────────
+    if asset_class == 'Thematic':
+        if has('artificial intelligence', ' ai etf', ' ai fund', 'machine learning',
+               'generative', 'large language'):
+            return 'Artificial Intelligence'
+        if has('cyber', 'cybersecurity', 'data security', 'network security'):
+            return 'Cybersecurity'
+        if has('uranium', 'nuclear') or code.lower() in ('atom', 'urnm', 'uran'):
+            return 'Uranium & Nuclear'
+        if (has('clean energy', 'renewable energy', 'solar energy', 'wind energy',
+                'green energy', 'clean power', 'climate transition') and
+                not has('uranium', 'nuclear')):
+            return 'Clean Energy'
+        if (has('copper miner', 'energy transition', 'green metal', 'battery material',
+                'critical mineral', 'strategic mineral', 'electrification') or
+                code.lower() in ('wire', 'xmet', 'gmtl')):
+            return 'Energy Transition Metals'
+        if has('health', 'biotech', 'pharma', 'medical', 'life science', 'genomic',
+               'biolog', 'oncolog'):
+            return 'Healthcare & Biotech'
+        if has('tech', 'digital', 'innovation', 'internet', 'software', 'semiconductor',
+               'cloud', 'data centre', 'robotics', 'automation', 'fintech'):
+            return 'Technology & Innovation'
+        if has('esg', 'ethical', 'responsible', 'sustainable', 'sustainability',
+               'impact', 'social', 'governance', 'climate'):
+            return 'ESG & Sustainability'
+        if has('infrastructure', 'toll road', 'airport', 'utility', 'utilities'):
+            return 'Global Infrastructure'
+        if has('global real estate', 'global reit', 'global property'):
+            return 'Global REITs'
+        return 'Technology & Innovation'
+
+    return None
