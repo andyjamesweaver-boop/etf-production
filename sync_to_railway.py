@@ -14,6 +14,7 @@ Environment variables (or edit defaults below):
 import gzip
 import io
 import os
+import ssl
 import sys
 import urllib.request
 import urllib.error
@@ -59,8 +60,13 @@ def main():
         },
     )
 
+    # macOS Python ships without system CA certs; bypass verification for this local tool
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+
     try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
+        with urllib.request.urlopen(req, timeout=120, context=ctx) as resp:
             body = resp.read().decode()
             print(f"Success ({resp.status}): {body}")
     except urllib.error.HTTPError as e:
