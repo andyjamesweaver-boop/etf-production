@@ -1369,6 +1369,7 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
             'Market Trends': ('bg-blue-100',   'text-blue-800'),
             'Thematic':      ('bg-purple-100', 'text-purple-800'),
             'Research':      ('bg-amber-100',  'text-amber-800'),
+            'Education':     ('bg-teal-100',   'text-teal-800'),
         }
         cards = ''
         for a in get_all_articles():
@@ -4136,7 +4137,8 @@ def _handle_articles_list(self):
         'Performance': ('bg-green-100', 'text-green-800'),
         'Market Trends': ('bg-blue-100', 'text-blue-800'),
         'Thematic': ('bg-purple-100', 'text-purple-800'),
-        'Research': ('bg-amber-100', 'text-amber-800'),
+        'Research':   ('bg-amber-100',  'text-amber-800'),
+        'Education':  ('bg-teal-100',   'text-teal-800'),
     }
     for a in articles:
         bg, fg = category_colors.get(a['category'], ('bg-gray-100', 'text-gray-800'))
@@ -4173,7 +4175,8 @@ def _handle_article_detail(self, slug):
         'Performance': ('bg-green-100', 'text-green-800'),
         'Market Trends': ('bg-blue-100', 'text-blue-800'),
         'Thematic': ('bg-purple-100', 'text-purple-800'),
-        'Research': ('bg-amber-100', 'text-amber-800'),
+        'Research':   ('bg-amber-100',  'text-amber-800'),
+        'Education':  ('bg-teal-100',   'text-teal-800'),
     }
     bg, fg = category_colors.get(a['category'], ('bg-gray-100', 'text-gray-800'))
 

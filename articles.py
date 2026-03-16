@@ -137,6 +137,213 @@ ARTICLES = [
 """,
     },
 
+    # ── ETF Basics ──────────────────────────────────────────────────────────────
+
+    {
+        "slug": "what-is-an-etf",
+        "title": "What Is an ETF?",
+        "subtitle": "Exchange traded funds combine the diversification of a managed fund with the simplicity of buying a single share. Here is how they work.",
+        "date": "2026-03-17",
+        "category": "Education",
+        "summary": "ETFs are the fastest-growing investment vehicle in Australia. We explain what they are, how the creation and redemption mechanism keeps prices fair, and why they have become the default choice for low-cost, diversified investing.",
+        "body": """
+<p>An <strong>exchange traded fund (ETF)</strong> is a fund that trades on a stock exchange — just like a share in BHP or CBA. When you buy one unit of VAS, for example, you are buying a small slice of a portfolio that holds every company in the S&P/ASX 300 index. The fund does all the work of owning and rebalancing those 300 stocks; you just own one line item in your brokerage account.</p>
+
+<p>Australia now has <strong>472 ETFs</strong> listed on the ASX and Cboe Australia, collectively managing over <strong>$336 billion</strong> in assets. The market has grown at roughly 25% per year for the past decade and shows no sign of slowing.</p>
+
+<h2>How an ETF is different from a managed fund</h2>
+<p>Before ETFs, the standard way to access a diversified portfolio was through a <em>managed fund</em> — an unlisted trust where you sent money directly to the fund manager and received units in return. Managed funds are priced once a day (typically at 4pm), and withdrawals can take several days to settle.</p>
+
+<p>ETFs solve both problems. Because units trade continuously on the exchange during market hours, you can buy or sell at any point in the trading day at the current market price. Settlement is T+2, the same as shares.</p>
+
+<h2>The creation and redemption mechanism</h2>
+<p>The key to understanding ETFs is the <strong>creation and redemption</strong> process — the system that keeps an ETF's market price closely aligned with the value of its underlying holdings.</p>
+
+<p>Large financial institutions called <em>authorised participants</em> (APs) can create new ETF units by delivering a basket of the underlying securities to the fund manager. In return they receive ETF units to sell on market. They can also do the reverse: redeem ETF units by handing them back and receiving the underlying securities.</p>
+
+<p>This arbitrage mechanism is self-correcting. If ETF units trade at a <em>premium</em> to the underlying basket, APs buy the basket cheaply, create new units, and sell them at the premium — pushing the ETF price back down. If units trade at a <em>discount</em>, APs buy cheap ETF units, redeem them for the basket, and sell the basket — pushing the ETF price back up. In practice, for liquid ETFs, this keeps the gap between market price and Net Asset Value (NAV) to a few cents.</p>
+
+<h2>Index ETFs vs active ETFs</h2>
+<p>Most ETFs in Australia are <strong>index ETFs</strong> — they track a published index such as the S&P/ASX 200, the MSCI World, or the Bloomberg AusBond Composite. The portfolio is determined by the index rules, not by a manager making active decisions. This means costs are low: the median Australian index ETF charges around <strong>0.20% per year</strong>.</p>
+
+<p><strong>Active ETFs</strong> use the same exchange-traded wrapper but let a portfolio manager make investment decisions. They typically charge more — the average active ETF in Australia charges around 0.76% — but offer the potential for returns that differ from the index.</p>
+
+<h2>What you own when you buy an ETF</h2>
+<p>When you buy units in a fund structured as a trust (most Australian ETFs), you are a <em>beneficiary</em> of the trust — you have a proportional claim on the trust's assets. You do not directly own the underlying shares; the trustee holds them on your behalf. This is an important distinction for tax purposes: capital gains and income are realised at the trust level and distributed to unitholders, with their own tax implications.</p>
+
+<p>Structured products like Global X's ETPMAG (physical silver) are slightly different — they are classified as exchange traded products (ETPs) rather than managed investment trusts, and are backed by physical commodity held in a vault rather than by shares in companies.</p>
+
+<h2>Getting started</h2>
+<p>To buy an ETF in Australia you need a brokerage account with a firm that has ASX access — CommSec, SelfWealth, Pearler, Stake, and interactive brokers are common choices. You can search for any ETF by its three- or four-letter code (VAS, NDQ, IVV, etc.) and place a buy order just like you would for a share. Most online brokers charge $5–$15 per trade, and some offer commission-free ETF purchases for accounts under certain thresholds.</p>
+""",
+    },
+
+    {
+        "slug": "etf-costs-explained",
+        "title": "ETF Costs Explained: MER, Brokerage and Bid-Ask Spreads",
+        "subtitle": "The management fee is only one of three costs you pay when investing in ETFs. Understanding all three is the difference between a good outcome and a mediocre one.",
+        "date": "2026-03-17",
+        "category": "Education",
+        "summary": "Management expense ratios get most of the attention, but brokerage commissions and bid-ask spreads can easily dwarf the MER for small or frequent investors. We break down every cost and show when each one matters most.",
+        "body": """
+<p>Cost is one of the strongest predictors of long-term investment returns. In a world where future market returns are uncertain, minimising fees is one of the few things investors can control. ETFs are generally cheap — but understanding exactly what you're paying requires looking at three distinct costs.</p>
+
+<h2>1. The management expense ratio (MER)</h2>
+<p>The <strong>MER</strong> — sometimes called the management fee or total expense ratio — is an annual charge expressed as a percentage of assets under management. It is deducted from the fund's assets continuously (not billed separately), which means the unit price you see already reflects this cost.</p>
+
+<p>For Australian index ETFs, MERs range from <strong>0.04%</strong> (IVV, A200) at the very cheapest to around <strong>0.69%</strong> for specialised thematic products. The average across all Australian ETFs is roughly <strong>0.40%</strong>. Active ETFs charge more — typically 0.60–1.00% — to cover the cost of portfolio management.</p>
+
+<table>
+  <thead><tr><th>Type</th><th>Typical MER range</th><th>Examples</th></tr></thead>
+  <tbody>
+    <tr><td>Broad index ETFs</td><td>0.04% – 0.20%</td><td>A200 (0.04%), VAS (0.07%), VGS (0.18%)</td></tr>
+    <tr><td>Factor / smart beta</td><td>0.25% – 0.50%</td><td>QUAL (0.40%), VDHG (0.27%), DHHF (0.19%)</td></tr>
+    <tr><td>Thematic ETFs</td><td>0.45% – 0.69%</td><td>NDQ (0.48%), WIRE (0.65%), XMET (0.69%)</td></tr>
+    <tr><td>Active ETFs</td><td>0.60% – 1.20%</td><td>DIVI (0.85%), QGFH (0.92%), MIDS (1.25%)</td></tr>
+    <tr><td>Physical commodities</td><td>0.40% – 0.65%</td><td>GOLD (0.40%), ETPMAG (0.49%), QAU (0.58%)</td></tr>
+  </tbody>
+</table>
+
+<p>Over long periods, even small differences in MER compound significantly. At 7% annual returns, $100,000 invested for 20 years in a 0.04% MER fund grows to approximately $385,000. The same investment in a 0.75% MER fund grows to only $339,000 — a difference of $46,000 on an identical underlying return.</p>
+
+<h2>2. Brokerage commission</h2>
+<p>Every time you buy or sell ETF units on the exchange, your broker charges a commission. This is typically a flat fee between <strong>$5 and $15 per trade</strong> for standard retail brokers in Australia, though some platforms (Pearler, Stake) offer commission-free ETF investing under certain conditions.</p>
+
+<p>Brokerage matters most for small or frequent investors. A $10 brokerage fee on a $200 purchase is a 5% drag — dwarfing even the highest ETF MERs. The same $10 on a $5,000 purchase is just 0.2%, which is more reasonable. As a general rule, many advisers suggest a minimum trade size of <strong>$1,000–$2,000</strong> to keep brokerage as a fraction of the investment.</p>
+
+<p>For investors using a <em>dollar-cost averaging</em> strategy (buying a fixed dollar amount on a regular schedule), the math is simple: minimise brokerage by buying less frequently in larger amounts, or use a zero-commission platform.</p>
+
+<h2>3. Bid-ask spread</h2>
+<p>When you look at an ETF's price on your broker platform, you'll see two prices: the <em>bid</em> (what buyers are willing to pay) and the <em>ask</em> (what sellers are asking). The difference is the <strong>bid-ask spread</strong>, and it is paid to market makers as compensation for providing liquidity.</p>
+
+<p>For Australia's largest, most liquid ETFs — VAS, VGS, IVV, A200 — the spread is typically just 1–3 cents on a $100+ unit price, making it negligible. For smaller or less-traded ETFs, the spread can be 0.1% to 0.5% or more, adding a hidden cost to every transaction.</p>
+
+<p>Practical tip: always use <strong>limit orders</strong> rather than market orders when buying or selling ETFs. A limit order lets you specify the maximum price you'll pay (or minimum you'll accept), preventing you from accidentally paying an inflated ask in a thin market. Place your limit at or near the mid-price (midpoint between bid and ask) for the best fill.</p>
+
+<h2>How the three costs interact</h2>
+<p>For a long-term, buy-and-hold investor making a small number of large purchases, the MER dominates total cost. For an active trader making many small purchases, brokerage and spreads dominate. Most retail investors land somewhere in between.</p>
+
+<p>A useful mental model: <em>the MER eats at your returns slowly and continuously; brokerage and spreads hit you every time you trade</em>. Minimise MER by choosing low-cost funds, and minimise trading costs by keeping transactions infrequent and large.</p>
+""",
+    },
+
+    {
+        "slug": "passive-vs-active-etfs",
+        "title": "Passive vs Active ETFs: What's the Difference?",
+        "subtitle": "Index ETFs follow rules. Active ETFs have a manager making decisions. The distinction shapes fees, tax efficiency, transparency and long-run performance expectations.",
+        "date": "2026-03-17",
+        "category": "Education",
+        "summary": "Australia's ETF market is split roughly two-to-one between passive index products and active strategies. We explain the core difference, when active might add value, and what the evidence says about each approach.",
+        "body": """
+<p>When you buy a passive ETF, you are buying the market. When you buy an active ETF, you are hiring a manager to try to beat it. Both use the same exchange-traded wrapper, but they represent fundamentally different investment philosophies.</p>
+
+<h2>How passive (index) ETFs work</h2>
+<p>A passive ETF tracks an index — a rules-based list of securities that is constructed and maintained by an independent index provider such as S&P, MSCI, or Bloomberg. The fund's job is to hold the same securities as the index in the same proportions, and to buy or sell only when the index changes.</p>
+
+<p>Because there is no research team deciding what to buy, costs are low. The cheapest Australian index ETFs — BetaShares A200 and iShares IVV — charge just <strong>0.04% per year</strong>. Even the most expensive passive products rarely exceed 0.70%.</p>
+
+<p>Passive ETFs are also highly transparent: the index rules are public, so you always know exactly what you own. VAS holds every company in the ASX 300. VGS holds large and mid-cap companies across 23 developed markets. There are no surprises.</p>
+
+<h2>How active ETFs work</h2>
+<p>An active ETF gives a portfolio manager discretion to construct a portfolio that differs from any index. The manager might overweight sectors they find attractive, underweight individual stocks they consider overvalued, or hold cash when they expect a market decline.</p>
+
+<p>Australia now has <strong>143 active ETFs</strong> managing $59.6 billion — a category that barely existed five years ago. Many are conversions of pre-existing unlisted managed funds, which brings the advantage of an established track record before the ETF listing.</p>
+
+<p>Active ETFs charge more. The average fee for an active ETF in Australia is <strong>0.76% per year</strong>, roughly double the passive average. But fees alone do not determine outcomes — the question is whether the manager's skill generates enough extra return to compensate.</p>
+
+<h2>The performance evidence</h2>
+<p>The S&P SPIVA report — which tracks how actively managed funds perform against their benchmark indices — has consistently found that a <em>majority</em> of active managers underperform their benchmark index after fees over periods of five years or longer. In Australia, the 10-year SPIVA data shows that roughly 80% of active Australian equity funds underperformed the S&P/ASX 200 index.</p>
+
+<p>This does not mean active management is always inferior. A minority of managers have demonstrated genuine, persistent skill. The challenge for investors is identifying those managers before the fact — and paying fees only when they are justified by expected outperformance.</p>
+
+<h2>When active might make sense</h2>
+<p>There are categories where active management has a more credible case:</p>
+
+<ul>
+  <li><strong>Less efficient markets</strong>: In small-cap Australian stocks or emerging markets, information is less widely distributed and prices may be more frequently mispriced — giving a skilled analyst a better edge.</li>
+  <li><strong>Fixed income</strong>: Active bond managers can add value through duration positioning, credit selection and avoiding defaults in ways that mechanical index-tracking does not.</li>
+  <li><strong>Specific mandates</strong>: An active fund with a clear, narrow mandate — such as a quality-screened equity income strategy — may serve a portfolio purpose that no passive index cleanly captures.</li>
+</ul>
+
+<h2>A practical framework</h2>
+<p>Many investors use a <em>core-satellite</em> approach: a low-cost passive core (VAS + VGS or similar) forms the foundation, representing 70–90% of the portfolio. Active or thematic ETFs make up the satellite — smaller allocations to specific ideas or manager strategies where the investor has a particular conviction.</p>
+
+<p>For most investors starting out, the case for beginning with passive index ETFs is strong: low fees, full transparency, no manager selection risk, and returns that track the market they're invested in. Complexity can be added later, when the reasoning is clear.</p>
+""",
+    },
+
+    {
+        "slug": "building-a-portfolio-with-etfs",
+        "title": "Building a Portfolio with ETFs",
+        "subtitle": "From a single diversified fund to a multi-asset portfolio — the building blocks available to Australian investors and how they fit together.",
+        "date": "2026-03-17",
+        "category": "Education",
+        "summary": "With 472 ETFs to choose from, building a portfolio can feel overwhelming. We show how a handful of funds can cover Australian shares, international shares, bonds and alternatives — and how to think about combining them.",
+        "body": """
+<p>One of the most powerful features of ETFs is that you can build a globally diversified portfolio from just two or three funds. Or from one. The depth of the Australian ETF market means investors have an enormous range of building blocks, from ultra-broad diversified funds to narrow single-country or single-commodity products.</p>
+
+<h2>Option 1: One-fund simplicity</h2>
+<p>Several Australian ETFs are themselves diversified multi-asset portfolios. Vanguard's VDHG (Diversified High Growth) and BetaShares' DHHF (Diversified All Growth) hold a basket of underlying index ETFs spanning Australian shares, international shares, and bonds. You buy one fund and get exposure to thousands of companies across dozens of countries.</p>
+
+<table>
+  <thead><tr><th>ETF</th><th>Allocation</th><th>Fee</th><th>FUM</th></tr></thead>
+  <tbody>
+    <tr><td>VDHG</td><td>90% growth / 10% defensive</td><td>0.27%</td><td>$2.5B</td></tr>
+    <tr><td>DHHF</td><td>100% growth (shares)</td><td>0.19%</td><td>$2.1B</td></tr>
+    <tr><td>VDBA</td><td>70% growth / 30% defensive</td><td>0.27%</td><td>$230M</td></tr>
+    <tr><td>VDGR</td><td>80% growth / 20% defensive</td><td>0.27%</td><td>$610M</td></tr>
+  </tbody>
+</table>
+
+<p>These funds are particularly well-suited to investors who want simplicity, or who are starting out and want a sensible default. The main trade-off is slightly less control over the precise allocation and a slightly higher fee than assembling the components individually.</p>
+
+<h2>Option 2: The two or three-fund portfolio</h2>
+<p>The classic approach for a growth-oriented investor is a simple split between:</p>
+<ul>
+  <li><strong>Australian equities</strong>: VAS (ASX 300, 0.07%) or A200 (ASX 200, 0.04%)</li>
+  <li><strong>International equities</strong>: VGS (MSCI World, 0.18%) or IVV (S&P 500, 0.04%)</li>
+</ul>
+
+<p>A common starting split is 30% Australian / 70% international, though this is a personal decision that depends on your income exposure to Australian assets (if you work in Australia, you already have significant local economic exposure), your currency preference, and your views on the relative valuation of each market.</p>
+
+<p>Adding a third fund — a bond ETF such as VAF (Vanguard Australian Fixed Interest, 0.20%) or VBND (Vanguard Global Bond, 0.20%) — introduces a defensive component that tends to buffer portfolio volatility during equity market downturns.</p>
+
+<h2>The main asset class building blocks</h2>
+<table>
+  <thead><tr><th>Asset class</th><th>Examples</th><th>Role in portfolio</th></tr></thead>
+  <tbody>
+    <tr><td>Australian equities</td><td>VAS, A200, IOZ</td><td>Growth, income, AUD exposure</td></tr>
+    <tr><td>International equities</td><td>VGS, IVV, IWLD</td><td>Growth, global diversification</td></tr>
+    <tr><td>US equities</td><td>IVV, VGAD, QUS</td><td>S&amp;P 500 / US large caps</td></tr>
+    <tr><td>Emerging markets</td><td>VGE, EMKT, IEMG</td><td>Higher growth potential, higher volatility</td></tr>
+    <tr><td>Australian bonds</td><td>VAF, IAF, AGVT</td><td>Defensive, income, low correlation to equities</td></tr>
+    <tr><td>Global bonds (hedged)</td><td>VBND, ILB, BHYB</td><td>Defensive with currency hedge</td></tr>
+    <tr><td>Property / REITs</td><td>VAP, MVA, DJRE</td><td>Real asset exposure, income</td></tr>
+    <tr><td>Gold</td><td>GOLD, QAU, NUGG</td><td>Inflation hedge, safe haven</td></tr>
+  </tbody>
+</table>
+
+<h2>Core-satellite: adding targeted exposure</h2>
+<p>Once you have a passive core, you can add smaller <em>satellite</em> positions in ETFs with a more specific focus. A satellite position might be:</p>
+<ul>
+  <li>A thematic ETF (NDQ for US tech, WIRE for copper miners, URNM for uranium)</li>
+  <li>A factor ETF (QUAL for quality stocks, MVOL for minimum volatility, VDHG for value)</li>
+  <li>An active ETF (a manager you believe will outperform over the long term)</li>
+  <li>A sector ETF (MVB for Australian banks, MVR for resources)</li>
+</ul>
+
+<p>The satellite should be sized according to your conviction and your tolerance for underperformance relative to the broader market. Most practitioners suggest keeping individual satellite positions to 5–10% of the total portfolio at most.</p>
+
+<h2>Home bias: how much Australian exposure?</h2>
+<p>Australia represents about 2% of global equity market capitalisation. A purely market-cap-weighted global portfolio would hold about 2% in Australian stocks and 98% internationally. In practice, most Australian investors hold significantly more than 2% in Australian stocks — a phenomenon called home bias.</p>
+
+<p>There are legitimate reasons for some Australian tilt: Australian dividends carry franking credits that are valuable for Australian tax residents; AUD-denominated assets reduce currency risk for AUD-based investors; and the Australian dividend yield is historically higher than many comparable international markets. A range of 20–40% Australian equities is common, though there is no single correct answer.</p>
+
+<h2>Starting simply</h2>
+<p>The best portfolio is one you will actually maintain through market volatility. Complexity adds nothing if it leads to poor decisions under pressure. Many experienced investors look back and wish they had started with something simpler: a two or three-fund portfolio, low fees, broad diversification, and regular contributions. The rest is refinement.</p>
+""",
+    },
+
     {
         "slug": "green-metals-etf-boom-2026",
         "title": "Green Metals on the ASX: The ETFs Betting on the Energy Transition",
