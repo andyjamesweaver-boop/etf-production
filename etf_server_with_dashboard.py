@@ -4202,6 +4202,13 @@ def run_server(port=None):
     if port is None:
         port = int(os.getenv('PORT') or os.getenv('ETF_PORT', '8081'))
 
+    # Start the background PCF scheduler (daemon thread — exits with server)
+    try:
+        from scheduler import start_scheduler
+        start_scheduler()
+    except Exception as e:
+        print(f"[warn] Scheduler failed to start: {e}")
+
     socketserver.TCPServer.allow_reuse_address = True
     with socketserver.TCPServer(("", port), ETFAPIHandler) as httpd:
         print(f"ETF Dashboard API running at http://localhost:{port}")

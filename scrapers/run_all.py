@@ -80,6 +80,20 @@ def run_nav():
     return scrape_nav(DB_PATH)
 
 
+def run_pcf():
+    """
+    Run only the issuer scrapers that download Portfolio Composition Files (PCFs).
+    This is a targeted run intended for twice-daily scheduling: it fetches the
+    latest PCF/holdings files from Global X, Macquarie, Dimensional and other
+    issuers that publish intraday-updated basket files, then rebuilds FUM ranks.
+    """
+    from scrapers.issuer_scrapers import scrape_all_issuers
+    count = scrape_all_issuers(DB_PATH)
+    from scrapers.master_list import build_master_list
+    build_master_list(DB_PATH)
+    return count
+
+
 SOURCES = {
     'asx_report': ('ASX Monthly Report', run_asx_report),
     'cboe': ('Cboe Australia', run_cboe),
@@ -88,6 +102,7 @@ SOURCES = {
     'master': ('Master List Builder', run_master),
     'nav': ('NAV & Premium/Discount', run_nav),
     'documents': ('Document Ingestion & AI Summaries', run_documents),
+    'pcf': ('PCF / Holdings Refresh', run_pcf),
 }
 
 
@@ -167,6 +182,7 @@ Sources:
   issuers     Scrape issuer websites (BetaShares, VanEck, Vanguard, iShares, SPDR, Global X)
   master      Rebuild FUM rankings and issuer stats
   documents   Discover PDS/TMD/factsheet URLs and generate AI summaries (slow, costs money)
+  pcf         Download PCF/holdings files from issuers + rebuild FUM ranks (twice-daily)
   all         Run all of the above except 'documents' (default)
         """
     )
