@@ -974,7 +974,7 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
             ).fetchall()
             by_ft = conn.execute(
                 "SELECT COALESCE(fund_type,'ETF') AS fund_type, COUNT(*) AS count FROM etfs "
-                "GROUP BY fund_type ORDER BY count DESC"
+                "GROUP BY COALESCE(fund_type,'ETF') ORDER BY count DESC"
             ).fetchall()
 
             # Unique dimension values for filter dropdowns

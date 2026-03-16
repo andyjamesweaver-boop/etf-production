@@ -345,12 +345,13 @@ async function init() {
     ['Most Active Year', peakYear[0], peakYear[1] + ' new listings'],
   ].map(([l,v,s]) => `<div class="card"><div class="sl">${l}</div><div class="sv">${v}</div><div class="ss">${s}</div></div>`).join('');
 
+  // Show the page before rendering the chart so the canvas has real dimensions
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('page').classList.remove('hidden');
+
   renderYearChart();
   renderTables();
   renderBars();
-
-  document.getElementById('loading').classList.add('hidden');
-  document.getElementById('page').classList.remove('hidden');
 }
 
 function renderYearChart() {
