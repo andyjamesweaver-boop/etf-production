@@ -132,6 +132,7 @@ def _parse_etf_sheet(ws) -> list[dict]:
     col_map = {}
     patterns = {
         'code':      re.compile(r'(code|ticker|asx\s*code)'),
+        'fund_type': re.compile(r'^\s*type\s*$'),
         'name':      re.compile(r'(fund\s*name|product\s*name|etf\s*name|name)'),
         'issuer':    re.compile(r'(issuer|manager|provider|fund\s*manager)'),
         'category':  re.compile(r'(category|asset\s*class|sector|classification)'),
@@ -177,9 +178,11 @@ def _parse_etf_sheet(ws) -> list[dict]:
                 return None
             return row[idx]
 
+        raw_type = str(cell('fund_type') or '').strip() or None
         etf = {
             'code': code,
             'name': str(cell('name') or '').strip() or None,
+            'fund_type': raw_type,
             'issuer': normalise_issuer(str(cell('issuer') or '').strip() or None),
             'asset_class': normalise_asset_class(str(cell('category') or '').strip() or None),
             'exchange': 'ASX',

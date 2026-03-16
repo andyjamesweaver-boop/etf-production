@@ -52,6 +52,18 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
             '/api/v1/screener': lambda: self.handle_screener(qs),
             '/api/v1/compare': lambda: self.handle_compare(qs),
             '/api/v1/holdings/search': lambda: self.handle_holdings_search(qs),
+            # Insights API
+            '/api/v1/insights/fum':      self.handle_insights_fum,
+            '/api/v1/insights/listings': self.handle_insights_listings,
+            '/api/v1/insights/returns':  self.handle_insights_returns,
+            '/api/v1/insights/expense':  self.handle_insights_expense,
+            '/api/v1/insights/issuers':  self.handle_insights_issuers,
+            # Insights pages
+            '/insights/fum':      lambda: self.handle_insights_page('fum'),
+            '/insights/listings': lambda: self.handle_insights_page('listings'),
+            '/insights/returns':  lambda: self.handle_insights_page('returns'),
+            '/insights/expense':  lambda: self.handle_insights_page('expense'),
+            '/insights/issuers':  lambda: self.handle_insights_page('issuers'),
         }
 
         handler = routes.get(path)
@@ -74,6 +86,8 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
                 self.handle_etf_dividends(code)
             elif sub == 'price-history':
                 self.handle_etf_price_history(code, qs)
+            elif sub == 'similar':
+                self.handle_etf_similar(code)
             else:
                 self.send_json({'error': f'Unknown sub-resource: {sub}'}, 404)
             return
@@ -153,6 +167,7 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
             asset_class = self._str(qs, 'asset_class')
             category = self._str(qs, 'category')  # alias
             benchmark = self._str(qs, 'benchmark')
+            fund_type = self._str(qs, 'fund_type')
 
             if exchange:
                 where.append("exchange = ?"); params.append(exchange.upper())
@@ -162,16 +177,20 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
                 where.append("asset_class = ?"); params.append(asset_class or category)
             if benchmark:
                 where.append("benchmark LIKE ?"); params.append(f'%{benchmark}%')
+            if fund_type:
+                where.append("fund_type = ?"); params.append(fund_type)
 
             sort_field_map = {
-                'fum':      ('fund_size_aud_millions', 'DESC'),
-                'price':    ('current_price',          'DESC'),
-                'return_1y':('return_1y',              'DESC'),
-                'yield':    ('distribution_yield',     'DESC'),
-                'expense':  ('expense_ratio',          'ASC'),
-                'name':     ('name',                   'ASC'),
-                'code':     ('code',                   'ASC'),
-                'rank':     ('rank_by_fum',            'ASC'),
+                'fum':       ('fund_size_aud_millions', 'DESC'),
+                'price':     ('current_price',          'DESC'),
+                'return_1y': ('return_1y',              'DESC'),
+                'return_3y': ('return_3y',              'DESC'),
+                'return_5y': ('return_5y',              'DESC'),
+                'yield':     ('distribution_yield',     'DESC'),
+                'expense':   ('expense_ratio',          'ASC'),
+                'name':      ('name',                   'ASC'),
+                'code':      ('code',                   'ASC'),
+                'rank':      ('rank_by_fum',            'ASC'),
             }
             sort_by  = self._str(qs, 'sort_by',  'rank')
             sort_dir = self._str(qs, 'sort_dir', '').upper()
@@ -208,7 +227,23 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
             if not row:
                 self.send_json({'error': f'ETF {code} not found'}, 404)
                 return
-            self.send_json(dict(row))
+            d = dict(row)
+            # Compute units change from history (current minus previous record)
+            hist = conn.execute(
+                "SELECT units_on_issue, date FROM units_history "
+                "WHERE etf_code = ? AND units_on_issue IS NOT NULL "
+                "ORDER BY date DESC LIMIT 2",
+                (code,)
+            ).fetchall()
+            if len(hist) >= 2:
+                d['units_change'] = hist[0]['units_on_issue'] - hist[1]['units_on_issue']
+                d['units_change_date'] = hist[0]['date']
+                d['units_change_prev_date'] = hist[1]['date']
+            else:
+                d['units_change'] = None
+                d['units_change_date'] = None
+                d['units_change_prev_date'] = None
+            self.send_json(d)
         except Exception as e:
             self.send_json({'error': str(e)}, 500)
         finally:
@@ -219,7 +254,7 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
         conn = get_db()
         try:
             rows = conn.execute(
-                "SELECT name, ticker, weight_pct, sector, country FROM etf_holdings "
+                "SELECT name, ticker, weight_pct, sector, country, last_updated FROM etf_holdings "
                 "WHERE etf_code = ? ORDER BY weight_pct DESC", (code,)
             ).fetchall()
             self.send_json({'code': code, 'holdings': [dict(r) for r in rows]})
@@ -233,7 +268,7 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
         conn = get_db()
         try:
             rows = conn.execute(
-                "SELECT sector, weight_pct FROM etf_sectors "
+                "SELECT sector, weight_pct, last_updated FROM etf_sectors "
                 "WHERE etf_code = ? ORDER BY weight_pct DESC", (code,)
             ).fetchall()
             self.send_json({'code': code, 'sectors': [dict(r) for r in rows]})
@@ -258,14 +293,77 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
 
     # ----- Price history -----
     def handle_etf_price_history(self, code, qs):
-        days = self._int(qs, 'days', 90)
+        # period: 1m | 3m | 6m | 1y | 3y | 5y  (default 1y)
+        period = self._str(qs, 'period', '1y')
+        period_days = {'1m': 31, '3m': 92, '6m': 183, '1y': 365,
+                       '3y': 1095, '5y': 1825}.get(period, 365)
+        from datetime import date, timedelta
+        since = (date.today() - timedelta(days=period_days)).isoformat()
+
         conn = get_db()
         try:
+            # ETF price series
             rows = conn.execute(
                 "SELECT date, open, high, low, close, volume FROM price_history "
-                "WHERE etf_code = ? ORDER BY date DESC LIMIT ?", (code, days)
+                "WHERE etf_code=? AND date>=? ORDER BY date ASC",
+                (code, since)
             ).fetchall()
-            self.send_json({'code': code, 'prices': [dict(r) for r in rows]})
+
+            # Benchmark for this ETF's asset class
+            ac = conn.execute(
+                "SELECT asset_class FROM etfs WHERE code=?", (code,)
+            ).fetchone()
+            ac = ac['asset_class'] if ac else None
+
+            # Map asset class → primary benchmark (must match price_history_fetcher.py)
+            AC_BENCHMARK = {
+                'Australian Equities':    'ASX200',
+                'International Equities': 'SP500',
+                'US Equities':            'SP500',
+                'Fixed Income':           'AU_BOND',
+                'Property':               'ASX200',
+                'Commodities':            'GOLD',
+                'Cash':                   'AU_CASH',
+                'Multi-Asset':            'SP500',
+                'Thematic':              'SP500',
+                'Currency':               'SP500',
+                'Digital Assets':         'BTC',
+                'Alternatives':           'SP500',
+                'Diversified':            'SP500',
+                'leveraged & inverse':    'ASX200',
+            }
+            bmark_name = AC_BENCHMARK.get(ac, 'ASX200')
+
+            # All benchmark series for this period
+            bmark_rows = conn.execute(
+                "SELECT ticker, date, close FROM benchmark_history "
+                "WHERE date>=? ORDER BY ticker, date ASC",
+                (since,)
+            ).fetchall()
+
+            # Group benchmarks by ticker
+            benchmarks = {}
+            for r in bmark_rows:
+                t = r['ticker']
+                if t not in benchmarks:
+                    benchmarks[t] = []
+                benchmarks[t].append({'date': r['date'], 'close': r['close']})
+
+            # Period return table from price history
+            prices = [r['close'] for r in rows if r['close']]
+            period_return = None
+            if len(prices) >= 2:
+                period_return = round((prices[-1] / prices[0] - 1) * 100, 2)
+
+            self.send_json({
+                'code': code,
+                'asset_class': ac,
+                'default_benchmark': bmark_name,
+                'period': period,
+                'prices': [dict(r) for r in rows],
+                'benchmarks': benchmarks,
+                'period_return': period_return,
+            })
         except Exception as e:
             self.send_json({'error': str(e)}, 500)
         finally:
@@ -360,12 +458,12 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
         conn = get_db()
         try:
             inflows = conn.execute(
-                "SELECT code, name, fund_flow_1m FROM etfs "
+                "SELECT code, name, issuer, fund_flow_1m FROM etfs "
                 "WHERE fund_flow_1m IS NOT NULL ORDER BY fund_flow_1m DESC LIMIT ?",
                 (limit,)
             ).fetchall()
             outflows = conn.execute(
-                "SELECT code, name, fund_flow_1m FROM etfs "
+                "SELECT code, name, issuer, fund_flow_1m FROM etfs "
                 "WHERE fund_flow_1m IS NOT NULL ORDER BY fund_flow_1m ASC LIMIT ?",
                 (limit,)
             ).fetchall()
@@ -551,6 +649,143 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
         finally:
             conn.close()
 
+    # ----- Similar ETFs (by portfolio holdings overlap) -----
+    def handle_etf_similar(self, code):
+        import re as _re
+        conn = get_db()
+        try:
+            # Fetch target ETF metadata
+            target = conn.execute(
+                "SELECT code, asset_class, name FROM etfs WHERE code=?", (code,)
+            ).fetchone()
+            if not target:
+                self.send_json({'error': 'ETF not found'}, 404)
+                return
+
+            target_ac = target['asset_class']
+
+            # Load all holdings
+            rows = conn.execute(
+                "SELECT etf_code, ticker, name, weight_pct FROM etf_holdings "
+                "WHERE weight_pct IS NOT NULL AND weight_pct > 0"
+            ).fetchall()
+
+            # --- Step 1: Build name→ticker lookup from holdings that have tickers.
+            # Also index first-28-char prefixes to match Dimensional ETFs that
+            # truncate names at 28 characters (e.g. "COMMONWEALTH BANK OF AUSTRAL").
+            name_to_ticker = {}
+            for r in rows:
+                if not r['ticker'] or not r['name']:
+                    continue
+                norm_t = _re.sub(r'-[A-Z]{2,3}$', '', r['ticker'].upper().strip())
+                if not norm_t:
+                    continue
+                norm_n = _re.sub(r'\s+', ' ', r['name'].upper().strip())
+                name_to_ticker[norm_n] = norm_t
+                if len(norm_n) > 28:
+                    name_to_ticker[norm_n[:28]] = norm_t
+
+            # --- Step 2: Canonical key for a holding.
+            # Prefer ticker; for name-only holdings resolve via lookup.
+            def _key(ticker, name):
+                if ticker:
+                    return _re.sub(r'-[A-Z]{2,3}$', '', ticker.upper().strip())
+                if name:
+                    norm_n = _re.sub(r'\s+', ' ', name.upper().strip())
+                    return name_to_ticker.get(norm_n, norm_n)
+                return ''
+
+            # --- Step 3: Build per-ETF weight dicts keyed by canonical key
+            holdings_map = {}
+            for r in rows:
+                ec = r['etf_code']
+                k = _key(r['ticker'], r['name'])
+                if not k:
+                    continue
+                if ec not in holdings_map:
+                    holdings_map[ec] = {}
+                holdings_map[ec][k] = holdings_map[ec].get(k, 0) + r['weight_pct']
+
+            target_h = holdings_map.get(code)
+            if not target_h:
+                self.send_json({'similar': [], 'message': 'No holdings data for this ETF'})
+                return
+
+            # --- Step 4: Compute weighted overlap for all other ETFs
+            # Fetch asset classes for all ETFs so we can prioritise same-class
+            ac_map = {r['code']: r['asset_class'] for r in conn.execute(
+                "SELECT code, asset_class FROM etfs"
+            ).fetchall()}
+
+            same_class, other_class = [], []
+            for other_code, other_h in holdings_map.items():
+                if other_code == code:
+                    continue
+                shared = sum(
+                    min(target_h[k], other_h[k])
+                    for k in target_h
+                    if k in other_h
+                )
+                if shared <= 0:
+                    continue
+                entry = (other_code, round(shared, 2))
+                if ac_map.get(other_code) == target_ac:
+                    same_class.append(entry)
+                else:
+                    other_class.append(entry)
+
+            same_class.sort(key=lambda x: x[1], reverse=True)
+            other_class.sort(key=lambda x: x[1], reverse=True)
+
+            # Return up to 8 same-class, then fill remaining slots (up to 12 total)
+            # with cross-class ETFs that have meaningful overlap (>= 5%)
+            SAME_LIMIT  = 8
+            TOTAL_LIMIT = 12
+            top_same  = same_class[:SAME_LIMIT]
+            top_other = [e for e in other_class if e[1] >= 5.0][: TOTAL_LIMIT - len(top_same)]
+            combined  = top_same + top_other
+            top_codes = [c for c, _ in combined]
+
+            if not top_codes:
+                self.send_json({'similar': [], 'same_class_count': 0})
+                return
+
+            # --- Step 5: Fetch metadata
+            score_map = {c: s for c, s in combined}
+            placeholders = ','.join('?' * len(top_codes))
+            etf_rows = conn.execute(
+                f"SELECT code, name, asset_class, issuer, fund_size_aud_millions, "
+                f"       COALESCE(expense_ratio, management_fee) AS expense_ratio, "
+                f"       return_1y "
+                f"FROM etfs WHERE code IN ({placeholders})",
+                top_codes
+            ).fetchall()
+
+            same_result, other_result = [], []
+            for r in etf_rows:
+                d = dict(r)
+                d['overlap_pct'] = score_map.get(r['code'], 0)
+                if r['asset_class'] == target_ac:
+                    same_result.append(d)
+                else:
+                    other_result.append(d)
+
+            same_result.sort(key=lambda x: x['overlap_pct'], reverse=True)
+            other_result.sort(key=lambda x: x['overlap_pct'], reverse=True)
+
+            self.send_json({
+                'code': code,
+                'asset_class': target_ac,
+                'same_class': same_result,
+                'other_class': other_result,
+                # Legacy flat list for backwards compat
+                'similar': same_result + other_result,
+            })
+        except Exception as e:
+            self.send_json({'error': str(e)}, 500)
+        finally:
+            conn.close()
+
     # ----- Holdings search -----
     def handle_holdings_search(self, qs):
         q = self._str(qs, 'q', '')
@@ -587,6 +822,313 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
         finally:
             conn.close()
 
+    # ================================================================== INSIGHTS PAGES
+    def handle_insights_page(self, name):
+        from insights_pages import get_insights_page
+        html = get_insights_page(name)
+        if html:
+            self.send_html(html)
+        else:
+            self.send_json({'error': f'Unknown insight page: {name}'}, 404)
+
+    # ----- Insights: FUM analysis -----
+    def handle_insights_fum(self):
+        conn = get_db()
+        try:
+            total = conn.execute(
+                "SELECT COALESCE(SUM(fund_size_aud_millions),0) FROM etfs"
+            ).fetchone()[0] or 1
+
+            top_etfs = conn.execute(
+                "SELECT code, name, issuer, asset_class, fund_size_aud_millions AS fum "
+                "FROM etfs WHERE fund_size_aud_millions > 0 ORDER BY fum DESC LIMIT 50"
+            ).fetchall()
+
+            by_issuer = conn.execute(
+                "SELECT issuer, COALESCE(SUM(fund_size_aud_millions),0) AS total_fum, "
+                "COUNT(*) AS etf_count FROM etfs WHERE issuer IS NOT NULL "
+                "GROUP BY issuer ORDER BY total_fum DESC"
+            ).fetchall()
+
+            by_ac = conn.execute(
+                "SELECT asset_class, COALESCE(SUM(fund_size_aud_millions),0) AS total_fum, "
+                "COUNT(*) AS etf_count FROM etfs WHERE asset_class IS NOT NULL "
+                "GROUP BY asset_class ORDER BY total_fum DESC"
+            ).fetchall()
+
+            # Top 5 per asset class and per issuer
+            top_per_ac, top_per_issuer = {}, {}
+            for row in by_ac:
+                ac = row['asset_class']
+                rows = conn.execute(
+                    "SELECT code, name, fund_size_aud_millions AS fum FROM etfs "
+                    "WHERE asset_class=? AND fund_size_aud_millions>0 ORDER BY fum DESC LIMIT 5",
+                    (ac,)
+                ).fetchall()
+                top_per_ac[ac] = [dict(r) for r in rows]
+            for row in by_issuer:
+                iss = row['issuer']
+                rows = conn.execute(
+                    "SELECT code, name, fund_size_aud_millions AS fum FROM etfs "
+                    "WHERE issuer=? AND fund_size_aud_millions>0 ORDER BY fum DESC LIMIT 5",
+                    (iss,)
+                ).fetchall()
+                top_per_issuer[iss] = [dict(r) for r in rows]
+
+            fums = [r['fum'] for r in top_etfs]
+            conc = {
+                'top5_pct':  round(sum(fums[:5])  / total * 100, 1),
+                'top10_pct': round(sum(fums[:10]) / total * 100, 1),
+                'top20_pct': round(sum(fums[:20]) / total * 100, 1),
+            }
+            self.send_json({
+                'total_fum': round(total, 2),
+                'top_etfs': [dict(r) | {'pct': round(r['fum'] / total * 100, 2)} for r in top_etfs],
+                'by_issuer': [dict(r) | {'pct': round(r['total_fum'] / total * 100, 2)} for r in by_issuer],
+                'by_asset_class': [dict(r) | {'pct': round(r['total_fum'] / total * 100, 2)} for r in by_ac],
+                'top_per_asset_class': top_per_ac,
+                'top_per_issuer': top_per_issuer,
+                'concentration': conc,
+            })
+        except Exception as e:
+            self.send_json({'error': str(e)}, 500)
+        finally:
+            conn.close()
+
+    # ----- Insights: listings history -----
+    def handle_insights_listings(self):
+        import re as _re
+        def year_from(d):
+            if not d: return None
+            m = _re.search(r'\b(20\d{2}|199\d)\b', str(d))
+            return m.group(1) if m else None
+
+        conn = get_db()
+        try:
+            all_etfs = conn.execute(
+                "SELECT code, name, issuer, asset_class, exchange, inception_date FROM etfs"
+            ).fetchall()
+
+            # Recent / oldest — sort lexicographically (ISO dates sort correctly; others approximate)
+            dated = [r for r in all_etfs if r['inception_date']]
+            dated_sorted = sorted(dated, key=lambda r: str(r['inception_date']))
+
+            year_counts = {}
+            for r in all_etfs:
+                yr = year_from(r['inception_date'])
+                if yr:
+                    year_counts[yr] = year_counts.get(yr, 0) + 1
+
+            by_issuer = conn.execute(
+                "SELECT issuer, COUNT(*) AS count FROM etfs WHERE issuer IS NOT NULL "
+                "GROUP BY issuer ORDER BY count DESC"
+            ).fetchall()
+            by_ac = conn.execute(
+                "SELECT asset_class, COUNT(*) AS count FROM etfs WHERE asset_class IS NOT NULL "
+                "GROUP BY asset_class ORDER BY count DESC"
+            ).fetchall()
+            by_ex = conn.execute(
+                "SELECT exchange, COUNT(*) AS count FROM etfs GROUP BY exchange ORDER BY count DESC"
+            ).fetchall()
+
+            self.send_json({
+                'total': len(all_etfs),
+                'recent': [dict(r) for r in reversed(dated_sorted[-30:])],
+                'oldest': [dict(r) for r in dated_sorted[:30]],
+                'by_year': sorted(
+                    [{'year': y, 'count': c} for y, c in year_counts.items()],
+                    key=lambda x: x['year']
+                ),
+                'by_issuer':     [dict(r) for r in by_issuer],
+                'by_asset_class':[dict(r) for r in by_ac],
+                'by_exchange':   [dict(r) for r in by_ex],
+            })
+        except Exception as e:
+            self.send_json({'error': str(e)}, 500)
+        finally:
+            conn.close()
+
+    # ----- Insights: returns analysis -----
+    def handle_insights_returns(self):
+        conn = get_db()
+        try:
+            avg = conn.execute(
+                "SELECT AVG(return_1y) FROM etfs WHERE return_1y IS NOT NULL"
+            ).fetchone()[0]
+
+            top = conn.execute(
+                "SELECT code, name, issuer, asset_class, return_1y, return_3y, return_5y, "
+                "fund_size_aud_millions FROM etfs WHERE return_1y IS NOT NULL "
+                "ORDER BY return_1y DESC LIMIT 30"
+            ).fetchall()
+            bottom = conn.execute(
+                "SELECT code, name, issuer, asset_class, return_1y, return_3y, return_5y, "
+                "fund_size_aud_millions FROM etfs WHERE return_1y IS NOT NULL "
+                "ORDER BY return_1y ASC LIMIT 20"
+            ).fetchall()
+            by_ac = conn.execute(
+                "SELECT asset_class, AVG(return_1y) AS avg_1y, AVG(return_3y) AS avg_3y, "
+                "AVG(return_5y) AS avg_5y, COUNT(*) AS etf_count "
+                "FROM etfs WHERE asset_class IS NOT NULL AND return_1y IS NOT NULL "
+                "GROUP BY asset_class ORDER BY avg_1y DESC"
+            ).fetchall()
+            by_issuer = conn.execute(
+                "SELECT issuer, AVG(return_1y) AS avg_1y, COUNT(*) AS etf_count "
+                "FROM etfs WHERE issuer IS NOT NULL AND return_1y IS NOT NULL "
+                "GROUP BY issuer ORDER BY avg_1y DESC"
+            ).fetchall()
+
+            buckets = ['<-40%','-40 to -20%','-20 to -10%','-10 to 0%',
+                       '0 to 5%','5 to 10%','10 to 20%','20 to 30%','30 to 50%','>50%']
+            counts = {b: 0 for b in buckets}
+            for row in conn.execute("SELECT return_1y FROM etfs WHERE return_1y IS NOT NULL"):
+                v = row[0]
+                if   v < -40: counts['<-40%']        += 1
+                elif v < -20: counts['-40 to -20%']  += 1
+                elif v < -10: counts['-20 to -10%']  += 1
+                elif v <   0: counts['-10 to 0%']    += 1
+                elif v <   5: counts['0 to 5%']      += 1
+                elif v <  10: counts['5 to 10%']     += 1
+                elif v <  20: counts['10 to 20%']    += 1
+                elif v <  30: counts['20 to 30%']    += 1
+                elif v <  50: counts['30 to 50%']    += 1
+                else:         counts['>50%']         += 1
+
+            self.send_json({
+                'avg_1y':          round(avg, 2) if avg is not None else None,
+                'top_performers':  [dict(r) for r in top],
+                'bottom_performers': [dict(r) for r in bottom],
+                'by_asset_class':  [dict(r) for r in by_ac],
+                'by_issuer':       [dict(r) for r in by_issuer],
+                'distribution':    [{'bucket': b, 'count': counts[b]} for b in buckets],
+            })
+        except Exception as e:
+            self.send_json({'error': str(e)}, 500)
+        finally:
+            conn.close()
+
+    # ----- Insights: expense / cost analysis -----
+    def handle_insights_expense(self):
+        # Use COALESCE(expense_ratio, management_fee) as effective MER.
+        # Many issuers (iShares, DFA, StateStreet) only populate management_fee;
+        # using expense_ratio alone produces misleadingly low averages for them.
+        MER = "COALESCE(expense_ratio, management_fee)"
+        conn = get_db()
+        try:
+            avg = conn.execute(
+                f"SELECT AVG({MER}) FROM etfs WHERE {MER} > 0"
+            ).fetchone()[0]
+
+            # FUM-weighted average MER across full market
+            fum_weighted_row = conn.execute(
+                f"SELECT SUM(fund_size_aud_millions * {MER}) / "
+                f"       SUM(CASE WHEN {MER} > 0 THEN fund_size_aud_millions END) "
+                f"FROM etfs WHERE {MER} > 0 AND fund_size_aud_millions > 0"
+            ).fetchone()[0]
+
+            cheapest = conn.execute(
+                f"SELECT code, name, issuer, asset_class, {MER} AS effective_mer, "
+                f"expense_ratio, management_fee, fund_size_aud_millions "
+                f"FROM etfs WHERE {MER} > 0 ORDER BY effective_mer ASC LIMIT 25"
+            ).fetchall()
+            priciest = conn.execute(
+                f"SELECT code, name, issuer, asset_class, {MER} AS effective_mer, "
+                f"expense_ratio, management_fee, fund_size_aud_millions "
+                f"FROM etfs WHERE {MER} IS NOT NULL ORDER BY effective_mer DESC LIMIT 25"
+            ).fetchall()
+
+            by_ac = conn.execute(
+                f"SELECT asset_class, AVG({MER}) AS avg_mer, MIN({MER}) AS min_mer, "
+                f"MAX({MER}) AS max_mer, COUNT(*) AS etf_count, "
+                f"SUM(fund_size_aud_millions * {MER}) / "
+                f"  SUM(CASE WHEN {MER} > 0 THEN fund_size_aud_millions END) AS fum_weighted_mer "
+                f"FROM etfs WHERE asset_class IS NOT NULL AND {MER} > 0 "
+                f"GROUP BY asset_class ORDER BY avg_mer ASC"
+            ).fetchall()
+
+            by_issuer = conn.execute(
+                f"SELECT issuer, AVG({MER}) AS avg_mer, MIN({MER}) AS min_mer, "
+                f"COUNT(*) AS etf_count, "
+                f"SUM(fund_size_aud_millions * {MER}) / "
+                f"  SUM(CASE WHEN {MER} > 0 THEN fund_size_aud_millions END) AS fum_weighted_mer, "
+                f"SUM(fund_size_aud_millions) AS total_fum "
+                f"FROM etfs WHERE issuer IS NOT NULL AND {MER} > 0 "
+                f"GROUP BY issuer ORDER BY avg_mer ASC"
+            ).fetchall()
+
+            buckets = ['0.00-0.10%','0.10-0.20%','0.20-0.30%','0.30-0.40%',
+                       '0.40-0.50%','0.50-0.75%','0.75-1.00%','>1.00%']
+            counts = {b: 0 for b in buckets}
+            for row in conn.execute(f"SELECT {MER} FROM etfs WHERE {MER} > 0"):
+                v = row[0]
+                if   v < 0.10: counts['0.00-0.10%'] += 1
+                elif v < 0.20: counts['0.10-0.20%'] += 1
+                elif v < 0.30: counts['0.20-0.30%'] += 1
+                elif v < 0.40: counts['0.30-0.40%'] += 1
+                elif v < 0.50: counts['0.40-0.50%'] += 1
+                elif v < 0.75: counts['0.50-0.75%'] += 1
+                elif v < 1.00: counts['0.75-1.00%'] += 1
+                else:          counts['>1.00%']     += 1
+
+            self.send_json({
+                'avg_mer':          round(avg, 3) if avg is not None else None,
+                'fum_weighted_mer': round(fum_weighted_row, 3) if fum_weighted_row else None,
+                'cheapest':         [dict(r) for r in cheapest],
+                'most_expensive':   [dict(r) for r in priciest],
+                'by_asset_class':   [dict(r) for r in by_ac],
+                'by_issuer':        [dict(r) for r in by_issuer],
+                'distribution':     [{'bucket': b, 'count': counts[b]} for b in buckets],
+            })
+        except Exception as e:
+            self.send_json({'error': str(e)}, 500)
+        finally:
+            conn.close()
+
+    # ----- Insights: issuer analysis -----
+    def handle_insights_issuers(self):
+        conn = get_db()
+        try:
+            total_mkt = conn.execute(
+                "SELECT COALESCE(SUM(fund_size_aud_millions),0) FROM etfs"
+            ).fetchone()[0] or 1
+
+            issuers = conn.execute(
+                "SELECT issuer, COUNT(*) AS etf_count, "
+                "COALESCE(SUM(fund_size_aud_millions),0) AS total_fum, "
+                "AVG(CASE WHEN COALESCE(expense_ratio, management_fee) > 0 "
+                "         THEN COALESCE(expense_ratio, management_fee) END) AS avg_mer, "
+                "AVG(return_1y) AS avg_return_1y, AVG(return_3y) AS avg_return_3y "
+                "FROM etfs WHERE issuer IS NOT NULL GROUP BY issuer ORDER BY total_fum DESC"
+            ).fetchall()
+
+            result = []
+            for row in issuers:
+                iss = row['issuer']
+                ac_rows = conn.execute(
+                    "SELECT asset_class, COUNT(*) AS cnt FROM etfs "
+                    "WHERE issuer=? AND asset_class IS NOT NULL GROUP BY asset_class ORDER BY cnt DESC",
+                    (iss,)
+                ).fetchall()
+                top_etf = conn.execute(
+                    "SELECT code, name, fund_size_aud_millions FROM etfs "
+                    "WHERE issuer=? ORDER BY fund_size_aud_millions DESC NULLS LAST LIMIT 1",
+                    (iss,)
+                ).fetchone()
+                d = dict(row)
+                d['market_share_pct'] = round(d['total_fum'] / total_mkt * 100, 2)
+                d['asset_classes'] = {r['asset_class']: r['cnt'] for r in ac_rows}
+                d['top_etf'] = dict(top_etf) if top_etf else None
+                if d['avg_mer']:       d['avg_mer']       = round(d['avg_mer'], 3)
+                if d['avg_return_1y']: d['avg_return_1y'] = round(d['avg_return_1y'], 2)
+                if d['avg_return_3y']: d['avg_return_3y'] = round(d['avg_return_3y'], 2)
+                result.append(d)
+
+            self.send_json({'issuers': result, 'total_market_fum': round(total_mkt, 2)})
+        except Exception as e:
+            self.send_json({'error': str(e)}, 500)
+        finally:
+            conn.close()
+
     # ================================================================== DASHBOARD
     def handle_dashboard(self):
         self.send_html(DASHBOARD_HTML)
@@ -606,6 +1148,8 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
 <title>Australian ETF Dashboard</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.3.1/dist/chartjs-adapter-luxon.umd.min.js"></script>
 <style>
   /* Exchange badges */
   .badge-asx { background: #1e40af; color: #fff; }
@@ -674,6 +1218,10 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
   /* Holdings table */
   #holdings-table tr { border-bottom: 1px solid #f1f5f9; }
   #holdings-table tr:hover { background: #eff6ff; }
+
+  /* Data freshness tooltip trigger */
+  .dated { cursor: help; }
+  .dated:hover { border-bottom: 1px dotted #94a3b8; }
 </style>
 </head>
 <body class="bg-slate-100 min-h-screen text-sm text-gray-800 antialiased">
@@ -716,35 +1264,35 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
 
   <!-- ── Stat cards ── -->
   <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
-    <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+    <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer" onclick="goCard('fum')" title="View FUM breakdown by asset class">
       <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Total FUM</p>
       <p id="c-fum" class="text-2xl font-bold text-gray-900 mt-1 leading-tight">—</p>
-      <p class="text-gray-400 text-xs mt-1">AUD</p>
+      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">AUD <span class="text-blue-300">›</span></p>
     </div>
-    <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+    <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer" onclick="goCard('count')" title="Browse all ETFs sorted by size">
       <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">ETFs Listed</p>
       <p id="c-count" class="text-2xl font-bold text-gray-900 mt-1 leading-tight">—</p>
-      <p class="text-gray-400 text-xs mt-1">all exchanges</p>
+      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">all exchanges <span class="text-blue-300">›</span></p>
     </div>
-    <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+    <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer" onclick="goCard('return')" title="See top performing ETFs">
       <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Avg 1Y Return</p>
       <p id="c-ret" class="text-2xl font-bold mt-1 leading-tight">—</p>
-      <p class="text-gray-400 text-xs mt-1">market average</p>
+      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">market average <span class="text-blue-300">›</span></p>
     </div>
-    <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+    <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer" onclick="goCard('expense')" title="See lowest cost ETFs">
       <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Avg Expense</p>
       <p id="c-exp" class="text-2xl font-bold text-gray-900 mt-1 leading-tight">—</p>
-      <p class="text-gray-400 text-xs mt-1">management fee</p>
+      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">management fee <span class="text-blue-300">›</span></p>
     </div>
-    <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+    <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer" onclick="goCard('top')" title="Open top performer detail">
       <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Top Performer</p>
       <p id="c-top" class="text-2xl font-bold text-green-600 mt-1 leading-tight">—</p>
-      <p class="text-gray-400 text-xs mt-1">best 1Y return</p>
+      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">best 1Y return <span class="text-blue-300">›</span></p>
     </div>
-    <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+    <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer" onclick="goCard('issuers')" title="View issuer market share">
       <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Issuers</p>
       <p id="c-issuers" class="text-2xl font-bold text-gray-900 mt-1 leading-tight">—</p>
-      <p class="text-gray-400 text-xs mt-1">fund managers</p>
+      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">fund managers <span class="text-blue-300">›</span></p>
     </div>
   </div>
 
@@ -755,6 +1303,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
       <button class="main-tab" data-view="screener">Screener</button>
       <button class="main-tab" data-view="compare">Compare</button>
       <button class="main-tab" data-view="holdings">Holdings Search</button>
+      <button class="main-tab" data-view="analytics">Analytics</button>
     </div>
   </div>
 
@@ -794,6 +1343,19 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             </select>
           </div>
           <div>
+            <label class="block text-xs text-gray-500 mb-1">Management Style</label>
+            <select id="f-type"
+                    class="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm bg-gray-50
+                           focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
+              <option value="">All Types</option>
+              <option value="ETF">Passive / Index</option>
+              <option value="Active">Active</option>
+              <option value="Complex">Active (Complex)</option>
+              <option value="SP">Physical / Structured</option>
+              <option value="Index">Index Accumulation</option>
+            </select>
+          </div>
+          <div>
             <label class="block text-xs text-gray-500 mb-1">Benchmark / Index</label>
             <input id="f-benchmark" type="text" placeholder="e.g. MSCI, S&amp;P/ASX…"
                    class="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm bg-gray-50
@@ -812,6 +1374,19 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
               <option value="price">Price</option>
               <option value="code">Code A–Z</option>
             </select>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Extra Columns</label>
+            <div class="space-y-1">
+              <label class="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+                <input id="col-3y" type="checkbox" class="accent-blue-600">
+                3Y Return
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+                <input id="col-5y" type="checkbox" class="accent-blue-600">
+                5Y Return
+              </label>
+            </div>
           </div>
           <button id="btn-reset"
                   class="w-full border border-gray-200 rounded-lg py-2 text-sm text-gray-500
@@ -836,12 +1411,14 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
                    style="position:sticky;top:0;z-index:5">
               <tr>
                 <th class="px-3 py-2.5 text-left w-8 cursor-pointer select-none hover:text-gray-700" data-sort="rank">#</th>
-                <th class="px-3 py-2.5 text-left cursor-pointer select-none hover:text-gray-700" data-sort="code">ETF</th>
-                <th class="px-3 py-2.5 text-left select-none text-gray-400">Class</th>
+                <th class="px-3 py-2.5 text-left cursor-pointer select-none hover:text-gray-700 w-64" data-sort="code">ETF</th>
+                <th class="px-3 py-2.5 text-left select-none text-gray-400 w-20">Class</th>
                 <th class="px-3 py-2.5 text-right cursor-pointer select-none hover:text-gray-700" data-sort="price">Price</th>
                 <th class="px-3 py-2.5 text-right cursor-pointer select-none hover:text-gray-700" data-sort="fum">FUM</th>
                 <th class="px-3 py-2.5 text-right cursor-pointer select-none hover:text-gray-700" data-sort="return_1y">1Y Rtn</th>
                 <th class="px-3 py-2.5 text-right cursor-pointer select-none hover:text-gray-700" data-sort="yield">Yield</th>
+                <th class="px-3 py-2.5 text-right cursor-pointer select-none hover:text-gray-700 col-3y hidden" data-sort="return_3y">3Y Rtn</th>
+                <th class="px-3 py-2.5 text-right cursor-pointer select-none hover:text-gray-700 col-5y hidden" data-sort="return_5y">5Y Rtn</th>
                 <th class="px-3 py-2.5 text-right cursor-pointer select-none hover:text-gray-700" data-sort="expense">MER</th>
               </tr>
             </thead>
@@ -878,6 +1455,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
     <div class="p-5">
       <div class="flex gap-6 border-b border-gray-100 mb-5 text-sm">
         <button class="dtab tab-active" data-tab="overview">Overview</button>
+        <button class="dtab" data-tab="performance">Performance</button>
         <button class="dtab" data-tab="holdings">Holdings</button>
         <button class="dtab" data-tab="sectors">Sectors</button>
         <button class="dtab" data-tab="dividends">Dividends</button>
@@ -895,10 +1473,12 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         <canvas id="chart-asset"></canvas>
       </div>
     </div>
-    <!-- Issuer market share bars -->
+    <!-- Issuer market share pie chart -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
       <h3 class="font-semibold text-gray-700 text-sm mb-3">Issuer Market Share</h3>
-      <div id="a-issuers" class="space-y-2.5"></div>
+      <div class="relative" style="height:220px">
+        <canvas id="chart-issuers"></canvas>
+      </div>
     </div>
     <!-- Fund flows bar chart -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
@@ -1000,7 +1580,14 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
             <h3 class="font-semibold text-gray-700">Screener Results</h3>
-            <span id="sc-result-count" class="text-xs text-gray-400"></span>
+            <div class="flex items-center gap-3">
+              <span id="sc-result-count" class="text-xs text-gray-400"></span>
+              <button id="sc-export"
+                      class="flex items-center gap-1 px-3 py-1.5 border border-gray-200 rounded-lg
+                             text-xs text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors">
+                &#8595; CSV
+              </button>
+            </div>
           </div>
           <div class="overflow-x-auto" style="max-height:600px;overflow-y:auto">
             <table class="w-full">
@@ -1046,6 +1633,16 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
                       rounded-xl shadow-2xl max-h-60 overflow-y-auto"></div>
         </div>
         <div id="cmp-chips" class="flex flex-wrap gap-2 items-center"></div>
+      </div>
+    </div>
+
+    <!-- Similar ETFs suggestions -->
+    <div id="cmp-similar-wrap" class="mb-6">
+      <h3 class="font-semibold text-gray-700 mb-3">Similar ETFs by Holdings Overlap</h3>
+      <div id="cmp-similar-content">
+        <p class="text-sm text-gray-400 bg-white rounded-xl shadow-sm border border-gray-100 py-8 text-center">
+          Add an ETF above to see similar alternatives based on portfolio holdings.
+        </p>
       </div>
     </div>
 
@@ -1113,6 +1710,68 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
     </div>
   </div><!-- /view-holdings -->
 
+  <!-- ══════════════════════════════ VIEW: Analytics ══════════════════════════════ -->
+  <div id="view-analytics" class="hidden">
+
+    <!-- Leaderboard cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+
+      <!-- Top Performers -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100">
+        <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+          <h3 class="font-semibold text-gray-700 text-sm">Top Performers</h3>
+          <span class="text-xs text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">1Y Return</span>
+        </div>
+        <div id="an-performers" class="divide-y divide-gray-50">
+          <div class="flex justify-center py-8"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+      <!-- Highest Yield -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100">
+        <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+          <h3 class="font-semibold text-gray-700 text-sm">Highest Yield</h3>
+          <span class="text-xs text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">Distribution</span>
+        </div>
+        <div id="an-yield" class="divide-y divide-gray-50">
+          <div class="flex justify-center py-8"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+      <!-- Lowest Cost -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100">
+        <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+          <h3 class="font-semibold text-gray-700 text-sm">Lowest Cost</h3>
+          <span class="text-xs text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">MER</span>
+        </div>
+        <div id="an-cheapest" class="divide-y divide-gray-50">
+          <div class="flex justify-center py-8"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Fund Flows -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+      <h3 class="font-semibold text-gray-700 text-sm mb-4">Fund Flows — Monthly (1M)</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <p class="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-2">Top Inflows</p>
+          <div id="an-inflows" class="space-y-2">
+            <div class="flex justify-center py-4"><div class="spinner"></div></div>
+          </div>
+        </div>
+        <div>
+          <p class="text-xs font-semibold text-red-500 uppercase tracking-wide mb-2">Top Outflows</p>
+          <div id="an-outflows" class="space-y-2">
+            <div class="flex justify-center py-4"><div class="spinner"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /view-analytics -->
+
 </main>
 
 <script>
@@ -1120,10 +1779,88 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
 const API = '';
 let page = 0, pageSize = 50, selectedCode = null;
 let tableSortKey = 'rank', tableSortDir = 'asc';
-let chartAsset = null, chartFlows = null;
+let topPerformerCode = null;
+let chartAsset = null, chartFlows = null, chartIssuers = null;
 
 const PALETTE = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6',
                  '#ec4899','#06b6d4','#84cc16','#f97316','#6366f1'];
+
+/* ─── Issuer brand identity ─── */
+const ISSUER_COLORS = {
+  'BetaShares':      '#FF6B35',
+  'Vanguard':        '#8B1A1A',
+  'iShares':         '#009CDE',
+  'VanEck':          '#1A3C8F',
+  'SPDR':            '#CC1122',
+  'Global X':        '#00A651',
+  'Magellan':        '#E8712A',
+  'Dimensional':     '#005B8E',
+  'JPMorgan':        '#003087',
+  'Fidelity':        '#009A44',
+  'Invesco':         '#1E5CAB',
+  'Janus Henderson': '#E30613',
+  'Perpetual':       '#6B2D8B',
+  'Platinum':        '#888888',
+  'Hyperion':        '#2D5F8A',
+  'Monochrome':      '#111111',
+  'Coolabah':        '#1C4F7C',
+  'PIMCO':           '#00AEEF',
+  'Schroders':       '#DB0011',
+  'Lazard':          '#00448E',
+  'Avantis':         '#004C97',
+  'Australian Ethical': '#76B043',
+};
+const ISSUER_DOMAINS = {
+  'BetaShares':      'betashares.com.au',
+  'Vanguard':        'vanguard.com.au',
+  'iShares':         'blackrock.com',
+  'VanEck':          'vaneck.com.au',
+  'SPDR':            'ssga.com',
+  'Global X':        'globalxetfs.com.au',
+  'Magellan':        'magellangroup.com.au',
+  'Dimensional':     'dimensional.com',
+  'JPMorgan':        'am.jpmorgan.com',
+  'Fidelity':        'fidelity.com.au',
+  'Invesco':         'invesco.com',
+  'Janus Henderson': 'janushenderson.com',
+  'Perpetual':       'perpetual.com.au',
+  'Platinum':        'platinum.com.au',
+  'Hyperion':        'hyperion.com.au',
+  'Monochrome':      'monochrome.com.au',
+  'Coolabah':        'coolabah.com.au',
+  'PIMCO':           'pimco.com.au',
+  'Schroders':       'schroders.com',
+  'Lazard':          'lazardassetmanagement.com',
+  'Avantis':         'au.avantis.com',
+  'Australian Ethical': 'australianethical.com.au',
+};
+function issuerColor(name) {
+  return ISSUER_COLORS[name] || '#94a3b8';
+}
+function issuerLogo(name) {
+  const dom = ISSUER_DOMAINS[name];
+  if (!dom) return null;
+  return `https://www.google.com/s2/favicons?domain=${dom}&sz=32`;
+}
+
+/* Asset class colours — consistent across charts */
+const ASSET_CLASS_COLORS = {
+  'Australian Equities':    '#3b82f6',
+  'International Equities': '#10b981',
+  'Fixed Income':           '#f59e0b',
+  'Diversified':            '#8b5cf6',
+  'Property':               '#ec4899',
+  'Cash':                   '#06b6d4',
+  'Commodities':            '#f97316',
+  'Infrastructure':         '#84cc16',
+  'Thematic':               '#6366f1',
+  'Digital Assets':         '#a855f7',
+  'Alternatives':           '#64748b',
+  'Currency':               '#14b8a6',
+};
+function assetColor(name) {
+  return ASSET_CLASS_COLORS[name] || '#94a3b8';
+}
 
 /* ======================================================= formatters */
 function fmtFum(v) {
@@ -1131,6 +1868,30 @@ function fmtFum(v) {
   if (v >= 1e6) return '$' + (v / 1e6).toFixed(2) + 'T';
   if (v >= 1000) return '$' + (v / 1000).toFixed(1) + 'B';
   return '$' + Math.round(v) + 'M';
+}
+/* Return FUM in AUD millions: units × price where available, else ASX report figure */
+function calcFum(e) {
+  if (e.units_on_issue && e.current_price)
+    return e.units_on_issue * e.current_price / 1e6;
+  return e.fund_size_aud_millions;
+}
+function fumTip(e) {
+  return e.units_on_issue && e.current_price
+    ? 'FUM = units on issue × price · ' + (e.units_on_issue_date || 'issuer website')
+    : 'FUM · ASX Monthly Report · ' + fmtTs(tsFor('asx_report'));
+}
+function fmtUnits(v) {
+  if (v == null) return '—';
+  if (v >= 1e9) return (v / 1e9).toFixed(2) + 'B';
+  if (v >= 1e6) return (v / 1e6).toFixed(1) + 'M';
+  if (v >= 1e3) return (v / 1e3).toFixed(1) + 'K';
+  return v.toLocaleString();
+}
+function fmtAud(v) {
+  if (v == null) return '—';
+  if (v >= 1e9) return '$' + (v / 1e9).toFixed(2) + 'B';
+  if (v >= 1e6) return '$' + (v / 1e6).toFixed(1) + 'M';
+  return '$' + Math.round(v).toLocaleString();
 }
 function pct(v, dp = 2) {
   if (v == null) return '—';
@@ -1207,11 +1968,24 @@ async function loadOverview() {
   if (m.top_performer) {
     document.getElementById('c-top').textContent =
       m.top_performer.code + ' ' + pct(m.top_performer.return_1y);
+    topPerformerCode = m.top_performer.code;
   }
   const now = new Date().toLocaleTimeString();
   document.getElementById('subtitle').textContent =
     `${(m.total_etfs || 0).toLocaleString()} ETFs · ${fmtFum(m.total_fum_millions)} FUM · ${now}`;
   document.getElementById('last-refresh').textContent = 'Live · ' + now;
+}
+
+/* ======================================================= stat card navigation */
+function goCard(type) {
+  switch (type) {
+    case 'fum':      window.location.href = '/insights/fum';      break;
+    case 'count':    window.location.href = '/insights/listings';  break;
+    case 'return':   window.location.href = '/insights/returns';   break;
+    case 'expense':  window.location.href = '/insights/expense';   break;
+    case 'top':      window.location.href = '/insights/returns';   break;
+    case 'issuers':  window.location.href = '/insights/issuers';   break;
+  }
 }
 
 /* ======================================================= table */
@@ -1220,10 +1994,12 @@ async function loadTable() {
   const ex   = document.getElementById('f-exchange').value;
   const iss  = document.getElementById('f-issuer').value;
   const ac   = document.getElementById('f-asset').value;
+  const ft   = document.getElementById('f-type').value;
   const bm   = document.getElementById('f-benchmark').value.trim();
   if (ex)  params.set('exchange',    ex);
   if (iss) params.set('issuer',      iss);
   if (ac)  params.set('asset_class', ac);
+  if (ft)  params.set('fund_type',   ft);
   if (bm)  params.set('benchmark',   bm);
   params.set('sort_by',  tableSortKey);
   params.set('sort_dir', tableSortDir);
@@ -1266,6 +2042,8 @@ function sortTable(key) {
 }
 
 function renderTable(etfs, total) {
+  const show3y = document.getElementById('col-3y')?.checked ?? false;
+  const show5y = document.getElementById('col-5y')?.checked ?? false;
   const label = total.toLocaleString() + ' ETF' + (total !== 1 ? 's' : '');
   document.getElementById('result-count').textContent = label;
   document.getElementById('result-count-sidebar').textContent = label + ' matching';
@@ -1275,20 +2053,32 @@ function renderTable(etfs, total) {
     const sel = e.code === selectedCode ? 'row-selected' : '';
     return `<tr class="cursor-pointer ${sel}" data-code="${e.code}">
       <td class="px-3 py-2.5 text-gray-300 font-mono text-xs">${e.rank_by_fum || '—'}</td>
-      <td class="px-3 py-2.5 max-w-0">
+      <td class="px-3 py-2.5 w-64">
         <div class="font-bold text-gray-900">${e.code}</div>
-        <div class="text-xs text-gray-400 truncate">${e.name || ''}</div>
-        ${e.benchmark ? `<div class="text-xs text-indigo-400 truncate" title="${e.benchmark}">&#8594; ${e.benchmark}</div>` : ''}
+        <div class="text-xs text-gray-400 truncate max-w-[240px]" title="${e.name || ''}">${e.name || ''}</div>
+        ${e.benchmark ? `<div class="text-xs text-indigo-400 truncate max-w-[240px]" title="${e.benchmark}">&#8594; ${e.benchmark}</div>` : ''}
       </td>
-      <td class="px-3 py-2.5">${acChip(e.asset_class)}</td>
-      <td class="px-3 py-2.5 text-right font-mono">${money(e.current_price)}</td>
-      <td class="px-3 py-2.5 text-right">${fmtFum(e.fund_size_aud_millions)}</td>
-      <td class="px-3 py-2.5 text-right font-semibold ${pctCls(e.return_1y)}">${pct(e.return_1y)}</td>
+      <td class="px-3 py-2.5 w-20">${acChip(e.asset_class)}</td>
+      <td class="px-3 py-2.5 text-right font-mono">
+        <span class="dated" title="Price · ${fmtTs(e.last_updated)}">${money(e.current_price)}</span>
+      </td>
+      <td class="px-3 py-2.5 text-right">
+        <span class="dated" title="${fumTip(e)}">${fmtFum(calcFum(e))}</span>
+      </td>
+      <td class="px-3 py-2.5 text-right font-semibold ${pctCls(e.return_1y)}">
+        <span class="dated" title="1Y Return · ASX Monthly Report · ${fmtTs(tsFor('asx_report'))}">${pct(e.return_1y)}</span>
+      </td>
+      <td class="px-3 py-2.5 text-right font-semibold col-3y ${show3y ? '' : 'hidden'} ${pctCls(e.return_3y)}">
+        <span class="dated" title="3Y Return · ASX Monthly Report · ${fmtTs(tsFor('asx_report'))}">${pct(e.return_3y)}</span>
+      </td>
+      <td class="px-3 py-2.5 text-right font-semibold col-5y ${show5y ? '' : 'hidden'} ${pctCls(e.return_5y)}">
+        <span class="dated" title="5Y Return · ASX Monthly Report · ${fmtTs(tsFor('asx_report'))}">${pct(e.return_5y)}</span>
+      </td>
       <td class="px-3 py-2.5 text-right text-gray-600">
-        ${e.distribution_yield != null ? e.distribution_yield.toFixed(1) + '%' : '—'}
+        <span class="dated" title="Distribution Yield · ASX Monthly Report · ${fmtTs(tsFor('asx_report'))}">${e.distribution_yield != null ? e.distribution_yield.toFixed(1) + '%' : '—'}</span>
       </td>
       <td class="px-3 py-2.5 text-right text-gray-400">
-        ${e.expense_ratio != null ? e.expense_ratio.toFixed(2) + '%' : '—'}
+        <span class="dated" title="MER · Issuer website · ${fmtTs(tsFor(ISSUER_SRC[e.issuer] || ''))}">${e.expense_ratio != null ? e.expense_ratio.toFixed(2) + '%' : '—'}</span>
       </td>
     </tr>`;
   }).join('');
@@ -1335,21 +2125,35 @@ async function showDetail(code) {
                     (d.exchange || 'ASX').toLowerCase();
 
   // Quick metrics strip
+  const _pSrc = 'ASX live data · ' + fmtTs(d.last_updated);
+  const _aSrc = 'ASX Monthly Report · ' + fmtTs(tsFor('asx_report'));
+  const _mSrc = 'Issuer website · ' + fmtTs(tsFor(ISSUER_SRC[d.issuer] || ''));
   const metrics = [
-    { label: 'Price',    value: money(d.current_price) },
-    { label: 'Day Chg',  value: pct(d.day_change_pct), num: d.day_change_pct },
-    { label: 'FUM',      value: fmtFum(d.fund_size_aud_millions) },
-    { label: 'Rank',     value: d.rank_by_fum ? '#' + d.rank_by_fum : '—' },
-    { label: '1Y Return', value: pct(d.return_1y), num: d.return_1y },
-    { label: 'Yield',    value: d.distribution_yield != null ? d.distribution_yield.toFixed(1) + '%' : '—' },
-    { label: 'MER',      value: (d.expense_ratio || d.management_fee) != null
-                                ? (d.expense_ratio || d.management_fee).toFixed(2) + '%' : '—' },
-    { label: 'Issuer',   value: d.issuer || '—' },
+    { label: 'Price',     value: money(d.current_price),           tip: _pSrc },
+    { label: 'Day Chg',   value: pct(d.day_change_pct),            tip: _pSrc, num: d.day_change_pct },
+    { label: 'FUM',       value: fmtFum(calcFum(d)), tip: fumTip(d) },
+    { label: 'Units on Issue', value: fmtUnits(d.units_on_issue),
+                          tip: d.units_on_issue_date ? 'Issuer website · ' + d.units_on_issue_date : _aSrc },
+    { label: 'Units Change',  value: d.units_change != null
+                                     ? (d.units_change >= 0 ? '+' : '-') + fmtUnits(Math.abs(d.units_change)) : '—',
+                          tip: d.units_change_date
+                               ? 'vs ' + d.units_change_prev_date + ' · Issuer website · ' + d.units_change_date : '',
+                          num: d.units_change },
+    { label: 'Net Assets', value: fmtAud(d.net_assets_aud),
+                          tip: d.net_assets_date ? 'Issuer website · ' + d.net_assets_date : _aSrc },
+    { label: 'Rank',      value: d.rank_by_fum ? '#' + d.rank_by_fum : '—',
+                          tip: 'FUM ranking · ' + fmtTs(tsFor('master_list')) },
+    { label: '1Y Return', value: pct(d.return_1y),                 tip: _aSrc, num: d.return_1y },
+    { label: 'Yield',     value: d.distribution_yield != null ? d.distribution_yield.toFixed(1) + '%' : '—', tip: _aSrc },
+    { label: 'MER',       value: (d.expense_ratio || d.management_fee) != null
+                                 ? (d.expense_ratio || d.management_fee).toFixed(2) + '%' : '—', tip: _mSrc },
+    { label: 'Issuer',    value: d.issuer || '—' },
   ];
   document.getElementById('d-metrics').innerHTML = metrics.map(m => `
     <div class="px-4 py-3">
       <p class="text-xs text-gray-400 font-medium">${m.label}</p>
-      <p class="font-semibold text-sm mt-0.5 truncate ${m.num != null ? pctCls(m.num) : 'text-gray-800'}">${m.value}</p>
+      <p class="font-semibold text-sm mt-0.5 truncate ${m.num != null ? pctCls(m.num) : 'text-gray-800'} ${m.tip ? 'dated' : ''}"
+         ${m.tip ? `title="${m.tip}"` : ''}>${m.value}</p>
     </div>`).join('');
 
   // Reset to overview tab
@@ -1361,19 +2165,68 @@ async function showDetail(code) {
 
 /* ======================================================= tab rendering */
 function renderOverviewTab(d) {
+  const _ao = 'ASX Monthly Report · ' + fmtTs(tsFor('asx_report'));
+  const _po = 'ASX live data · ' + fmtTs(d.last_updated);
   const cards = [
-    ['1M Return',     pct(d.return_1m),  d.return_1m],
-    ['3M Return',     pct(d.return_3m),  d.return_3m],
-    ['1Y Return',     pct(d.return_1y),  d.return_1y],
-    ['3Y Return',     pct(d.return_3y),  d.return_3y],
-    ['52W High',      money(d.year_high)],
-    ['52W Low',       money(d.year_low)],
-    ['Bid/Ask',       d.bid_ask_spread_pct != null ? d.bid_ask_spread_pct + '%' : '—'],
-    ['Inception',     d.inception_date || '—'],
-    ['Asset Class',   d.asset_class || '—'],
-    ['Exchange',      d.exchange || '—'],
-    ['Currency',      'AUD'],
+    ['1M Return',   pct(d.return_1m),  d.return_1m, _ao],
+    ['3M Return',   pct(d.return_3m),  d.return_3m, _ao],
+    ['1Y Return',   pct(d.return_1y),  d.return_1y, _ao],
+    ['3Y Return',   pct(d.return_3y),  d.return_3y, _ao],
+    ['52W High',    money(d.year_high), null,         _po],
+    ['52W Low',     money(d.year_low),  null,         _po],
+    ['Bid/Ask',     d.bid_ask_spread_pct != null ? d.bid_ask_spread_pct + '%' : '—', null, _po],
+    ['Inception',   d.inception_date || '—'],
+    ['Asset Class', d.asset_class || '—'],
+    ['Exchange',    d.exchange || '—'],
+    ['Currency',    'AUD'],
   ];
+
+  // ── AI Summary card ──────────────────────────────────────────────────────
+  let aiSummaryHtml = '';
+  if (d.summary) {
+    let s = null;
+    try { s = typeof d.summary === 'string' ? JSON.parse(d.summary) : d.summary; } catch(e) {}
+    if (s) {
+      const risksHtml = Array.isArray(s.key_risks) && s.key_risks.length
+        ? `<details class="mt-2">
+             <summary class="text-xs text-blue-600 cursor-pointer hover:underline select-none">
+               Key risks (${s.key_risks.length})
+             </summary>
+             <ul class="mt-1.5 space-y-1 list-disc list-inside">
+               ${s.key_risks.map(r => `<li class="text-xs text-gray-600">${r}</li>`).join('')}
+             </ul>
+           </details>`
+        : '';
+      aiSummaryHtml = `
+        <div class="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 mb-3">
+          <p class="text-blue-500 text-xs font-medium uppercase tracking-wide mb-1.5">AI Summary</p>
+          ${s.summary ? `<p class="text-sm text-gray-700 leading-relaxed">${s.summary}</p>` : ''}
+          ${s.objective ? `<p class="mt-2 text-xs text-gray-500"><span class="font-medium text-gray-600">Objective:</span> ${s.objective}</p>` : ''}
+          ${s.suitable_for ? `<p class="mt-1 text-xs text-gray-500"><span class="font-medium text-gray-600">Suitable for:</span> ${s.suitable_for}</p>` : ''}
+          ${risksHtml}
+          <p class="mt-2 text-xs text-gray-400 italic">Generated by AI from PDS — not financial advice.</p>
+        </div>`;
+    }
+  }
+
+  // ── Document links row ────────────────────────────────────────────────────
+  const docLinks = [
+    ['PDS',        d.pds_url],
+    ['TMD',        d.tmd_url],
+    ['Fact Sheet', d.factsheet_url],
+  ].filter(([, url]) => url);
+  const docLinksHtml = docLinks.length ? `
+    <div class="flex flex-wrap gap-2 mb-3">
+      ${docLinks.map(([label, url]) => `
+        <a href="${url}" target="_blank" rel="noopener"
+           class="inline-flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-200
+                  rounded-full text-xs font-medium text-gray-600 hover:border-blue-400
+                  hover:text-blue-600 transition-colors">
+          &#128196; ${label}
+        </a>`).join('')}
+    </div>` : '';
+
+  // ── Benchmark banner ──────────────────────────────────────────────────────
   const benchmarkRow = d.benchmark ? `
     <div class="bg-indigo-50 border border-indigo-100 rounded-lg px-4 py-3 mb-3 flex items-center gap-2">
       <span class="text-indigo-300 text-lg">&#8594;</span>
@@ -1382,11 +2235,15 @@ function renderOverviewTab(d) {
         <p class="font-semibold text-indigo-900 text-sm">${d.benchmark}</p>
       </div>
     </div>` : '';
+
   document.getElementById('tab-content').innerHTML = `
+    ${aiSummaryHtml}
+    ${docLinksHtml}
     ${benchmarkRow}
     <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-      ${cards.map(([label, val, num]) => `
-        <div class="bg-slate-50 rounded-lg p-3 border border-gray-100">
+      ${cards.map(([label, val, num, tip]) => `
+        <div class="bg-slate-50 rounded-lg p-3 border border-gray-100${tip ? ' dated' : ''}"
+             ${tip ? `title="${tip}"` : ''}>
           <p class="text-gray-400 text-xs">${label}</p>
           <p class="font-semibold text-sm mt-0.5 ${num != null ? pctCls(num) : 'text-gray-800'}">${val}</p>
         </div>`).join('')}
@@ -1408,6 +2265,10 @@ async function showTab(tab) {
     const d = await api('/api/v1/etfs/' + selectedCode);
     renderOverviewTab(d);
 
+  } else if (tab === 'performance') {
+    el.innerHTML = '<div class="flex justify-center py-10"><div class="spinner"></div></div>';
+    await renderPerformanceTab(selectedCode);
+
   } else if (tab === 'holdings') {
     el.innerHTML = '<div class="flex justify-center py-10"><div class="spinner"></div></div>';
     const h = await api('/api/v1/etfs/' + selectedCode + '/holdings');
@@ -1416,6 +2277,7 @@ async function showTab(tab) {
       return;
     }
     const all = h.holdings;
+    const holdingsTs = all.reduce((mx, r) => r.last_updated > mx ? r.last_updated : mx, '');
     const maxW = Math.max(...all.map(x => x.weight_pct || 0));
     const top10Wt = all.slice(0, 10).reduce((s, x) => s + (x.weight_pct || 0), 0);
     const byCountry = {};
@@ -1430,6 +2292,7 @@ async function showTab(tab) {
         ${topCountries.length > 1 ? `<span class="text-xs text-gray-400">·</span>
           <span class="text-xs text-gray-500">${topCountries.map(([c, w]) =>
             `<strong class="text-gray-600">${c}</strong> ${w.toFixed(0)}%`).join(' &middot; ')}</span>` : ''}
+        ${holdingsTs ? `<span class="ml-auto text-xs text-gray-400" title="Holdings last updated by issuer scraper">As of ${fmtTs(holdingsTs)}</span>` : ''}
       </div>
       <input id="holding-filter" type="text" placeholder="Filter by name or ticker…"
         class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-200">
@@ -1483,6 +2346,7 @@ async function showTab(tab) {
       return;
     }
     const totalWt = s.sectors.reduce((sum, r) => sum + (r.weight_pct || 0), 0);
+    const sectorsTs = s.sectors.reduce((mx, r) => r.last_updated > mx ? r.last_updated : mx, '');
     el.innerHTML = `
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 items-start">
         <div class="flex justify-center">
@@ -1507,6 +2371,7 @@ async function showTab(tab) {
           </div>
           <p class="text-xs text-gray-400 mt-3 pt-2 border-t border-gray-100">
             Coverage: <strong>${totalWt.toFixed(1)}%</strong> of portfolio
+            ${sectorsTs ? `· <span title="Sectors last updated by issuer scraper">As of ${fmtTs(sectorsTs)}</span>` : ''}
           </p>
         </div>
       </div>`;
@@ -1607,6 +2472,305 @@ async function showTab(tab) {
   }
 }
 
+/* ======================================================= performance tab */
+const BENCHMARK_LABELS = {
+  // Equities
+  ASX200:  'S&P/ASX 200',
+  AORD:    'All Ords',
+  SP500:   'S&P 500',
+  NDX100:  'Nasdaq 100',
+  MSCIW:   'MSCI ACWI',
+  // Fixed Income
+  AU_BOND: 'AU Bonds (VAF)',
+  US_BOND: 'US Bonds (AGG)',
+  // Commodities
+  GOLD:    'Gold (GLD)',
+  COMMOD:  'Commodities (GSCI)',
+  // Cash
+  AU_CASH: 'AU Cash (BILL)',
+  // Crypto
+  BTC:     'Bitcoin',
+  ETH:     'Ethereum',
+};
+const BENCHMARK_COLORS = {
+  // Equities — blues/purples
+  ASX200:  '#6366f1',
+  AORD:    '#8b5cf6',
+  SP500:   '#f59e0b',
+  NDX100:  '#10b981',
+  MSCIW:   '#ec4899',
+  // Fixed Income — teals
+  AU_BOND: '#0d9488',
+  US_BOND: '#0891b2',
+  // Commodities — ambers/oranges
+  GOLD:    '#d97706',
+  COMMOD:  '#b45309',
+  // Cash — slate
+  AU_CASH: '#64748b',
+  // Crypto — rose/orange
+  BTC:     '#f97316',
+  ETH:     '#a855f7',
+};
+
+let perfChart = null;
+let perfData  = null;   // last fetched payload
+let perfCode  = null;
+
+async function renderPerformanceTab(code) {
+  const el = document.getElementById('tab-content');
+  const periods = ['1m', '3m', '6m', '1y', '3y', '5y'];
+  const labels  = { '1m':'1 Month','3m':'3 Months','6m':'6 Months',
+                    '1y':'1 Year','3y':'3 Years','5y':'5 Years' };
+
+  el.innerHTML = `
+    <div class="flex flex-wrap gap-2 mb-4 items-center justify-between">
+      <div class="flex gap-1" id="perf-period-btns">
+        ${periods.map(p => `
+          <button data-period="${p}"
+                  class="perf-period px-3 py-1 text-xs rounded-lg border font-medium transition-colors
+                         ${p === '1y' ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-200 text-gray-500 hover:border-blue-400 hover:text-blue-600'}">
+            ${labels[p]}
+          </button>`).join('')}
+      </div>
+      <div class="flex gap-1 flex-wrap" id="perf-bmark-btns"></div>
+    </div>
+
+    <div class="relative mb-4" style="height:300px">
+      <canvas id="perf-chart"></canvas>
+    </div>
+
+    <div id="perf-table-wrap" class="overflow-x-auto mb-2"></div>
+    <p class="text-xs text-gray-400">Prices from Yahoo Finance · rebased to 100 at period start · weekly data</p>`;
+
+  await loadPerfData(code, '1y');
+
+  // Period button clicks
+  document.getElementById('perf-period-btns').addEventListener('click', async e => {
+    const btn = e.target.closest('[data-period]');
+    if (!btn) return;
+    document.querySelectorAll('.perf-period').forEach(b => {
+      b.className = b.className.replace('bg-blue-600 text-white border-blue-600',
+                                        'border-gray-200 text-gray-500 hover:border-blue-400 hover:text-blue-600');
+    });
+    btn.className = btn.className.replace('border-gray-200 text-gray-500 hover:border-blue-400 hover:text-blue-600',
+                                          'bg-blue-600 text-white border-blue-600');
+    await loadPerfData(code, btn.dataset.period);
+  });
+}
+
+// Benchmark toggles state
+const activeBmarks = new Set(['DEFAULT']);
+
+async function loadPerfData(code, period) {
+  const d = await api('/api/v1/etfs/' + code + '/price-history?period=' + period);
+  perfData = d;
+  perfCode = code;
+
+  // Render benchmark toggle buttons
+  const bmarkEl = document.getElementById('perf-bmark-btns');
+  if (bmarkEl) {
+    const allBmarks = Object.keys(d.benchmarks || {});
+    // Default to asset-class benchmark
+    if (d.default_benchmark) activeBmarks.add(d.default_benchmark);
+
+    bmarkEl.innerHTML = allBmarks.map(b => {
+      const active = activeBmarks.has(b) || b === d.default_benchmark;
+      const col = BENCHMARK_COLORS[b] || '#6b7280';
+      return `<button data-bmark="${b}"
+        class="perf-bmark px-2.5 py-1 text-xs rounded-lg border font-medium transition-colors
+               ${active ? 'text-white' : 'text-gray-500 bg-white border-gray-200 hover:border-gray-400'}"
+        style="${active ? `background:${col};border-color:${col}` : ''}">
+        ${BENCHMARK_LABELS[b] || b}
+      </button>`;
+    }).join('');
+
+    bmarkEl.querySelectorAll('[data-bmark]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const b = btn.dataset.bmark;
+        if (activeBmarks.has(b)) activeBmarks.delete(b);
+        else activeBmarks.add(b);
+        drawPerfChart(perfData, perfCode);
+        // Update button style
+        const col = BENCHMARK_COLORS[b] || '#6b7280';
+        if (activeBmarks.has(b)) {
+          btn.style.background = col; btn.style.borderColor = col; btn.classList.add('text-white');
+          btn.classList.remove('text-gray-500', 'bg-white', 'border-gray-200', 'hover:border-gray-400');
+        } else {
+          btn.style.background = ''; btn.style.borderColor = ''; btn.classList.remove('text-white');
+          btn.classList.add('text-gray-500', 'bg-white', 'border-gray-200', 'hover:border-gray-400');
+        }
+      });
+    });
+  }
+
+  drawPerfChart(d, code);
+}
+
+function drawPerfChart(d, code) {
+  const prices  = (d.prices || []).filter(r => r.close);
+  if (!prices.length) {
+    document.getElementById('perf-chart').parentElement.innerHTML =
+      '<p class="text-center text-gray-400 text-sm py-16">No price history available for this ETF yet.<br><span class="text-xs">Data is fetched from Yahoo Finance — run the price history fetcher to populate.</span></p>';
+    renderPerfTable(d, code, []);
+    return;
+  }
+
+  // Rebase everything to 100 at first date
+  const base0   = prices[0].close;
+  const etfDates = prices.map(r => r.date);
+  const etfVals  = prices.map(r => parseFloat((r.close / base0 * 100).toFixed(2)));
+
+  const datasets = [{
+    label: code,
+    data: etfDates.map((dt, i) => ({ x: dt, y: etfVals[i] })),
+    borderColor: '#2563eb',
+    backgroundColor: 'rgba(37,99,235,0.08)',
+    fill: true,
+    tension: 0.3,
+    pointRadius: 0,
+    borderWidth: 2.5,
+    order: 0,
+  }];
+
+  // Overlay selected benchmarks
+  for (const [bName, bSeries] of Object.entries(d.benchmarks || {})) {
+    if (!activeBmarks.has(bName) && bName !== d.default_benchmark) continue;
+    if (!activeBmarks.has(bName)) continue;
+    if (!bSeries.length) continue;
+    // Find first benchmark point >= ETF start date
+    const startDate = etfDates[0];
+    const aligned = bSeries.filter(r => r.date >= startDate);
+    if (!aligned.length) continue;
+    const bBase = aligned[0].close;
+    datasets.push({
+      label: BENCHMARK_LABELS[bName] || bName,
+      data: aligned.map(r => ({ x: r.date, y: parseFloat((r.close / bBase * 100).toFixed(2)) })),
+      borderColor: BENCHMARK_COLORS[bName] || '#9ca3af',
+      backgroundColor: 'transparent',
+      fill: false,
+      tension: 0.3,
+      pointRadius: 0,
+      borderWidth: 1.5,
+      borderDash: [4, 3],
+      order: 1,
+    });
+  }
+
+  const ctx = document.getElementById('perf-chart');
+  if (!ctx) return;
+  if (perfChart) { perfChart.destroy(); perfChart = null; }
+
+  perfChart = new Chart(ctx, {
+    type: 'line',
+    data: { datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)}`,
+            afterBody: items => {
+              const etf = items.find(i => i.dataset.label === code);
+              if (!etf) return [];
+              return [`Return: ${(etf.parsed.y - 100).toFixed(2)}%`];
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          type: 'time',
+          time: { unit: 'month', tooltipFormat: 'yyyy-MM-dd' },
+          grid: { display: false },
+          ticks: { font: { size: 10 }, maxTicksLimit: 12 },
+        },
+        y: {
+          ticks: {
+            font: { size: 10 },
+            callback: v => v.toFixed(0),
+          },
+          grid: { color: 'rgba(0,0,0,0.04)' },
+          title: { display: true, text: 'Rebased to 100', font: { size: 10 }, color: '#9ca3af' },
+        },
+      },
+    },
+  });
+
+  renderPerfTable(d, code, prices);
+}
+
+function renderPerfTable(d, code, prices) {
+  const el = document.getElementById('perf-table-wrap');
+  if (!el) return;
+
+  // Compute period returns from price series
+  function periodReturn(days) {
+    if (prices.length < 2) return null;
+    const cutoff = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+    const from = prices.find(r => r.date >= cutoff);
+    if (!from) return null;
+    const last = prices[prices.length - 1].close;
+    return (last / from.close - 1) * 100;
+  }
+
+  const periods = [
+    { label: '1M',  days: 31 },
+    { label: '3M',  days: 92 },
+    { label: '6M',  days: 183 },
+    { label: '1Y',  days: 365 },
+    { label: '3Y',  days: 1095 },
+    { label: '5Y',  days: 1825 },
+  ];
+
+  // Build benchmark return columns for active benchmarks
+  const activeBmarkList = Object.entries(d.benchmarks || {})
+    .filter(([b]) => activeBmarks.has(b));
+
+  const headerCols = activeBmarkList.map(([b]) =>
+    `<th class="pb-2 px-3 text-right text-xs text-gray-400 font-semibold uppercase"
+         style="color:${BENCHMARK_COLORS[b] || '#9ca3af'}">${BENCHMARK_LABELS[b] || b}</th>`
+  ).join('');
+
+  const rows = periods.map(({ label, days }) => {
+    const etfRet = periodReturn(days);
+
+    const bmarkCols = activeBmarkList.map(([b, bSeries]) => {
+      const cutoff = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+      const from = bSeries.find(r => r.date >= cutoff);
+      const last = bSeries[bSeries.length - 1];
+      const ret = (from && last) ? (last.close / from.close - 1) * 100 : null;
+      const diff = (etfRet != null && ret != null) ? etfRet - ret : null;
+      const diffStr = diff != null ? ` <span class="text-xs ${diff >= 0 ? 'text-emerald-600' : 'text-red-500'}">(${diff >= 0 ? '+' : ''}${diff.toFixed(2)}%)</span>` : '';
+      return `<td class="py-2.5 px-3 text-right text-sm">${ret != null ? ret.toFixed(2) + '%' : '—'}</td>`;
+    }).join('');
+
+    const src1m = d.return_1m;  // from etfs table
+    // Prefer live-computed from price series if available, fall back to DB
+    const showRet = etfRet;
+    const cls = showRet != null ? (showRet >= 0 ? 'text-emerald-600' : 'text-red-500') : 'text-gray-400';
+    return `<tr class="border-b border-gray-50 hover:bg-slate-50">
+      <td class="py-2.5 pr-3 text-xs font-semibold text-gray-500 uppercase">${label}</td>
+      <td class="py-2.5 px-3 text-right font-semibold text-sm ${cls}">${showRet != null ? showRet.toFixed(2) + '%' : '—'}</td>
+      ${bmarkCols}
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = `
+    <table class="w-full text-sm mt-2">
+      <thead>
+        <tr class="border-b border-gray-200">
+          <th class="pb-2 pr-3 text-left text-xs text-gray-400 font-semibold uppercase">Period</th>
+          <th class="pb-2 px-3 text-right text-xs text-blue-600 font-semibold uppercase">${code} Return</th>
+          ${headerCols}
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
 document.querySelectorAll('.dtab').forEach(b =>
   b.addEventListener('click', () => showTab(b.dataset.tab))
 );
@@ -1655,7 +2819,7 @@ document.addEventListener('click', e => {
 });
 
 /* ======================================================= filter wiring */
-['f-exchange', 'f-issuer', 'f-asset'].forEach(id =>
+['f-exchange', 'f-issuer', 'f-asset', 'f-type'].forEach(id =>
   document.getElementById(id).addEventListener('change', () => { page = 0; loadTable(); })
 );
 // Benchmark text filter — debounced
@@ -1673,7 +2837,7 @@ document.getElementById('f-sort').addEventListener('change', function () {
   loadTable();
 });
 document.getElementById('btn-reset').addEventListener('click', () => {
-  ['f-exchange', 'f-issuer', 'f-asset'].forEach(id => document.getElementById(id).value = '');
+  ['f-exchange', 'f-issuer', 'f-asset', 'f-type'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('f-benchmark').value = '';
   tableSortKey = 'rank';
   tableSortDir = 'asc';
@@ -1690,7 +2854,7 @@ document.getElementById('etf-thead').addEventListener('click', e => {
 /* ======================================================= analytics */
 async function loadAnalytics() {
   const [flows, issuers, cats] = await Promise.all([
-    api('/api/v1/analytics/fund-flows?limit=6'),
+    api('/api/v1/analytics/fund-flows?limit=8'),
     api('/api/v1/issuers'),
     api('/api/v1/categories'),
   ]);
@@ -1698,60 +2862,180 @@ async function loadAnalytics() {
   // Issuer count stat card
   document.getElementById('c-issuers').textContent = (issuers.issuers || []).length;
 
-  // Asset class doughnut
-  const catData = (cats.categories || []).filter(c => c.total_fum > 0).slice(0, 9);
+  /* ── 1. Asset class doughnut ── */
+  const catData = (cats.categories || []).filter(c => c.total_fum > 0).slice(0, 12);
+  const totalAum = catData.reduce((s, c) => s + (c.total_fum || 0), 0);
+
+  // Centre-text plugin
+  const centreTextPlugin = {
+    id: 'centreText',
+    beforeDraw(chart) {
+      const { ctx, chartArea: { top, left, width, height } } = chart;
+      ctx.save();
+      const cx = left + width / 2, cy = top + height / 2;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = 'bold 13px Inter,sans-serif';
+      ctx.fillStyle = '#1e293b';
+      ctx.fillText(fmtFum(totalAum), cx, cy - 7);
+      ctx.font = '10px Inter,sans-serif';
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillText('Total AUM', cx, cy + 8);
+      ctx.restore();
+    }
+  };
+
   if (chartAsset) chartAsset.destroy();
   chartAsset = new Chart(
     document.getElementById('chart-asset').getContext('2d'), {
       type: 'doughnut',
+      plugins: [centreTextPlugin],
       data: {
         labels: catData.map(c => c.asset_class || 'Other'),
         datasets: [{
           data: catData.map(c => c.total_fum || 0),
-          backgroundColor: PALETTE,
+          backgroundColor: catData.map(c => assetColor(c.asset_class)),
+          hoverBackgroundColor: catData.map(c => assetColor(c.asset_class)),
           borderWidth: 2,
           borderColor: '#fff',
+          hoverBorderWidth: 3,
+          hoverOffset: 8,
         }],
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        cutout: '62%',
+        cutout: '64%',
+        animation: { animateRotate: true, duration: 600 },
+        onClick(evt, els) {
+          if (!els.length) return;
+          const label = catData[els[0].index]?.asset_class;
+          if (!label) return;
+          // Navigate to list view filtered by this asset class
+          document.querySelector('.main-tab[data-view=list]').click();
+          setTimeout(() => {
+            // Set the sort to FUM and apply asset class text filter
+            const search = document.getElementById('search');
+            if (search) { search.value = ''; search.dispatchEvent(new Event('input')); }
+            // Trigger asset class filter in the screener — open screener with that class pre-filtered
+            document.querySelector('.main-tab[data-view=screener]').click();
+            setTimeout(() => {
+              const cb = [...document.querySelectorAll('.sc-ac')].find(el => el.value === label);
+              if (cb && !cb.checked) { cb.checked = true; cb.dispatchEvent(new Event('change')); }
+            }, 50);
+          }, 50);
+        },
         plugins: {
           legend: {
             position: 'bottom',
-            labels: { font: { size: 10 }, padding: 8, boxWidth: 10 },
+            labels: {
+              font: { size: 10 },
+              padding: 8,
+              boxWidth: 10,
+              generateLabels(chart) {
+                return chart.data.labels.map((label, i) => ({
+                  text: label,
+                  fillStyle: catData[i] ? assetColor(catData[i].asset_class) : '#ccc',
+                  strokeStyle: '#fff',
+                  lineWidth: 0,
+                  index: i,
+                }));
+              },
+            },
           },
           tooltip: {
-            callbacks: { label: ctx => ' ' + ctx.label + ': ' + fmtFum(ctx.parsed) },
+            callbacks: {
+              label(ctx) {
+                const c = catData[ctx.dataIndex];
+                const pct = totalAum > 0 ? ((c.total_fum / totalAum) * 100).toFixed(1) : '0';
+                return [
+                  ' ' + fmtFum(c.total_fum) + '  (' + pct + '%)',
+                  ' ' + c.etf_count + ' ETFs',
+                ];
+              },
+            },
           },
         },
       },
     }
   );
 
-  // Issuer bars
-  const topIss = (issuers.issuers || []).slice(0, 10);
-  const totalFum = topIss.reduce((s, i) => s + (i.total_fum || 0), 0);
-  document.getElementById('a-issuers').innerHTML = topIss.map((i, idx) => {
-    const p = totalFum > 0 ? ((i.total_fum || 0) / totalFum * 100) : 0;
-    return `<div class="flex items-center gap-2">
-      <div class="w-2.5 h-2.5 rounded-sm shrink-0" style="background:${PALETTE[idx % PALETTE.length]}"></div>
-      <span class="text-xs text-gray-700 w-24 truncate">${i.name}</span>
-      <div class="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
-        <div class="h-full rounded-full" style="width:${p.toFixed(1)}%;background:${PALETTE[idx % PALETTE.length]}"></div>
-      </div>
-      <span class="text-xs text-gray-500 w-10 text-right">${p.toFixed(1)}%</span>
-    </div>`;
-  }).join('');
+  /* ── 2. Issuer market share — pie/doughnut chart ── */
+  const topIss = (issuers.issuers || []).filter(i => (i.total_fum || 0) > 0).slice(0, 10);
+  const issTotal = topIss.reduce((s, i) => s + (i.total_fum || 0), 0);
 
-  // Flows bar chart (top inflows + outflows combined)
+  if (chartIssuers) chartIssuers.destroy();
+  chartIssuers = new Chart(
+    document.getElementById('chart-issuers').getContext('2d'), {
+      type: 'doughnut',
+      data: {
+        labels: topIss.map(i => i.name),
+        datasets: [{
+          data: topIss.map(i => i.total_fum || 0),
+          backgroundColor: topIss.map(i => issuerColor(i.name)),
+          borderWidth: 2,
+          borderColor: '#fff',
+          hoverBorderWidth: 3,
+          hoverOffset: 8,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '60%',
+        animation: { animateRotate: true, duration: 600 },
+        onClick(evt, els) {
+          if (!els.length) return;
+          const iss = topIss[els[0].index];
+          if (!iss) return;
+          document.querySelector('.main-tab[data-view=screener]').click();
+          setTimeout(() => {
+            const cb = [...document.querySelectorAll('.sc-is')].find(el => el.value === iss.name);
+            if (cb && !cb.checked) { cb.checked = true; cb.dispatchEvent(new Event('change')); }
+          }, 80);
+        },
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: {
+              font: { size: 10 },
+              padding: 7,
+              boxWidth: 10,
+            },
+          },
+          tooltip: {
+            callbacks: {
+              label(ctx) {
+                const iss = topIss[ctx.dataIndex];
+                const pct = issTotal > 0 ? ((iss.total_fum / issTotal) * 100).toFixed(1) : '0';
+                return [
+                  ' ' + fmtFum(iss.total_fum) + '  (' + pct + '%)',
+                  ' ' + iss.etf_count + ' ETFs',
+                ];
+              },
+            },
+          },
+        },
+      },
+    }
+  );
+
+  /* ── 3. Fund flows bar chart — coloured by issuer, click to detail ── */
   const inflows  = (flows.top_inflows  || []).slice(0, 5);
   const outflows = (flows.top_outflows || []).slice(0, 5);
-  const flowLabels = [...inflows.map(r => r.code), ...outflows.map(r => r.code)];
-  const flowVals   = [...inflows.map(r => r.fund_flow_1m || 0),
-                      ...outflows.map(r => r.fund_flow_1m || 0)];
-  const flowBg = flowVals.map(v => v >= 0 ? 'rgba(16,185,129,.8)' : 'rgba(239,68,68,.8)');
+  const flowRows   = [...inflows, ...outflows];
+  const flowLabels = flowRows.map(r => r.code);
+  const flowVals   = flowRows.map(r => r.fund_flow_1m || 0);
+  // Positive bars: issuer brand color; negative bars: muted red
+  const flowBg = flowRows.map(r =>
+    (r.fund_flow_1m || 0) >= 0
+      ? issuerColor(r.issuer)
+      : 'rgba(239,68,68,0.75)'
+  );
+  const flowBorder = flowRows.map(r =>
+    (r.fund_flow_1m || 0) >= 0
+      ? issuerColor(r.issuer)
+      : '#ef4444'
+  );
 
   if (chartFlows) chartFlows.destroy();
   chartFlows = new Chart(
@@ -1762,16 +3046,40 @@ async function loadAnalytics() {
         datasets: [{
           data: flowVals,
           backgroundColor: flowBg,
-          borderRadius: 4,
+          borderColor: flowBorder,
+          borderWidth: 1,
+          borderRadius: 5,
+          borderSkipped: false,
         }],
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        animation: { duration: 500 },
+        onClick(evt, els) {
+          if (!els.length) return;
+          const row = flowRows[els[0].index];
+          if (row) {
+            showDetail(row.code);
+            document.querySelector('.main-tab[data-view=list]').click();
+          }
+        },
         plugins: {
           legend: { display: false },
           tooltip: {
-            callbacks: { label: ctx => ' ' + fmtFum(ctx.parsed.y) },
+            callbacks: {
+              title: ctx => {
+                const r = flowRows[ctx[0].dataIndex];
+                return r ? r.code + (r.issuer ? '  ·  ' + r.issuer : '') : ctx[0].label;
+              },
+              label: ctx => {
+                const r = flowRows[ctx.dataIndex];
+                return [
+                  ' Flow: ' + fmtFum(ctx.parsed.y),
+                  r?.name ? ' ' + r.name.slice(0, 40) : '',
+                ].filter(Boolean);
+              },
+            },
           },
         },
         scales: {
@@ -1789,10 +3097,38 @@ async function loadAnalytics() {
   );
 }
 
+/* ======================================================= data freshness */
+let scrapeTimes = {};
+
+// Map issuer display names → scrape_log source keys
+const ISSUER_SRC = {
+  'BetaShares': 'betashares', 'Vanguard': 'vanguard', 'iShares': 'ishares',
+  'VanEck': 'vaneck', 'Global X': 'globalx', 'SPDR': 'spdr',
+  'StateStreet': 'statestreet',
+};
+
+function fmtTs(ts) {
+  if (!ts) return 'unknown date';
+  const d = new Date(String(ts).replace(' ', 'T'));
+  if (isNaN(d)) return String(ts);
+  return d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+       + ' ' + d.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+function tsFor(source) { return scrapeTimes[source] || ''; }
+
+async function loadScrapeTimes() {
+  const d = await api('/api/v1/scrape-status');
+  (d.log || []).forEach(row => {
+    if (row.finished_at && (!scrapeTimes[row.source] || row.finished_at > scrapeTimes[row.source]))
+      scrapeTimes[row.source] = row.finished_at;
+  });
+}
+
 /* ======================================================= init */
 async function init() {
   try {
-    await Promise.all([loadFilters(), loadOverview(), loadTable(), loadAnalytics()]);
+    await Promise.all([loadFilters(), loadOverview(), loadTable(), loadAnalytics(), loadScrapeTimes()]);
   } catch (e) {
     console.error('Init error:', e);
   }
@@ -1802,7 +3138,7 @@ init();
 setInterval(() => { loadOverview(); loadTable(); }, 120000);
 
 /* ======================================================= main view tabs */
-const VIEWS = ['list', 'screener', 'compare', 'holdings'];
+const VIEWS = ['list', 'screener', 'compare', 'holdings', 'analytics'];
 document.querySelectorAll('.main-tab').forEach(btn => {
   btn.addEventListener('click', () => {
     const v = btn.dataset.view;
@@ -1810,14 +3146,15 @@ document.querySelectorAll('.main-tab').forEach(btn => {
     btn.classList.add('active');
     VIEWS.forEach(id => document.getElementById('view-' + id).classList.add('hidden'));
     document.getElementById('view-' + v).classList.remove('hidden');
-    if (v === 'screener' && !screenerLoaded) initScreener();
-    if (v === 'compare'  && !compareLoaded)  initCompare();
-    if (v === 'holdings') { /* always ready */ }
+    if (v === 'screener'  && !screenerLoaded)  initScreener();
+    if (v === 'compare'   && !compareLoaded)   initCompare();
+    if (v === 'analytics' && !analyticsLoaded) initAnalytics();
   });
 });
 
 /* ============================================================ SCREENER */
 let screenerLoaded = false;
+let scLastData = [];
 const scFilters = {
   exchange: '', assetClasses: new Set(), issuers: new Set(),
   maxFee: 2, minFum: '', minRet: '', maxRet: '', minYield: '', hedged: false,
@@ -1836,7 +3173,7 @@ async function initScreener() {
   (cats.categories || []).forEach(c => {
     const id = 'sca-' + c.asset_class.replace(/\W/g, '_');
     const label = document.createElement('label');
-    label.innerHTML = `<input type="checkbox" id="${id}" value="${c.asset_class}" class="accent-blue-600">
+    label.innerHTML = `<input type="checkbox" id="${id}" value="${c.asset_class}" class="sc-ac accent-blue-600">
       <span class="truncate">${c.asset_class} <span class="text-gray-400">(${c.etf_count})</span></span>`;
     label.querySelector('input').addEventListener('change', e => {
       if (e.target.checked) scFilters.assetClasses.add(e.target.value);
@@ -1850,7 +3187,7 @@ async function initScreener() {
   (issuers.issuers || []).forEach(i => {
     const id = 'sci-' + i.name.replace(/\W/g, '_');
     const label = document.createElement('label');
-    label.innerHTML = `<input type="checkbox" id="${id}" value="${i.name}" class="accent-blue-600">
+    label.innerHTML = `<input type="checkbox" id="${id}" value="${i.name}" class="sc-is accent-blue-600">
       <span class="truncate">${i.name} <span class="text-gray-400">(${i.etf_count})</span></span>`;
     label.querySelector('input').addEventListener('change', e => {
       if (e.target.checked) scFilters.issuers.add(e.target.value);
@@ -1955,6 +3292,7 @@ async function scFetch() {
   if (scFilters.issuers.size > 1)
     rows = rows.filter(e => scFilters.issuers.has(e.issuer));
 
+  scLastData = rows;
   document.getElementById('sc-count').textContent =
     rows.length + ' ETF' + (rows.length !== 1 ? 's' : '') + ' matching';
   document.getElementById('sc-result-count').textContent =
@@ -1973,11 +3311,12 @@ async function scFetch() {
         <td class="px-3 py-2.5">
           <div class="font-bold text-gray-900">${e.code}</div>
           <div class="text-xs text-gray-400 truncate max-w-[160px]">${e.name || ''}</div>
+          ${e.benchmark ? `<div class="text-xs text-indigo-400 truncate max-w-[160px]" title="${e.benchmark}">&#8594; ${e.benchmark}</div>` : ''}
         </td>
         <td class="px-3 py-2.5">${acChip(e.asset_class)}</td>
         <td class="px-3 py-2.5 text-xs text-gray-500 max-w-[100px] truncate">${e.issuer || '—'}</td>
         <td class="px-3 py-2.5 text-right font-mono">${money(e.current_price)}</td>
-        <td class="px-3 py-2.5 text-right">${fmtFum(e.fund_size_aud_millions)}</td>
+        <td class="px-3 py-2.5 text-right" title="${fumTip(e)}">${fmtFum(calcFum(e))}</td>
         <td class="px-3 py-2.5 text-right font-semibold ${pctCls(e.return_1y)}">${pct(e.return_1y)}</td>
         <td class="px-3 py-2.5 text-right text-gray-600">
           ${e.distribution_yield != null ? e.distribution_yield.toFixed(1) + '%' : '—'}
@@ -1991,6 +3330,7 @@ async function scFetch() {
 
 /* ============================================================ COMPARE */
 let compareLoaded = false;
+let analyticsLoaded = false;
 const cmpSet = new Set();
 let cmpTimer;
 
@@ -2034,6 +3374,7 @@ function initCompare() {
           renderCmpChips();
           if (cmpSet.size >= 2) cmpFetch();
           else renderCmpHint();
+          cmpFetchSimilar();
         })
       );
     }, 250);
@@ -2061,6 +3402,7 @@ function cmpRemove(code) {
   renderCmpChips();
   if (cmpSet.size >= 2) cmpFetch();
   else renderCmpHint();
+  cmpFetchSimilar();
 }
 
 function renderCmpHint() {
@@ -2073,6 +3415,108 @@ async function cmpFetch() {
   const codes = [...cmpSet].join(',');
   const d = await api('/api/v1/compare?codes=' + codes);
   renderCmpTable(d.data || []);
+}
+
+// Fetch similar ETFs for all codes in the compare set
+async function cmpFetchSimilar() {
+  const el = document.getElementById('cmp-similar-content');
+  if (cmpSet.size === 0) {
+    el.innerHTML = '<p class="text-sm text-gray-400 bg-white rounded-xl shadow-sm border border-gray-100 py-8 text-center">Add an ETF above to see similar alternatives based on portfolio holdings.</p>';
+    return;
+  }
+  el.innerHTML = '<p class="text-sm text-gray-400 py-4 text-center">Loading suggestions…</p>';
+
+  const results = await Promise.all([...cmpSet].map(code =>
+    api('/api/v1/etfs/' + code + '/similar').then(d => ({ code, ...d }))
+  ));
+
+  // Merge results: for each source ETF we get same_class + other_class.
+  // Aggregate per source asset class, deduplicating by taking max overlap.
+  // bySourceAC = { acName: { same: Map<code, etfObj>, other: Map<code, etfObj> } }
+  const bySourceAC = {};
+
+  for (const res of results) {
+    const ac = res.asset_class || 'Other';
+    if (!bySourceAC[ac]) bySourceAC[ac] = { same: new Map(), other: new Map() };
+    const bucket = bySourceAC[ac];
+
+    for (const s of (res.same_class || [])) {
+      if (cmpSet.has(s.code)) continue;
+      const cur = bucket.same.get(s.code);
+      if (!cur || s.overlap_pct > cur.overlap_pct) bucket.same.set(s.code, s);
+    }
+    for (const s of (res.other_class || [])) {
+      if (cmpSet.has(s.code)) continue;
+      const cur = bucket.other.get(s.code);
+      if (!cur || s.overlap_pct > cur.overlap_pct) bucket.other.set(s.code, s);
+    }
+  }
+
+  const acs = Object.keys(bySourceAC);
+  if (acs.length === 0) {
+    el.innerHTML = '<p class="text-sm text-gray-400 bg-white rounded-xl shadow-sm border border-gray-100 py-8 text-center">No similar ETFs found (holdings data may be unavailable).</p>';
+    return;
+  }
+
+  function similarCard(s, dimmed) {
+    const overlapColor = s.overlap_pct >= 50 ? 'bg-green-100 text-green-700'
+                       : s.overlap_pct >= 20 ? 'bg-yellow-100 text-yellow-700'
+                       : 'bg-gray-100 text-gray-500';
+    return `
+      <div class="bg-white border ${dimmed ? 'border-dashed border-gray-200 opacity-80' : 'border-gray-200'} rounded-xl p-4 hover:shadow-md hover:border-blue-200 transition-all">
+        <div class="flex justify-between items-start mb-1">
+          <span class="font-bold text-blue-700 text-base">${s.code}</span>
+          <span class="text-xs ${overlapColor} font-semibold px-2 py-0.5 rounded-full">${s.overlap_pct.toFixed(0)}% overlap</span>
+        </div>
+        <p class="text-xs text-gray-500 mb-1 leading-snug">${(s.name || '').slice(0, 50)}</p>
+        ${dimmed ? `<p class="text-xs text-gray-400 italic mb-1">${s.asset_class || ''}</p>` : ''}
+        <div class="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
+          ${s.issuer ? `<span>${s.issuer}</span>` : ''}
+          ${calcFum(s) != null ? `<span class="text-gray-400">FUM: ${fmtFum(calcFum(s))}</span>` : ''}
+          ${s.expense_ratio ? `<span class="text-gray-400">MER: ${s.expense_ratio.toFixed(2)}%</span>` : ''}
+          ${s.return_1y != null ? `<span class="${pctCls(s.return_1y)}">${pct(s.return_1y)} 1Y</span>` : ''}
+        </div>
+        <button onclick="cmpAdd('${s.code}')"
+                class="mt-3 text-xs text-blue-600 hover:text-blue-800 font-medium border border-blue-200 hover:border-blue-400 rounded-lg px-3 py-1 transition-colors">
+          + Add to Compare
+        </button>
+      </div>`;
+  }
+
+  const html = acs.map(ac => {
+    const { same, other } = bySourceAC[ac];
+    const sameList  = [...same.values()].sort((a, b) => b.overlap_pct - a.overlap_pct).slice(0, 5);
+    const otherList = [...other.values()].sort((a, b) => b.overlap_pct - a.overlap_pct).slice(0, 3);
+
+    const sameCards  = sameList.map(s => similarCard(s, false)).join('');
+    const otherCards = otherList.map(s => similarCard(s, true)).join('');
+    const hasOther   = otherCards.length > 0;
+
+    return `
+      <div class="mb-6">
+        <h4 class="text-sm font-semibold text-gray-600 mb-3 flex items-center gap-2">${acChip(ac)}</h4>
+        ${sameList.length > 0
+          ? `<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-3">${sameCards}</div>`
+          : `<p class="text-xs text-gray-400 italic mb-3">No same-class ETFs with holdings overlap found.</p>`}
+        ${hasOther ? `
+          <details class="mt-1">
+            <summary class="text-xs text-gray-400 cursor-pointer hover:text-gray-600 select-none mb-2">
+              ▸ Other asset classes with overlap
+            </summary>
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mt-2">${otherCards}</div>
+          </details>` : ''}
+      </div>`;
+  }).join('');
+
+  el.innerHTML = html;
+}
+
+function cmpAdd(code) {
+  if (cmpSet.size >= 5) { alert('Maximum 5 ETFs for comparison.'); return; }
+  cmpSet.add(code);
+  renderCmpChips();
+  if (cmpSet.size >= 2) cmpFetch();
+  cmpFetchSimilar();
 }
 
 function miniBar(val, maxVal, neg) {
@@ -2101,7 +3545,8 @@ function renderCmpTable(etfs) {
     { label: 'Issuer',        fmt: e => e.issuer || '—' },
     { label: 'Exchange',      fmt: e => `<span class="badge-${(e.exchange||'asx').toLowerCase()} px-1.5 py-0.5 rounded text-xs font-medium">${e.exchange || '—'}</span>` },
     { label: 'Asset Class',   fmt: e => acChip(e.asset_class) },
-    { label: 'FUM',           fmt: e => fmtFum(e.fund_size_aud_millions) },
+    { label: 'Benchmark',     fmt: e => e.benchmark ? `<span class="text-xs text-indigo-700">${e.benchmark}</span>` : '—' },
+    { label: 'FUM',           fmt: e => fmtFum(calcFum(e)) },
     { label: 'Mgmt Fee',      fmt: e => miniBar(e.expense_ratio, maxFee, false), bar: true },
     { label: 'Dist. Yield',   fmt: e => miniBar(e.distribution_yield, maxYield, false), bar: true },
     { label: '1M Return',     fmt: e => `<span class="${pctCls(e.return_1m)}">${pct(e.return_1m)}</span>` },
@@ -2210,6 +3655,121 @@ async function hsFetch() {
       <td class="px-3 py-2.5">${acChip(r.asset_class)}</td>
     </tr>`).join('');
 }
+
+/* ============================================================ ANALYTICS */
+async function initAnalytics() {
+  analyticsLoaded = true;
+  const [performers, yieldData, cheapest, flows] = await Promise.all([
+    api('/api/v1/analytics/top-performers?limit=15'),
+    api('/api/v1/analytics/highest-yield?limit=15'),
+    api('/api/v1/analytics/cheapest?limit=15'),
+    api('/api/v1/analytics/fund-flows?limit=10'),
+  ]);
+
+  function leaderRow(code, name, valueHtml, rank) {
+    return `<div class="px-4 py-2.5 flex items-center gap-3 hover:bg-slate-50 cursor-pointer"
+         onclick="showDetail('${code}');document.querySelector('.main-tab[data-view=list]').click()">
+      <span class="text-gray-300 font-mono text-xs w-5 text-right shrink-0">${rank}</span>
+      <div class="flex-1 min-w-0">
+        <div class="font-bold text-gray-900 text-sm">${code}</div>
+        <div class="text-xs text-gray-400 truncate">${name || ''}</div>
+      </div>
+      ${valueHtml}
+    </div>`;
+  }
+
+  document.getElementById('an-performers').innerHTML =
+    (performers.top_performers || []).map((e, i) =>
+      leaderRow(e.code, e.name,
+        `<span class="font-semibold text-sm shrink-0 ${pctCls(e.return_1y)}">${pct(e.return_1y)}</span>`,
+        i + 1)
+    ).join('');
+
+  document.getElementById('an-yield').innerHTML =
+    (yieldData.highest_yield || []).map((e, i) =>
+      leaderRow(e.code, e.name,
+        `<span class="font-semibold text-sm shrink-0 text-emerald-600">${e.distribution_yield != null ? e.distribution_yield.toFixed(1) + '%' : '—'}</span>`,
+        i + 1)
+    ).join('');
+
+  document.getElementById('an-cheapest').innerHTML =
+    (cheapest.cheapest || []).map((e, i) =>
+      leaderRow(e.code, e.name,
+        `<span class="font-semibold text-sm shrink-0 text-gray-700">${e.expense_ratio != null ? e.expense_ratio.toFixed(2) + '%' : '—'}</span>`,
+        i + 1)
+    ).join('');
+
+  const allFlows = [...(flows.top_inflows || []), ...(flows.top_outflows || [])];
+  const maxFlow = Math.max(...allFlows.map(r => Math.abs(r.fund_flow_1m || 0)), 1);
+
+  function flowRow(r, dir) {
+    const col   = dir === 'in' ? issuerColor(r.issuer) : '#ef4444';
+    const barW  = (Math.abs(r.fund_flow_1m || 0) / maxFlow * 100).toFixed(1);
+    return `<div class="flex items-center gap-2 cursor-pointer hover:bg-slate-50 px-2 py-1.5 rounded group"
+         onclick="showDetail('${r.code}');document.querySelector('.main-tab[data-view=list]').click()">
+      <div class="min-w-0 w-24 shrink-0">
+        <div class="font-bold text-gray-900 text-xs">${r.code}</div>
+        <div class="text-[10px] text-gray-400 truncate">${r.issuer || ''}</div>
+      </div>
+      <div class="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+        <div class="h-full rounded-full transition-all" style="background:${col};width:${barW}%"></div>
+      </div>
+      <span class="text-xs font-semibold w-16 text-right shrink-0" style="color:${col}">${fmtFum(r.fund_flow_1m)}</span>
+    </div>`;
+  }
+
+  document.getElementById('an-inflows').innerHTML =
+    (flows.top_inflows || []).slice(0, 8).map(r => flowRow(r, 'in')).join('');
+  document.getElementById('an-outflows').innerHTML =
+    (flows.top_outflows || []).slice(0, 8).map(r => flowRow(r, 'out')).join('');
+}
+
+/* ============================================================ CSV EXPORT */
+function scExportCSV() {
+  if (!scLastData.length) return;
+  const headers = ['Code','Name','Asset Class','Issuer','Price (AUD)','FUM (AUD M)',
+                   '1Y Return (%)','Yield (%)','MER (%)'];
+  const escape = v => '"' + String(v || '').replace(/"/g, '""') + '"';
+  const csvRows = [headers.join(',')];
+  scLastData.forEach(e => {
+    csvRows.push([
+      e.code,
+      escape(e.name),
+      escape(e.asset_class),
+      escape(e.issuer),
+      e.current_price         != null ? e.current_price.toFixed(2)          : '',
+      calcFum(e) != null ? calcFum(e).toFixed(1) : '',
+      e.return_1y             != null ? e.return_1y.toFixed(2)              : '',
+      e.distribution_yield    != null ? e.distribution_yield.toFixed(2)     : '',
+      e.expense_ratio         != null ? e.expense_ratio.toFixed(2)          : '',
+    ].join(','));
+  });
+  const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = 'etf-screener-' + new Date().toISOString().slice(0, 10) + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+document.getElementById('sc-export').addEventListener('click', scExportCSV);
+
+/* ============================================================ COLUMN TOGGLES */
+document.getElementById('col-3y').addEventListener('change', function () {
+  document.querySelectorAll('.col-3y').forEach(el => el.classList.toggle('hidden', !this.checked));
+});
+document.getElementById('col-5y').addEventListener('change', function () {
+  document.querySelectorAll('.col-5y').forEach(el => el.classList.toggle('hidden', !this.checked));
+});
+
+/* ============================================================ KEYBOARD SHORTCUT */
+document.addEventListener('keydown', e => {
+  if (e.key === '/' && !e.ctrlKey && !e.metaKey &&
+      !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
+    e.preventDefault();
+    document.getElementById('search').focus();
+  }
+});
 </script>
 </body>
 </html>'''
