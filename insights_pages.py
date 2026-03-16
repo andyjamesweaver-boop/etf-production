@@ -761,6 +761,417 @@ PAGE_ISSUERS = _page(
 
 
 # ---------------------------------------------------------------------------
+# NAV PREMIUM / DISCOUNT PAGE
+# ---------------------------------------------------------------------------
+_NAV_BODY = """
+<!-- Hero stats -->
+<div id="hero" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3"></div>
+
+<!-- Market-wide 90-day premium/discount trend + distribution -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+  <div class="card lg:col-span-2">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="font-semibold text-sm text-gray-700">Market-wide Premium/Discount — Last 90 Days</h2>
+      <span class="text-xs text-gray-400">Average across all ETFs with NAV data</span>
+    </div>
+    <div class="relative" style="height:220px"><canvas id="chart-hist"></canvas></div>
+  </div>
+  <div class="card">
+    <h2 class="font-semibold text-sm text-gray-700 mb-3">Today's Distribution</h2>
+    <div class="relative" style="height:220px"><canvas id="chart-dist"></canvas></div>
+  </div>
+</div>
+
+<!-- By asset class + by issuer -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+  <div class="card">
+    <h2 class="font-semibold text-sm text-gray-700 mb-3">Avg Premium/Discount by Asset Class</h2>
+    <div id="ac-bars"></div>
+  </div>
+  <div class="card">
+    <h2 class="font-semibold text-sm text-gray-700 mb-3">Avg Premium/Discount by Issuer</h2>
+    <div id="iss-bars"></div>
+  </div>
+</div>
+
+<!-- Historical explorer for individual ETF -->
+<div class="card">
+  <div class="flex flex-wrap items-center gap-3 mb-4">
+    <h2 class="font-semibold text-sm text-gray-700">Historical Premium/Discount Explorer</h2>
+    <select id="etf-picker" class="border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm bg-gray-50 focus:ring-2 focus:ring-blue-200 outline-none min-w-[200px]">
+      <option value="">— select an ETF —</option>
+    </select>
+    <select id="period-picker" class="border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm bg-gray-50 focus:ring-2 focus:ring-blue-200 outline-none">
+      <option value="3m">3 months</option>
+      <option value="1y" selected>1 year</option>
+      <option value="3y">3 years</option>
+      <option value="all">All time</option>
+    </select>
+    <span id="etf-stats" class="text-xs text-gray-400"></span>
+  </div>
+  <div class="relative" style="height:260px"><canvas id="chart-etf"></canvas></div>
+</div>
+
+<!-- Today's full snapshot table -->
+<div class="card">
+  <div class="flex items-center justify-between mb-3">
+    <h2 class="font-semibold text-sm text-gray-700">Today's Snapshot — All ETFs</h2>
+    <div class="flex items-center gap-2">
+      <input id="snap-search" type="text" placeholder="Filter by code or name…"
+             class="border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm bg-gray-50 focus:ring-2 focus:ring-blue-200 outline-none w-52">
+      <select id="snap-sort" class="border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm bg-gray-50 focus:ring-2 focus:ring-blue-200 outline-none">
+        <option value="pd-desc">Largest premium first</option>
+        <option value="pd-asc">Largest discount first</option>
+        <option value="fum-desc">FUM (largest first)</option>
+        <option value="abs-desc">Largest deviation first</option>
+      </select>
+    </div>
+  </div>
+  <div class="overflow-x-auto">
+    <table>
+      <thead><tr>
+        <th>Code</th><th>Fund Name</th><th>Issuer</th><th>Asset Class</th>
+        <th style="text-align:right">NAV</th>
+        <th style="text-align:right">Price</th>
+        <th style="text-align:right">Prem/Disc</th>
+        <th style="text-align:right">FUM</th>
+      </tr></thead>
+      <tbody id="snap-table"></tbody>
+    </table>
+  </div>
+</div>
+"""
+
+_NAV_JS = """
+let _data = null;
+let _etfChart = null;
+
+async function init() {
+  _data = await api('/api/v1/insights/nav');
+
+  document.getElementById('ts').textContent = 'Snapshot: ' + _data.snapshot_date;
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('page').classList.remove('hidden');
+
+  renderHero();
+  renderHistChart();
+  renderDistChart();
+  renderAcBars();
+  renderIssBars();
+  populateEtfPicker();
+  renderSnapTable();
+
+  document.getElementById('etf-picker').addEventListener('change', loadEtfHistory);
+  document.getElementById('period-picker').addEventListener('change', loadEtfHistory);
+
+  let snapTimer;
+  document.getElementById('snap-search').addEventListener('input', () => {
+    clearTimeout(snapTimer);
+    snapTimer = setTimeout(renderSnapTable, 250);
+  });
+  document.getElementById('snap-sort').addEventListener('change', renderSnapTable);
+}
+
+function fmtPd(v, decimals) {
+  if (v == null) return '—';
+  const d = decimals != null ? decimals : 3;
+  return (v >= 0 ? '+' : '') + v.toFixed(d) + '%';
+}
+function pdCls(v) {
+  if (v == null) return '';
+  if (v > 0.05) return 'pos';
+  if (v < -0.05) return 'neg';
+  return 'text-gray-500';
+}
+function pdBar(v, maxAbs) {
+  if (v == null) return '';
+  const pct = maxAbs > 0 ? Math.min(Math.abs(v) / maxAbs * 100, 100).toFixed(1) : 0;
+  const col = v > 0 ? '#16a34a' : '#dc2626';
+  const dir = v > 0 ? 'left' : 'right';
+  // Centred bar: positive goes right from centre, negative goes left
+  if (v >= 0) {
+    return `<div style="display:flex;align-items:center;gap:4px;justify-content:flex-end">
+      <span class="${pdCls(v)}" style="font-size:.75rem;font-weight:600;min-width:60px;text-align:right">${fmtPd(v)}</span>
+      <div style="width:60px;height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden">
+        <div style="width:${pct}%;height:100%;background:${col};border-radius:4px;margin-left:0"></div>
+      </div>
+    </div>`;
+  } else {
+    return `<div style="display:flex;align-items:center;gap:4px;justify-content:flex-end">
+      <span class="${pdCls(v)}" style="font-size:.75rem;font-weight:600;min-width:60px;text-align:right">${fmtPd(v)}</span>
+      <div style="width:60px;height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden;display:flex;justify-content:flex-end">
+        <div style="width:${pct}%;height:100%;background:${col};border-radius:4px"></div>
+      </div>
+    </div>`;
+  }
+}
+
+function renderHero() {
+  const s = _data.summary;
+  const cards = [
+    { label: 'ETFs with NAV',   val: s.total,       sub: 'today',         col: '#3b82f6' },
+    { label: 'At Premium',      val: s.at_premium,  sub: '> +0.05%',      col: '#16a34a' },
+    { label: 'Near Par',        val: s.near_par,    sub: '±0.05%',        col: '#6b7280' },
+    { label: 'At Discount',     val: s.at_discount, sub: '< −0.05%',      col: '#dc2626' },
+    { label: 'Avg Prem/Disc',   val: fmtPd(s.avg_pd),  sub: 'market avg', col: s.avg_pd >= 0 ? '#16a34a' : '#dc2626', raw: true },
+    { label: 'Max Premium',     val: fmtPd(s.max_premium),  sub: 'today', col: '#16a34a', raw: true },
+    { label: 'Max Discount',    val: fmtPd(s.max_discount), sub: 'today', col: '#dc2626', raw: true },
+  ];
+  document.getElementById('hero').innerHTML = cards.map(c => `
+    <div class="card p-3">
+      <p class="sl">${c.label}</p>
+      <p class="sv mt-1" style="color:${c.col};font-size:1.4rem">${c.raw ? c.val : c.val.toLocaleString()}</p>
+      <p class="ss">${c.sub}</p>
+    </div>`).join('');
+}
+
+function renderHistChart() {
+  const hist = _data.market_history;
+  if (!hist.length) return;
+  const labels = hist.map(r => r.date);
+  const avg = hist.map(r => r.avg_pd != null ? +r.avg_pd.toFixed(4) : null);
+  const minPd = hist.map(r => r.min_pd != null ? +r.min_pd.toFixed(4) : null);
+  const maxPd = hist.map(r => r.max_pd != null ? +r.max_pd.toFixed(4) : null);
+
+  new Chart(document.getElementById('chart-hist'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Max', data: maxPd, borderColor: 'rgba(22,163,74,0.35)',
+          backgroundColor: 'rgba(22,163,74,0.08)', fill: '+1', borderWidth: 1, pointRadius: 0, tension: 0.3 },
+        { label: 'Avg', data: avg, borderColor: '#3b82f6',
+          backgroundColor: 'transparent', borderWidth: 2, pointRadius: 0, tension: 0.3 },
+        { label: 'Min', data: minPd, borderColor: 'rgba(220,38,38,0.35)',
+          backgroundColor: 'rgba(220,38,38,0.08)', fill: '-1', borderWidth: 1, pointRadius: 0, tension: 0.3 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 10, font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label}: ${fmtPd(ctx.parsed.y)}`
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { maxTicksLimit: 8, font: { size: 10 } }, grid: { display: false } },
+        y: {
+          ticks: { font: { size: 10 }, callback: v => fmtPd(v) },
+          grid: { color: '#f1f5f9' },
+        }
+      }
+    }
+  });
+}
+
+function renderDistChart() {
+  const vals = _data.snapshot.map(r => r.premium_discount_pct).filter(v => v != null);
+  if (!vals.length) return;
+
+  // Build histogram buckets: -1.0 to +1.0 in 0.1% steps
+  const lo = -1.0, hi = 1.0, step = 0.1;
+  const buckets = [];
+  for (let b = lo; b < hi; b = +(b + step).toFixed(2)) buckets.push(b);
+  const counts = new Array(buckets.length).fill(0);
+  const overflow = { lo: 0, hi: 0 };
+  vals.forEach(v => {
+    if (v < lo) { overflow.lo++; return; }
+    if (v >= hi) { overflow.hi++; return; }
+    const idx = Math.floor((v - lo) / step);
+    if (idx >= 0 && idx < counts.length) counts[idx]++;
+  });
+
+  const labels = buckets.map(b => fmtPd(b, 1));
+  const colors = buckets.map(b => b >= 0 ? 'rgba(22,163,74,0.7)' : 'rgba(220,38,38,0.7)');
+
+  new Chart(document.getElementById('chart-dist'), {
+    type: 'bar',
+    data: { labels, datasets: [{ data: counts, backgroundColor: colors, borderRadius: 2 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { title: ctx => ctx[0].label + ' to ' + fmtPd(+ctx[0].label.replace('%','').replace('+','') + step, 1),
+                                label: ctx => ctx.parsed.y + ' ETFs' } } },
+      scales: {
+        x: { ticks: { font: { size: 9 }, maxRotation: 45 }, grid: { display: false } },
+        y: { ticks: { font: { size: 10 }, stepSize: 1 }, grid: { color: '#f1f5f9' } }
+      }
+    }
+  });
+}
+
+function renderAcBars() {
+  const rows = _data.by_asset_class;
+  if (!rows.length) { document.getElementById('ac-bars').innerHTML = '<p class="text-xs text-gray-400">No data</p>'; return; }
+  const maxAbs = Math.max(...rows.map(r => Math.abs(r.avg_pd || 0)));
+  document.getElementById('ac-bars').innerHTML = rows.map(r => {
+    const v = r.avg_pd;
+    const pct = maxAbs > 0 ? (Math.abs(v) / maxAbs * 100).toFixed(1) : 0;
+    const col = v >= 0 ? '#16a34a' : '#dc2626';
+    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
+      <span style="font-size:.73rem;color:#374151;width:160px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.asset_class}">${r.asset_class || 'Unknown'}</span>
+      <div style="flex:1;height:14px;background:#f1f5f9;border-radius:4px;overflow:hidden">
+        <div style="width:${pct}%;height:100%;background:${col};border-radius:4px"></div>
+      </div>
+      <span class="${pdCls(v)}" style="font-size:.73rem;font-weight:600;width:64px;text-align:right">${fmtPd(v)}</span>
+      <span style="font-size:.68rem;color:#94a3b8;width:32px;text-align:right">${r.count}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderIssBars() {
+  const rows = _data.by_issuer.filter(r => r.count >= 2).slice(0, 15);
+  if (!rows.length) { document.getElementById('iss-bars').innerHTML = '<p class="text-xs text-gray-400">No data</p>'; return; }
+  const maxAbs = Math.max(...rows.map(r => Math.abs(r.avg_pd || 0)));
+  document.getElementById('iss-bars').innerHTML = rows.map(r => {
+    const v = r.avg_pd;
+    const pct = maxAbs > 0 ? (Math.abs(v) / maxAbs * 100).toFixed(1) : 0;
+    const col = v >= 0 ? '#16a34a' : '#dc2626';
+    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
+      <span style="font-size:.73rem;color:#374151;width:120px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.issuer}">${r.issuer}</span>
+      <div style="flex:1;height:14px;background:#f1f5f9;border-radius:4px;overflow:hidden">
+        <div style="width:${pct}%;height:100%;background:${col};border-radius:4px"></div>
+      </div>
+      <span class="${pdCls(v)}" style="font-size:.73rem;font-weight:600;width:64px;text-align:right">${fmtPd(v)}</span>
+      <span style="font-size:.68rem;color:#94a3b8;width:32px;text-align:right">${r.count}</span>
+    </div>`;
+  }).join('');
+}
+
+function populateEtfPicker() {
+  const sel = document.getElementById('etf-picker');
+  _data.etfs_with_history.forEach(e => {
+    const o = document.createElement('option');
+    o.value = e.code;
+    o.textContent = e.code + ' — ' + (e.name || '') + ' (' + e.days + ' days)';
+    sel.appendChild(o);
+  });
+  // Auto-load first ETF with most history
+  if (_data.etfs_with_history.length) {
+    sel.value = _data.etfs_with_history[0].code;
+    loadEtfHistory();
+  }
+}
+
+async function loadEtfHistory() {
+  const code = document.getElementById('etf-picker').value;
+  const period = document.getElementById('period-picker').value;
+  if (!code) return;
+
+  const d = await api('/api/v1/etfs/' + code + '/nav-history?period=' + period);
+  const rows = d.nav_history || [];
+  if (!rows.length) {
+    document.getElementById('etf-stats').textContent = 'No data for this period';
+    return;
+  }
+
+  const pds = rows.map(r => r.premium_discount_pct).filter(v => v != null);
+  const avgPd = pds.length ? (pds.reduce((a,b) => a+b, 0) / pds.length).toFixed(3) : null;
+  const maxPd = pds.length ? Math.max(...pds).toFixed(3) : null;
+  const minPd = pds.length ? Math.min(...pds).toFixed(3) : null;
+  document.getElementById('etf-stats').textContent =
+    pds.length + ' days · avg ' + fmtPd(+avgPd) + ' · range ' + fmtPd(+minPd) + ' to ' + fmtPd(+maxPd);
+
+  const labels = rows.map(r => r.date);
+  const pdData = rows.map(r => r.premium_discount_pct != null ? +r.premium_discount_pct.toFixed(4) : null);
+
+  if (_etfChart) _etfChart.destroy();
+  _etfChart = new Chart(document.getElementById('chart-etf'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: code + ' Prem/Disc',
+        data: pdData,
+        borderColor: '#3b82f6',
+        backgroundColor: ctx => {
+          const v = ctx.parsed?.y;
+          return v >= 0 ? 'rgba(22,163,74,0.08)' : 'rgba(220,38,38,0.08)';
+        },
+        fill: { target: { value: 0 }, above: 'rgba(22,163,74,0.10)', below: 'rgba(220,38,38,0.10)' },
+        borderWidth: 1.5,
+        pointRadius: rows.length < 60 ? 2 : 0,
+        tension: 0.2,
+        segment: {
+          borderColor: ctx => ctx.p1.parsed.y >= 0 ? '#16a34a' : '#dc2626',
+        }
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: { label: ctx => ` ${ctx.dataset.label}: ${fmtPd(ctx.parsed.y)}` }
+        },
+        annotation: {
+          annotations: { zero: { type: 'line', yMin: 0, yMax: 0, borderColor: '#94a3b8', borderWidth: 1, borderDash: [4,4] } }
+        }
+      },
+      scales: {
+        x: { ticks: { maxTicksLimit: 10, font: { size: 10 } }, grid: { display: false } },
+        y: {
+          ticks: { font: { size: 10 }, callback: v => fmtPd(v) },
+          grid: { color: '#f1f5f9' }
+        }
+      }
+    }
+  });
+}
+
+function renderSnapTable() {
+  const q = document.getElementById('snap-search').value.toLowerCase();
+  const sort = document.getElementById('snap-sort').value;
+
+  let rows = _data.snapshot.filter(r =>
+    !q || r.code.toLowerCase().includes(q) || (r.name||'').toLowerCase().includes(q) || (r.issuer||'').toLowerCase().includes(q)
+  );
+
+  if (sort === 'pd-desc') rows.sort((a,b) => (b.premium_discount_pct||0) - (a.premium_discount_pct||0));
+  else if (sort === 'pd-asc') rows.sort((a,b) => (a.premium_discount_pct||0) - (b.premium_discount_pct||0));
+  else if (sort === 'fum-desc') rows.sort((a,b) => (b.fum||0) - (a.fum||0));
+  else if (sort === 'abs-desc') rows.sort((a,b) => Math.abs(b.premium_discount_pct||0) - Math.abs(a.premium_discount_pct||0));
+
+  document.getElementById('snap-table').innerHTML = rows.map(r => {
+    const v = r.premium_discount_pct;
+    const maxAbs = 1.0;
+    const pct = v != null ? Math.min(Math.abs(v) / maxAbs * 100, 100).toFixed(1) : 0;
+    const col = v != null ? (v >= 0 ? '#16a34a' : '#dc2626') : '#94a3b8';
+    return `<tr>
+      <td><span style="font-weight:700;font-family:monospace">${r.code}</span></td>
+      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.name||''}">${r.name||'—'}</td>
+      <td style="color:#64748b">${r.issuer||'—'}</td>
+      <td>${r.asset_class||'—'}</td>
+      <td style="text-align:right;font-family:monospace">${r.nav != null ? '$'+r.nav.toFixed(4) : '—'}</td>
+      <td style="text-align:right;font-family:monospace">${r.close_price != null ? '$'+r.close_price.toFixed(4) : '—'}</td>
+      <td style="text-align:right">
+        <div style="display:flex;align-items:center;justify-content:flex-end;gap:6px">
+          <div style="width:50px;height:8px;background:#f1f5f9;border-radius:4px;overflow:hidden">
+            <div style="width:${pct}%;height:100%;background:${col};border-radius:4px"></div>
+          </div>
+          <span class="${pdCls(v)}" style="font-weight:600;font-family:monospace;min-width:60px;text-align:right">${fmtPd(v)}</span>
+        </div>
+      </td>
+      <td style="text-align:right">${fmtFum(r.fum)}</td>
+    </tr>`;
+  }).join('');
+}
+"""
+
+PAGE_NAV = _page(
+    'Premium / Discount to NAV',
+    'How Australian ETFs trade relative to their Net Asset Value',
+    _NAV_BODY,
+    _NAV_JS,
+)
+
+
+# ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
 PAGES = {
@@ -769,6 +1180,7 @@ PAGES = {
     'returns':  PAGE_RETURNS,
     'expense':  PAGE_EXPENSE,
     'issuers':  PAGE_ISSUERS,
+    'nav':      PAGE_NAV,
 }
 
 def get_insights_page(name: str) -> str | None:

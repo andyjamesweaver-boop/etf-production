@@ -75,12 +75,18 @@ def run_documents():
     return scrape_documents(DB_PATH)
 
 
+def run_nav():
+    from scrapers.nav_fetcher import scrape_nav
+    return scrape_nav(DB_PATH)
+
+
 SOURCES = {
     'asx_report': ('ASX Monthly Report', run_asx_report),
     'cboe': ('Cboe Australia', run_cboe),
     'asx_api': ('ASX Live Prices', run_asx_api),
     'issuers': ('Issuer Websites', run_issuers),
     'master': ('Master List Builder', run_master),
+    'nav': ('NAV & Premium/Discount', run_nav),
     'documents': ('Document Ingestion & AI Summaries', run_documents),
 }
 
@@ -194,12 +200,12 @@ Sources:
 
     if args.source == 'all':
         # documents excluded from default daily run (slow + API costs)
-        sources = ['asx_report', 'cboe', 'issuers', 'asx_api', 'master']
+        sources = ['asx_report', 'cboe', 'issuers', 'asx_api', 'master', 'nav']
     else:
         sources = [args.source]
         # Always run master list after individual scrapers, except for
-        # 'master' itself and 'documents' (which is standalone)
-        if args.source not in ('master', 'documents') and 'master' not in sources:
+        # standalone sources
+        if args.source not in ('master', 'documents', 'nav') and 'master' not in sources:
             sources.append('master')
 
     run_pipeline(sources)

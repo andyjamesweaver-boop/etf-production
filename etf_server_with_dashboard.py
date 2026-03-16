@@ -58,12 +58,14 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
             '/api/v1/insights/returns':  self.handle_insights_returns,
             '/api/v1/insights/expense':  self.handle_insights_expense,
             '/api/v1/insights/issuers':  self.handle_insights_issuers,
+            '/api/v1/insights/nav':      self.handle_insights_nav,
             # Insights pages
             '/insights/fum':      lambda: self.handle_insights_page('fum'),
             '/insights/listings': lambda: self.handle_insights_page('listings'),
             '/insights/returns':  lambda: self.handle_insights_page('returns'),
             '/insights/expense':  lambda: self.handle_insights_page('expense'),
             '/insights/issuers':  lambda: self.handle_insights_page('issuers'),
+            '/insights/nav':      lambda: self.handle_insights_page('nav'),
         }
 
         handler = routes.get(path)
@@ -86,6 +88,8 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
                 self.handle_etf_dividends(code)
             elif sub == 'price-history':
                 self.handle_etf_price_history(code, qs)
+            elif sub == 'nav-history':
+                self.handle_etf_nav_history(code, qs)
             elif sub == 'similar':
                 self.handle_etf_similar(code)
             else:
@@ -286,6 +290,26 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
                 "WHERE etf_code = ? ORDER BY ex_date DESC LIMIT 50", (code,)
             ).fetchall()
             self.send_json({'code': code, 'dividends': [dict(r) for r in rows]})
+        except Exception as e:
+            self.send_json({'error': str(e)}, 500)
+        finally:
+            conn.close()
+
+    # ----- NAV history -----
+    def handle_etf_nav_history(self, code, qs):
+        period = self._str(qs, 'period', '1y')
+        period_days = {'1m': 31, '3m': 92, '6m': 183, '1y': 365,
+                       '3y': 1095, '5y': 1825, 'all': 9999}.get(period, 365)
+        from datetime import date, timedelta
+        since = (date.today() - timedelta(days=period_days)).isoformat()
+        conn = get_db()
+        try:
+            rows = conn.execute(
+                "SELECT date, nav, close_price, premium_discount_pct, source "
+                "FROM nav_history WHERE etf_code=? AND date>=? ORDER BY date ASC",
+                (code, since)
+            ).fetchall()
+            self.send_json({'code': code, 'nav_history': [dict(r) for r in rows]})
         except Exception as e:
             self.send_json({'error': str(e)}, 500)
         finally:
@@ -1129,6 +1153,112 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
         finally:
             conn.close()
 
+    # ----- Insights: NAV premium/discount -----
+    def handle_insights_nav(self):
+        conn = get_db()
+        try:
+            from datetime import date
+            today = date.today().isoformat()
+
+            # Latest nav_history date with meaningful coverage
+            latest_date = conn.execute(
+                "SELECT date FROM nav_history GROUP BY date ORDER BY COUNT(*) DESC, date DESC LIMIT 1"
+            ).fetchone()
+            snap_date = latest_date['date'] if latest_date else today
+
+            # Full snapshot for that date joined to etfs
+            snapshot = conn.execute("""
+                SELECT n.etf_code AS code, e.name, e.issuer, e.asset_class,
+                       e.fund_size_aud_millions AS fum, e.fund_type,
+                       n.nav, n.close_price, n.premium_discount_pct, n.source
+                FROM nav_history n
+                JOIN etfs e ON e.code = n.etf_code
+                WHERE n.date = ?
+                  AND n.premium_discount_pct IS NOT NULL
+                ORDER BY n.premium_discount_pct DESC
+            """, (snap_date,)).fetchall()
+
+            rows = [dict(r) for r in snapshot]
+
+            # Summary stats
+            prems = [r['premium_discount_pct'] for r in rows if r['premium_discount_pct'] is not None]
+            at_premium  = sum(1 for v in prems if v > 0.05)
+            at_discount = sum(1 for v in prems if v < -0.05)
+            near_par    = sum(1 for v in prems if -0.05 <= v <= 0.05)
+            avg_pd      = round(sum(prems) / len(prems), 4) if prems else None
+            max_prem    = max(prems) if prems else None
+            max_disc    = min(prems) if prems else None
+
+            # By asset class
+            by_ac = conn.execute("""
+                SELECT e.asset_class,
+                       AVG(n.premium_discount_pct) AS avg_pd,
+                       MIN(n.premium_discount_pct) AS min_pd,
+                       MAX(n.premium_discount_pct) AS max_pd,
+                       COUNT(*) AS count
+                FROM nav_history n JOIN etfs e ON e.code = n.etf_code
+                WHERE n.date = ? AND n.premium_discount_pct IS NOT NULL
+                  AND e.asset_class IS NOT NULL
+                GROUP BY e.asset_class ORDER BY avg_pd DESC
+            """, (snap_date,)).fetchall()
+
+            # By issuer
+            by_issuer = conn.execute("""
+                SELECT e.issuer,
+                       AVG(n.premium_discount_pct) AS avg_pd,
+                       MIN(n.premium_discount_pct) AS min_pd,
+                       MAX(n.premium_discount_pct) AS max_pd,
+                       COUNT(*) AS count
+                FROM nav_history n JOIN etfs e ON e.code = n.etf_code
+                WHERE n.date = ? AND n.premium_discount_pct IS NOT NULL
+                  AND e.issuer IS NOT NULL
+                GROUP BY e.issuer ORDER BY count DESC
+            """, (snap_date,)).fetchall()
+
+            # Historical avg premium/discount across all ETFs (last 90 days)
+            hist = conn.execute("""
+                SELECT date,
+                       AVG(premium_discount_pct) AS avg_pd,
+                       MIN(premium_discount_pct) AS min_pd,
+                       MAX(premium_discount_pct) AS max_pd,
+                       COUNT(*) AS etf_count
+                FROM nav_history
+                WHERE premium_discount_pct IS NOT NULL
+                  AND date >= DATE(?, '-90 days')
+                GROUP BY date ORDER BY date ASC
+            """, (snap_date,)).fetchall()
+
+            # ETFs with most historical data (for the history explorer)
+            has_history = conn.execute("""
+                SELECT n.etf_code AS code, e.name, e.issuer, COUNT(*) AS days
+                FROM nav_history n JOIN etfs e ON e.code = n.etf_code
+                WHERE n.premium_discount_pct IS NOT NULL
+                GROUP BY n.etf_code HAVING days > 30
+                ORDER BY days DESC LIMIT 60
+            """).fetchall()
+
+            self.send_json({
+                'snapshot_date': snap_date,
+                'summary': {
+                    'total': len(prems),
+                    'at_premium': at_premium,
+                    'at_discount': at_discount,
+                    'near_par': near_par,
+                    'avg_pd': avg_pd,
+                    'max_premium': round(max_prem, 4) if max_prem is not None else None,
+                    'max_discount': round(max_disc, 4) if max_disc is not None else None,
+                },
+                'snapshot': rows,
+                'by_asset_class': [dict(r) for r in by_ac],
+                'by_issuer': [dict(r) for r in by_issuer],
+                'market_history': [dict(r) for r in hist],
+                'etfs_with_history': [dict(r) for r in has_history],
+            })
+        except Exception as e:
+            self.send_json({'error': str(e)}, 500)
+        finally:
+            conn.close()
+
     # ================================================================== DASHBOARD
     def handle_dashboard(self):
         self.send_html(DASHBOARD_HTML)
@@ -1411,8 +1541,8 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
                    style="position:sticky;top:0;z-index:5">
               <tr>
                 <th class="px-3 py-2.5 text-left w-8 cursor-pointer select-none hover:text-gray-700" data-sort="rank">#</th>
-                <th class="px-3 py-2.5 text-left cursor-pointer select-none hover:text-gray-700 w-64" data-sort="code">ETF</th>
-                <th class="px-3 py-2.5 text-left select-none text-gray-400 w-20">Class</th>
+                <th class="px-3 py-2.5 text-left cursor-pointer select-none hover:text-gray-700" style="min-width:260px" data-sort="code">ETF</th>
+                <th class="px-3 py-2.5 text-left select-none text-gray-400" style="width:80px;max-width:80px">Class</th>
                 <th class="px-3 py-2.5 text-right cursor-pointer select-none hover:text-gray-700" data-sort="price">Price</th>
                 <th class="px-3 py-2.5 text-right cursor-pointer select-none hover:text-gray-700" data-sort="fum">FUM</th>
                 <th class="px-3 py-2.5 text-right cursor-pointer select-none hover:text-gray-700" data-sort="return_1y">1Y Rtn</th>
@@ -2053,12 +2183,12 @@ function renderTable(etfs, total) {
     const sel = e.code === selectedCode ? 'row-selected' : '';
     return `<tr class="cursor-pointer ${sel}" data-code="${e.code}">
       <td class="px-3 py-2.5 text-gray-300 font-mono text-xs">${e.rank_by_fum || '—'}</td>
-      <td class="px-3 py-2.5 w-64">
+      <td class="px-3 py-2.5" style="min-width:260px">
         <div class="font-bold text-gray-900">${e.code}</div>
-        <div class="text-xs text-gray-400 truncate max-w-[240px]" title="${e.name || ''}">${e.name || ''}</div>
-        ${e.benchmark ? `<div class="text-xs text-indigo-400 truncate max-w-[240px]" title="${e.benchmark}">&#8594; ${e.benchmark}</div>` : ''}
+        <div class="text-xs text-gray-400 truncate" style="max-width:240px" title="${e.name || ''}">${e.name || ''}</div>
+        ${e.benchmark ? `<div class="text-xs text-indigo-400 truncate" style="max-width:240px" title="${e.benchmark}">&#8594; ${e.benchmark}</div>` : ''}
       </td>
-      <td class="px-3 py-2.5 w-20">${acChip(e.asset_class)}</td>
+      <td class="px-3 py-2.5" style="width:80px;max-width:80px">${acChip(e.asset_class)}</td>
       <td class="px-3 py-2.5 text-right font-mono">
         <span class="dated" title="Price · ${fmtTs(e.last_updated)}">${money(e.current_price)}</span>
       </td>
@@ -2130,6 +2260,12 @@ async function showDetail(code) {
   const _mSrc = 'Issuer website · ' + fmtTs(tsFor(ISSUER_SRC[d.issuer] || ''));
   const metrics = [
     { label: 'Price',     value: money(d.current_price),           tip: _pSrc },
+    { label: 'NAV',       value: d.nav_per_unit != null ? '$' + d.nav_per_unit.toFixed(4) : '—',
+                          tip: 'Net Asset Value per unit · Yahoo Finance / iShares' },
+    { label: 'Prem/Disc', value: d.premium_discount_pct != null
+                                 ? (d.premium_discount_pct >= 0 ? '+' : '') + d.premium_discount_pct.toFixed(3) + '%' : '—',
+                          tip: '(Price − NAV) / NAV · positive = premium, negative = discount',
+                          num: d.premium_discount_pct },
     { label: 'Day Chg',   value: pct(d.day_change_pct),            tip: _pSrc, num: d.day_change_pct },
     { label: 'FUM',       value: fmtFum(calcFum(d)), tip: fumTip(d) },
     { label: 'Units on Issue', value: fmtUnits(d.units_on_issue),
