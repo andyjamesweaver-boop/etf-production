@@ -1358,7 +1358,29 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
 
     # ================================================================== DASHBOARD
     def handle_dashboard(self):
-        self.send_html(DASHBOARD_HTML)
+        from articles import get_all_articles
+        _CAT_COLORS = {
+            'Performance':   ('bg-green-100',  'text-green-800'),
+            'Market Trends': ('bg-blue-100',   'text-blue-800'),
+            'Thematic':      ('bg-purple-100', 'text-purple-800'),
+            'Research':      ('bg-amber-100',  'text-amber-800'),
+        }
+        cards = ''
+        for a in get_all_articles():
+            bg, fg = _CAT_COLORS.get(a['category'], ('bg-gray-100', 'text-gray-800'))
+            cards += (
+                f'<a href="/articles/{a["slug"]}" '
+                f'class="flex-shrink-0 w-64 snap-start bg-white rounded-xl border border-gray-100 '
+                f'shadow-sm hover:shadow-md transition-shadow p-4 block">'
+                f'<span class="inline-block {bg} {fg} text-xs font-semibold px-2 py-0.5 rounded mb-2">'
+                f'{a["category"]}</span>'
+                f'<p class="text-sm font-bold text-gray-900 leading-snug mb-1 line-clamp-2">{a["title"]}</p>'
+                f'<p class="text-xs text-gray-500 line-clamp-2">{a["subtitle"]}</p>'
+                f'<p class="text-xs text-gray-400 mt-2">{a["date"]}</p>'
+                f'</a>'
+            )
+        html = DASHBOARD_HTML.replace('<!--ARTICLE_CAROUSEL-->', cards)
+        self.send_html(html)
 
     def log_message(self, fmt, *args):
         ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -1525,6 +1547,32 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
       <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Prem / Disc</p>
       <p id="c-nav" class="text-2xl font-bold text-gray-900 mt-1 leading-tight">—</p>
       <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">vs NAV <span class="text-blue-300">›</span></p>
+    </div>
+  </div>
+
+  <!-- ── Articles carousel ── -->
+  <div class="mb-5">
+    <div class="flex items-center justify-between mb-2 px-0.5">
+      <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Latest Articles</span>
+      <a href="/articles" class="text-xs text-blue-500 hover:text-blue-700 font-medium">View all →</a>
+    </div>
+    <div class="relative">
+      <div id="article-carousel" class="flex gap-3 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-1"
+           style="scrollbar-width:none;-ms-overflow-style:none;">
+        <!--ARTICLE_CAROUSEL-->
+      </div>
+      <button onclick="carouselScroll(-1)"
+              class="hidden lg:flex absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4
+                     w-8 h-8 items-center justify-center rounded-full bg-white shadow border
+                     border-gray-200 text-gray-500 hover:text-blue-600 z-10">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <button onclick="carouselScroll(1)"
+              class="hidden lg:flex absolute right-0 top-1/2 -translate-y-1/2 translate-x-4
+                     w-8 h-8 items-center justify-center rounded-full bg-white shadow border
+                     border-gray-200 text-gray-500 hover:text-blue-600 z-10">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
     </div>
   </div>
 
@@ -4010,6 +4058,12 @@ document.getElementById('col-3y').addEventListener('change', function () {
 document.getElementById('col-5y').addEventListener('change', function () {
   document.querySelectorAll('.col-5y').forEach(el => el.classList.toggle('hidden', !this.checked));
 });
+
+/* ============================================================ ARTICLE CAROUSEL */
+function carouselScroll(dir) {
+  const el = document.getElementById('article-carousel');
+  el.scrollBy({ left: dir * 280, behavior: 'smooth' });
+}
 
 /* ============================================================ KEYBOARD SHORTCUT */
 document.addEventListener('keydown', e => {
