@@ -158,6 +158,9 @@ def create_tables(conn):
             asx_url                 TEXT,
             pds_url                 TEXT,
 
+            -- Classification
+            fund_type               TEXT,
+
             -- Meta
             data_source             TEXT,
             last_scraped            TIMESTAMP,
@@ -240,7 +243,32 @@ def create_tables(conn):
         )
     ''')
 
-    # 7. scrape_log
+    # 7. nav_history
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS nav_history (
+            id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+            etf_code                TEXT NOT NULL,
+            date                    TEXT NOT NULL,
+            nav                     REAL NOT NULL,
+            close_price             REAL,
+            premium_discount_pct    REAL,
+            source                  TEXT,
+            last_updated            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(etf_code, date),
+            FOREIGN KEY (etf_code) REFERENCES etfs(code) ON DELETE CASCADE
+        )
+    ''')
+
+    # 8. schema_migrations
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS schema_migrations (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            name        TEXT UNIQUE NOT NULL,
+            applied_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    # 9. scrape_log
     conn.execute('''
         CREATE TABLE IF NOT EXISTS scrape_log (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -272,6 +300,7 @@ def create_indexes(conn):
         'CREATE INDEX IF NOT EXISTS idx_price_history_etf_date ON price_history(etf_code, date DESC)',
         'CREATE INDEX IF NOT EXISTS idx_scrape_log_source ON scrape_log(source)',
         'CREATE INDEX IF NOT EXISTS idx_scrape_log_finished ON scrape_log(finished_at DESC)',
+        'CREATE INDEX IF NOT EXISTS idx_nav_history_etf_date ON nav_history(etf_code, date DESC)',
     ]
     for sql in indexes:
         conn.execute(sql)
@@ -349,7 +378,7 @@ def setup_database(db_path=None):
     # Verify
     counts = {}
     for table in ['etfs', 'etf_holdings', 'etf_sectors', 'etf_dividends',
-                   'price_history', 'issuers', 'scrape_log']:
+                   'price_history', 'nav_history', 'issuers', 'scrape_log']:
         row = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
         counts[table] = row[0]
 
