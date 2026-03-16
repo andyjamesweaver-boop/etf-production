@@ -24,13 +24,32 @@ conn = sqlite3.connect(db_path)
 conn.execute('PRAGMA journal_mode=WAL')
 conn.execute('PRAGMA foreign_keys=ON')
 
-# Ensure migration tracking table exists
+# Ensure migration tracking table exists with correct schema
 conn.execute('''CREATE TABLE IF NOT EXISTS schema_migrations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT UNIQUE NOT NULL,
     applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )''')
 conn.commit()
+
+# Check if name column exists (old DBs may have a schema_migrations table with different columns)
+cols = {row[1] for row in conn.execute('PRAGMA table_info(schema_migrations)').fetchall()}
+if 'name' not in cols:
+    print('  schema_migrations missing name column — rebuilding...')
+    conn.execute('ALTER TABLE schema_migrations RENAME TO _schema_migrations_old')
+    conn.execute('''CREATE TABLE schema_migrations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE NOT NULL,
+        applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+    # Mark all known migration files as already applied so they do not re-run
+    mig_dir_check = '/app/migrations'
+    if os.path.isdir(mig_dir_check):
+        for f in sorted(os.listdir(mig_dir_check)):
+            if f.endswith('.py') and f[0].isdigit():
+                conn.execute('INSERT OR IGNORE INTO schema_migrations (name) VALUES (?)', (f[:-3],))
+    conn.commit()
+    print('  schema_migrations rebuilt.')
 
 # Run any migration files not yet applied
 mig_dir = '/app/migrations'
