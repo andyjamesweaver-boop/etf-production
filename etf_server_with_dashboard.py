@@ -939,19 +939,28 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
         conn = get_db()
         try:
             all_etfs = conn.execute(
-                "SELECT code, name, issuer, asset_class, exchange, inception_date FROM etfs"
+                "SELECT code, name, issuer, asset_class, exchange, inception_date, fund_type FROM etfs"
             ).fetchall()
 
-            # Recent / oldest — sort lexicographically (ISO dates sort correctly; others approximate)
+            # Recent / oldest — sort lexicographically (ISO dates sort correctly)
             dated = [r for r in all_etfs if r['inception_date']]
             dated_sorted = sorted(dated, key=lambda r: str(r['inception_date']))
 
-            year_counts = {}
+            # Build per-ETF list with year for client-side slicing
+            etf_list = []
             for r in all_etfs:
                 yr = year_from(r['inception_date'])
                 if yr:
-                    year_counts[yr] = year_counts.get(yr, 0) + 1
+                    etf_list.append({
+                        'code': r['code'],
+                        'year': yr,
+                        'exchange': r['exchange'] or 'Unknown',
+                        'fund_type': r['fund_type'] or 'ETF',
+                        'issuer': r['issuer'] or 'Other',
+                        'asset_class': r['asset_class'] or 'Other',
+                    })
 
+            # Pre-aggregate totals for sidebar bars
             by_issuer = conn.execute(
                 "SELECT issuer, COUNT(*) AS count FROM etfs WHERE issuer IS NOT NULL "
                 "GROUP BY issuer ORDER BY count DESC"
@@ -963,18 +972,32 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
             by_ex = conn.execute(
                 "SELECT exchange, COUNT(*) AS count FROM etfs GROUP BY exchange ORDER BY count DESC"
             ).fetchall()
+            by_ft = conn.execute(
+                "SELECT COALESCE(fund_type,'ETF') AS fund_type, COUNT(*) AS count FROM etfs "
+                "GROUP BY fund_type ORDER BY count DESC"
+            ).fetchall()
+
+            # Unique dimension values for filter dropdowns
+            issuers = sorted({r['issuer'] for r in all_etfs if r['issuer']})
+            exchanges = sorted({r['exchange'] for r in all_etfs if r['exchange']})
+            fund_types = sorted({r['fund_type'] for r in all_etfs if r['fund_type']})
+            asset_classes = sorted({r['asset_class'] for r in all_etfs if r['asset_class']})
 
             self.send_json({
                 'total': len(all_etfs),
                 'recent': [dict(r) for r in reversed(dated_sorted[-30:])],
                 'oldest': [dict(r) for r in dated_sorted[:30]],
-                'by_year': sorted(
-                    [{'year': y, 'count': c} for y, c in year_counts.items()],
-                    key=lambda x: x['year']
-                ),
-                'by_issuer':     [dict(r) for r in by_issuer],
-                'by_asset_class':[dict(r) for r in by_ac],
-                'by_exchange':   [dict(r) for r in by_ex],
+                'etf_list': etf_list,
+                'by_issuer':      [dict(r) for r in by_issuer],
+                'by_asset_class': [dict(r) for r in by_ac],
+                'by_exchange':    [dict(r) for r in by_ex],
+                'by_fund_type':   [dict(r) for r in by_ft],
+                'filter_options': {
+                    'issuers': issuers,
+                    'exchanges': exchanges,
+                    'fund_types': fund_types,
+                    'asset_classes': asset_classes,
+                },
             })
         except Exception as e:
             self.send_json({'error': str(e)}, 500)

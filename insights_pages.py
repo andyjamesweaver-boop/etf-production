@@ -243,10 +243,28 @@ PAGE_FUM = _page(
 # ---------------------------------------------------------------------------
 _LISTINGS_BODY = """
 <div id="hero" class="grid grid-cols-2 sm:grid-cols-4 gap-4"></div>
+
+<!-- Year chart with filters -->
 <div class="card">
-  <h2 class="font-semibold text-sm text-gray-700 mb-4">ETFs Listed by Year</h2>
+  <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+    <h2 class="font-semibold text-sm text-gray-700">ETFs Listed by Year</h2>
+    <div class="flex flex-wrap gap-2 items-center">
+      <select id="f-dim" class="text-xs border border-gray-200 rounded px-2 py-1 text-gray-600 bg-white">
+        <option value="all">All ETFs</option>
+        <option value="exchange">By Exchange</option>
+        <option value="fund_type">By Investment Style</option>
+        <option value="issuer">By Issuer</option>
+        <option value="asset_class">By Asset Class</option>
+      </select>
+      <select id="f-val" class="text-xs border border-gray-200 rounded px-2 py-1 text-gray-600 bg-white hidden">
+        <option value="">— All —</option>
+      </select>
+    </div>
+  </div>
   <div class="relative" style="height:260px"><canvas id="chart-years"></canvas></div>
+  <p id="chart-subtitle" class="text-xs text-gray-400 mt-2 text-center"></p>
 </div>
+
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
   <div class="card">
     <h2 class="font-semibold text-sm text-gray-700 mb-3">Most Recent Listings</h2>
@@ -256,93 +274,194 @@ _LISTINGS_BODY = """
     </table></div>
   </div>
   <div class="card">
-    <h2 class="font-semibold text-sm text-gray-700 mb-3">Longest Running ETFs</h2>
+    <h2 class="font-semibold text-sm text-gray-700 mb-1">Longest Running ETFs</h2>
+    <p class="text-xs text-gray-400 mb-3">STW and SFY were Australia's first ETFs, both listed on 27 August 2001.</p>
     <div class="overflow-x-auto"><table>
-      <thead><tr><th>Code</th><th>Name</th><th>Issuer</th><th>Inception</th></tr></thead>
+      <thead><tr><th>Code</th><th>Name</th><th>Issuer</th><th>Inception</th><th></th></tr></thead>
       <tbody id="tbl-oldest"></tbody>
     </table></div>
   </div>
 </div>
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+<div class="grid grid-cols-1 lg:grid-cols-4 gap-5">
   <div class="card">
-    <h2 class="font-semibold text-sm text-gray-700 mb-4">ETFs Listed — by Issuer</h2>
+    <h2 class="font-semibold text-sm text-gray-700 mb-4">By Issuer</h2>
     <div id="bars-issuer"></div>
   </div>
   <div class="card">
-    <h2 class="font-semibold text-sm text-gray-700 mb-4">ETFs Listed — by Asset Class</h2>
+    <h2 class="font-semibold text-sm text-gray-700 mb-4">By Asset Class</h2>
     <div id="bars-asset"></div>
   </div>
   <div class="card">
-    <h2 class="font-semibold text-sm text-gray-700 mb-4">ETFs by Exchange</h2>
+    <h2 class="font-semibold text-sm text-gray-700 mb-4">By Exchange</h2>
     <div id="bars-exchange"></div>
-    <div class="mt-5">
-      <h3 class="font-semibold text-xs text-gray-500 uppercase mb-3">ETFs per Year — Top Issuers</h3>
-      <div id="tbl-issuer-year" class="text-xs text-gray-600"></div>
-    </div>
+  </div>
+  <div class="card">
+    <h2 class="font-semibold text-sm text-gray-700 mb-4">By Investment Style</h2>
+    <div id="bars-fundtype"></div>
   </div>
 </div>
 """
 
-_LISTINGS_JS = """
+# Colour palettes for stacked chart dimensions
+_LISTINGS_PALETTE = """
+const PALETTES = {
+  exchange:   {'ASX':'#3b82f6','CXA':'#8b5cf6','Unknown':'#94a3b8'},
+  fund_type:  {'ETF':'#3b82f6','Active':'#f59e0b','Complex':'#ef4444','SP':'#10b981','Index':'#6366f1'},
+  asset_class:{'Equities':'#3b82f6','Fixed Income':'#10b981','Multi-Asset':'#f59e0b','Commodities':'#f97316',
+               'Currency':'#8b5cf6','Cash':'#06b6d4','Property':'#ec4899','Alternatives':'#6b7280','Other':'#94a3b8'},
+};
+function dimColor(dim, val, i) {
+  if (PALETTES[dim] && PALETTES[dim][val]) return PALETTES[dim][val];
+  const fallback = ['#3b82f6','#8b5cf6','#f59e0b','#10b981','#ef4444','#f97316','#06b6d4','#ec4899','#6366f1','#84cc16'];
+  return fallback[i % fallback.length];
+}
+"""
+
+_LISTINGS_JS = _LISTINGS_PALETTE + """
+let _data = null;
+let _yearChart = null;
+
 async function init() {
-  const d = await api('/api/v1/insights/listings');
+  _data = await api('/api/v1/insights/listings');
   document.getElementById('ts').textContent = new Date().toLocaleTimeString('en-AU');
 
-  const recentDate = d.recent[0]?.inception_date || '—';
-  const oldestDate = d.oldest[0]?.inception_date || '—';
-  const peakYear = d.by_year.reduce((a, b) => b.count > a.count ? b : a, { year: '—', count: 0 });
+  // Populate filter dropdowns
+  const dimSel = document.getElementById('f-dim');
+  const valSel = document.getElementById('f-val');
+  dimSel.addEventListener('change', () => { populateValFilter(); renderYearChart(); });
+  valSel.addEventListener('change', renderYearChart);
+
+  const recentDate = _data.recent[0]?.inception_date || '—';
+  const oldest = _data.oldest[0];
+
+  // Peak year from full etf_list
+  const allYearCounts = {};
+  _data.etf_list.forEach(e => { allYearCounts[e.year] = (allYearCounts[e.year]||0) + 1; });
+  const peakYear = Object.entries(allYearCounts).reduce((a,b) => b[1]>a[1] ? b : a, ['—',0]);
 
   document.getElementById('hero').innerHTML = [
-    ['Total ETFs', d.total, 'ASX + CXA'],
-    ['Newest', d.recent[0]?.code || '—', recentDate],
-    ['Oldest', d.oldest[0]?.code || '—', oldestDate],
-    ['Most Active Year', peakYear.year, peakYear.count + ' new listings'],
-  ].map(([l, v, s]) => `<div class="card"><div class="sl">${l}</div><div class="sv">${v}</div><div class="ss">${s}</div></div>`).join('');
+    ['Total ETFs', _data.total, 'ASX + CXA'],
+    ['Newest', _data.recent[0]?.code || '—', recentDate],
+    ['Oldest', oldest?.code || '—', oldest?.inception_date || '—'],
+    ['Most Active Year', peakYear[0], peakYear[1] + ' new listings'],
+  ].map(([l,v,s]) => `<div class="card"><div class="sl">${l}</div><div class="sv">${v}</div><div class="ss">${s}</div></div>`).join('');
 
-  // Year bar chart
-  const years = d.by_year.filter(r => /^\d{4}$/.test(r.year) && +r.year >= 2001);
-  new Chart(document.getElementById('chart-years').getContext('2d'), {
-    type: 'bar',
-    data: {
-      labels: years.map(r => r.year),
-      datasets: [{ data: years.map(r => r.count), backgroundColor: '#3b82f6', borderRadius: 4, borderSkipped: false }],
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' ' + ctx.parsed.y + ' ETFs listed' } } },
-      scales: { x: { ticks: { font: { size: 10 } } }, y: { ticks: { font: { size: 10 }, stepSize: 5 }, grid: { color: '#f1f5f9' } } },
-    },
-  });
-
-  const etfRow = (e) => `<tr>
-    <td class="font-bold text-blue-600">${e.code}</td>
-    <td class="text-gray-600" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.name}">${e.name}</td>
-    <td class="text-gray-500">${e.issuer || '—'}</td>
-    <td class="text-gray-400 tabular-nums text-xs">${e.inception_date || '—'}</td>
-  </tr>`;
-  document.getElementById('tbl-recent').innerHTML = d.recent.map(etfRow).join('');
-  document.getElementById('tbl-oldest').innerHTML = d.oldest.map(etfRow).join('');
-
-  // Issuer bar
-  const issMax = d.by_issuer[0]?.count || 1;
-  document.getElementById('bars-issuer').innerHTML = d.by_issuer.slice(0, 15)
-    .map(r => hbar(r.issuer, r.count, issMax, issColor(r.issuer), r.count + ' ETFs', ''))
-    .join('');
-
-  // Asset class bar
-  const acMax = d.by_asset_class[0]?.count || 1;
-  document.getElementById('bars-asset').innerHTML = d.by_asset_class
-    .map(r => hbar(r.asset_class, r.count, acMax, acColor(r.asset_class), r.count + ' ETFs', ''))
-    .join('');
-
-  // Exchange bar
-  const exMax = d.by_exchange[0]?.count || 1;
-  document.getElementById('bars-exchange').innerHTML = d.by_exchange
-    .map(r => hbar(r.exchange || 'Unknown', r.count, exMax, '#6366f1', r.count + ' ETFs', ''))
-    .join('');
+  renderYearChart();
+  renderTables();
+  renderBars();
 
   document.getElementById('loading').classList.add('hidden');
   document.getElementById('page').classList.remove('hidden');
+}
+
+function populateValFilter() {
+  const dim = document.getElementById('f-dim').value;
+  const valSel = document.getElementById('f-val');
+  valSel.innerHTML = '<option value="">— All —</option>';
+  if (dim === 'all') { valSel.classList.add('hidden'); return; }
+  valSel.classList.remove('hidden');
+  const vals = [...new Set(_data.etf_list.map(e => e[dim]))].sort();
+  vals.forEach(v => { const o = document.createElement('option'); o.value = v; o.textContent = v; valSel.appendChild(o); });
+}
+
+function renderYearChart() {
+  const dim = document.getElementById('f-dim').value;
+  const filterVal = document.getElementById('f-val').value;
+
+  // Filter ETFs
+  let etfs = _data.etf_list;
+  if (dim !== 'all' && filterVal) etfs = etfs.filter(e => e[dim] === filterVal);
+
+  // Get all years 2001–present
+  const allYears = [...new Set(etfs.map(e => e.year))].filter(y => +y >= 2001).sort();
+
+  let datasets, subtitle;
+
+  if (dim === 'all' || filterVal) {
+    // Single colour bar
+    const counts = {};
+    etfs.forEach(e => { counts[e.year] = (counts[e.year]||0) + 1; });
+    datasets = [{ data: allYears.map(y => counts[y]||0), backgroundColor: '#3b82f6', borderRadius: 4, borderSkipped: false }];
+    subtitle = filterVal ? `Showing: ${filterVal}` : 'All ETFs';
+  } else {
+    // Stacked by dimension
+    const groups = [...new Set(etfs.map(e => e[dim]))].sort();
+    datasets = groups.map((g, i) => {
+      const counts = {};
+      etfs.filter(e => e[dim] === g).forEach(e => { counts[e.year] = (counts[e.year]||0) + 1; });
+      return {
+        label: g,
+        data: allYears.map(y => counts[y]||0),
+        backgroundColor: dimColor(dim, g, i),
+        borderRadius: 2,
+        borderSkipped: false,
+      };
+    });
+    subtitle = 'Stacked by ' + dim.replace('_',' ');
+  }
+
+  document.getElementById('chart-subtitle').textContent = subtitle;
+
+  const ctx = document.getElementById('chart-years').getContext('2d');
+  if (_yearChart) _yearChart.destroy();
+  _yearChart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: allYears, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: datasets.length > 1, position: 'bottom', labels: { font: { size: 10 }, boxWidth: 12 } },
+        tooltip: { callbacks: { label: ctx => ' ' + ctx.parsed.y + ' ETFs' } },
+      },
+      scales: {
+        x: { stacked: true, ticks: { font: { size: 10 } } },
+        y: { stacked: true, ticks: { font: { size: 10 }, stepSize: 5 }, grid: { color: '#f1f5f9' } },
+      },
+    },
+  });
+}
+
+function renderTables() {
+  // Annotations for notable ETFs
+  const NOTES = {
+    STW: { label: "Australia's first ETF", cls: 'bg-blue-50 text-blue-700' },
+    SFY: { label: "Australia's first ETF", cls: 'bg-blue-50 text-blue-700' },
+    PMGOLD: { label: 'Date as per ASX report', cls: 'bg-amber-50 text-amber-700' },
+  };
+
+  const etfRow = (e) => {
+    const note = NOTES[e.code];
+    const badge = note ? `<span class="badge ${note.cls}">${note.label}</span>` : '';
+    return `<tr>
+      <td class="font-bold text-blue-600">${e.code}</td>
+      <td class="text-gray-600" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.name||''}">${e.name||'—'}</td>
+      <td class="text-gray-500">${e.issuer||'—'}</td>
+      <td class="text-gray-400 tabular-nums text-xs">${e.inception_date||'—'}</td>
+      <td>${badge}</td>
+    </tr>`;
+  };
+
+  document.getElementById('tbl-recent').innerHTML = _data.recent.map(etfRow).join('');
+  document.getElementById('tbl-oldest').innerHTML = _data.oldest.map(etfRow).join('');
+}
+
+function renderBars() {
+  const issMax = _data.by_issuer[0]?.count || 1;
+  document.getElementById('bars-issuer').innerHTML = _data.by_issuer.slice(0, 15)
+    .map(r => hbar(r.issuer, r.count, issMax, issColor(r.issuer), r.count + ' ETFs', '')).join('');
+
+  const acMax = _data.by_asset_class[0]?.count || 1;
+  document.getElementById('bars-asset').innerHTML = _data.by_asset_class
+    .map(r => hbar(r.asset_class, r.count, acMax, acColor(r.asset_class), r.count + ' ETFs', '')).join('');
+
+  const exMax = _data.by_exchange[0]?.count || 1;
+  document.getElementById('bars-exchange').innerHTML = _data.by_exchange
+    .map(r => hbar(r.exchange||'Unknown', r.count, exMax, dimColor('exchange', r.exchange, 0), r.count + ' ETFs', '')).join('');
+
+  const ftMax = _data.by_fund_type[0]?.count || 1;
+  document.getElementById('bars-fundtype').innerHTML = _data.by_fund_type
+    .map((r,i) => hbar(r.fund_type, r.count, ftMax, dimColor('fund_type', r.fund_type, i), r.count + ' ETFs', '')).join('');
 }
 """
 
