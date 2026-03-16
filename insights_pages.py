@@ -41,6 +41,10 @@ _HEAD = """<!DOCTYPE html>
   .hbar-fill  { height: 100%; border-radius: 4px; transition: width .6s ease; }
   .hbar-val   { font-size: .73rem; color: #475569; width: 52px; text-align: right; flex-shrink: 0; }
   .hbar-sub   { font-size: .65rem; color: #94a3b8; width: 32px; text-align: right; flex-shrink: 0; }
+  .dim-btn { font-size: .72rem; font-weight: 600; padding: .3rem .75rem; border-radius: 6px;
+             border: 1px solid #e2e8f0; background: #f8fafc; color: #64748b; cursor: pointer; transition: all .15s; }
+  .dim-btn:hover { border-color: #3b82f6; color: #3b82f6; }
+  .dim-btn.active-dim { background: #3b82f6; border-color: #3b82f6; color: #fff; }
 </style>
 </head>"""
 
@@ -248,21 +252,15 @@ _LISTINGS_BODY = """
 <div class="card">
   <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
     <h2 class="font-semibold text-sm text-gray-700">ETFs Listed by Year</h2>
-    <div class="flex flex-wrap gap-2 items-center">
-      <select id="f-dim" class="text-xs border border-gray-200 rounded px-2 py-1 text-gray-600 bg-white">
-        <option value="all">All ETFs</option>
-        <option value="exchange">By Exchange</option>
-        <option value="fund_type">By Investment Style</option>
-        <option value="issuer">By Issuer</option>
-        <option value="asset_class">By Asset Class</option>
-      </select>
-      <select id="f-val" class="text-xs border border-gray-200 rounded px-2 py-1 text-gray-600 bg-white hidden">
-        <option value="">— All —</option>
-      </select>
+    <div id="dim-tabs" class="flex flex-wrap gap-1">
+      <button data-dim="all"          class="dim-btn active-dim">All</button>
+      <button data-dim="exchange"     class="dim-btn">Exchange</button>
+      <button data-dim="asset_class"  class="dim-btn">Asset Class</button>
+      <button data-dim="fund_type"    class="dim-btn">Style</button>
+      <button data-dim="issuer"       class="dim-btn">Issuer</button>
     </div>
   </div>
-  <div class="relative" style="height:260px"><canvas id="chart-years"></canvas></div>
-  <p id="chart-subtitle" class="text-xs text-gray-400 mt-2 text-center"></p>
+  <div class="relative" style="height:300px"><canvas id="chart-years"></canvas></div>
 </div>
 
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -303,7 +301,6 @@ _LISTINGS_BODY = """
 </div>
 """
 
-# Colour palettes for stacked chart dimensions
 _LISTINGS_PALETTE = """
 const PALETTES = {
   exchange:   {'ASX':'#3b82f6','CXA':'#8b5cf6','Unknown':'#94a3b8'},
@@ -311,38 +308,39 @@ const PALETTES = {
   asset_class:{'Equities':'#3b82f6','Fixed Income':'#10b981','Multi-Asset':'#f59e0b','Commodities':'#f97316',
                'Currency':'#8b5cf6','Cash':'#06b6d4','Property':'#ec4899','Alternatives':'#6b7280','Other':'#94a3b8'},
 };
+const FALLBACK_COLORS = ['#3b82f6','#8b5cf6','#f59e0b','#10b981','#ef4444','#f97316','#06b6d4','#ec4899','#6366f1','#84cc16','#a855f7','#14b8a6'];
 function dimColor(dim, val, i) {
-  if (PALETTES[dim] && PALETTES[dim][val]) return PALETTES[dim][val];
-  const fallback = ['#3b82f6','#8b5cf6','#f59e0b','#10b981','#ef4444','#f97316','#06b6d4','#ec4899','#6366f1','#84cc16'];
-  return fallback[i % fallback.length];
+  return (PALETTES[dim] && PALETTES[dim][val]) ? PALETTES[dim][val] : FALLBACK_COLORS[i % FALLBACK_COLORS.length];
 }
 """
 
 _LISTINGS_JS = _LISTINGS_PALETTE + """
 let _data = null;
 let _yearChart = null;
+let _activeDim = 'all';
 
 async function init() {
   _data = await api('/api/v1/insights/listings');
   document.getElementById('ts').textContent = new Date().toLocaleTimeString('en-AU');
 
-  // Populate filter dropdowns
-  const dimSel = document.getElementById('f-dim');
-  const valSel = document.getElementById('f-val');
-  dimSel.addEventListener('change', () => { populateValFilter(); renderYearChart(); });
-  valSel.addEventListener('change', renderYearChart);
+  // Toggle button handlers
+  document.getElementById('dim-tabs').addEventListener('click', e => {
+    const btn = e.target.closest('.dim-btn');
+    if (!btn) return;
+    document.querySelectorAll('.dim-btn').forEach(b => b.classList.remove('active-dim'));
+    btn.classList.add('active-dim');
+    _activeDim = btn.dataset.dim;
+    renderYearChart();
+  });
 
-  const recentDate = _data.recent[0]?.inception_date || '—';
-  const oldest = _data.oldest[0];
-
-  // Peak year from full etf_list
   const allYearCounts = {};
   _data.etf_list.forEach(e => { allYearCounts[e.year] = (allYearCounts[e.year]||0) + 1; });
   const peakYear = Object.entries(allYearCounts).reduce((a,b) => b[1]>a[1] ? b : a, ['—',0]);
+  const oldest = _data.oldest[0];
 
   document.getElementById('hero').innerHTML = [
     ['Total ETFs', _data.total, 'ASX + CXA'],
-    ['Newest', _data.recent[0]?.code || '—', recentDate],
+    ['Newest', _data.recent[0]?.code || '—', _data.recent[0]?.inception_date || '—'],
     ['Oldest', oldest?.code || '—', oldest?.inception_date || '—'],
     ['Most Active Year', peakYear[0], peakYear[1] + ' new listings'],
   ].map(([l,v,s]) => `<div class="card"><div class="sl">${l}</div><div class="sv">${v}</div><div class="ss">${s}</div></div>`).join('');
@@ -355,53 +353,48 @@ async function init() {
   document.getElementById('page').classList.remove('hidden');
 }
 
-function populateValFilter() {
-  const dim = document.getElementById('f-dim').value;
-  const valSel = document.getElementById('f-val');
-  valSel.innerHTML = '<option value="">— All —</option>';
-  if (dim === 'all') { valSel.classList.add('hidden'); return; }
-  valSel.classList.remove('hidden');
-  const vals = [...new Set(_data.etf_list.map(e => e[dim]))].sort();
-  vals.forEach(v => { const o = document.createElement('option'); o.value = v; o.textContent = v; valSel.appendChild(o); });
-}
-
 function renderYearChart() {
-  const dim = document.getElementById('f-dim').value;
-  const filterVal = document.getElementById('f-val').value;
-
-  // Filter ETFs
-  let etfs = _data.etf_list;
-  if (dim !== 'all' && filterVal) etfs = etfs.filter(e => e[dim] === filterVal);
-
-  // Get all years 2001–present
+  const dim = _activeDim;
+  const etfs = _data.etf_list;
   const allYears = [...new Set(etfs.map(e => e.year))].filter(y => +y >= 2001).sort();
 
-  let datasets, subtitle;
-
-  if (dim === 'all' || filterVal) {
-    // Single colour bar
+  let datasets;
+  if (dim === 'all') {
     const counts = {};
     etfs.forEach(e => { counts[e.year] = (counts[e.year]||0) + 1; });
-    datasets = [{ data: allYears.map(y => counts[y]||0), backgroundColor: '#3b82f6', borderRadius: 4, borderSkipped: false }];
-    subtitle = filterVal ? `Showing: ${filterVal}` : 'All ETFs';
+    datasets = [{
+      label: 'All ETFs',
+      data: allYears.map(y => counts[y]||0),
+      backgroundColor: '#3b82f6',
+      borderRadius: 3,
+      borderSkipped: false,
+    }];
   } else {
-    // Stacked by dimension
-    const groups = [...new Set(etfs.map(e => e[dim]))].sort();
+    // For issuer, only show top 10 by total count to keep chart readable
+    let groups = [...new Set(etfs.map(e => e[dim]))].sort();
+    if (dim === 'issuer') {
+      const totals = {};
+      etfs.forEach(e => { totals[e[dim]] = (totals[e[dim]]||0) + 1; });
+      groups = Object.entries(totals).sort((a,b) => b[1]-a[1]).slice(0, 10).map(([g]) => g);
+      // Everything else → "Other"
+      const topSet = new Set(groups);
+      const hasOther = etfs.some(e => !topSet.has(e[dim]));
+      if (hasOther) groups.push('Other');
+    }
     datasets = groups.map((g, i) => {
       const counts = {};
-      etfs.filter(e => e[dim] === g).forEach(e => { counts[e.year] = (counts[e.year]||0) + 1; });
+      const subset = (dim === 'issuer' && g === 'Other')
+        ? etfs.filter(e => !new Set(groups.slice(0,-1)).has(e[dim]))
+        : etfs.filter(e => e[dim] === g);
+      subset.forEach(e => { counts[e.year] = (counts[e.year]||0) + 1; });
       return {
         label: g,
         data: allYears.map(y => counts[y]||0),
         backgroundColor: dimColor(dim, g, i),
-        borderRadius: 2,
         borderSkipped: false,
       };
     });
-    subtitle = 'Stacked by ' + dim.replace('_',' ');
   }
-
-  document.getElementById('chart-subtitle').textContent = subtitle;
 
   const ctx = document.getElementById('chart-years').getContext('2d');
   if (_yearChart) _yearChart.destroy();
@@ -411,11 +404,18 @@ function renderYearChart() {
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: {
-        legend: { display: datasets.length > 1, position: 'bottom', labels: { font: { size: 10 }, boxWidth: 12 } },
-        tooltip: { callbacks: { label: ctx => ' ' + ctx.parsed.y + ' ETFs' } },
+        legend: {
+          display: dim !== 'all',
+          position: 'bottom',
+          labels: { font: { size: 10 }, boxWidth: 12, padding: 10 },
+        },
+        tooltip: {
+          mode: 'index', intersect: false,
+          callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y}` },
+        },
       },
       scales: {
-        x: { stacked: true, ticks: { font: { size: 10 } } },
+        x: { stacked: true, ticks: { font: { size: 10 } }, grid: { display: false } },
         y: { stacked: true, ticks: { font: { size: 10 }, stepSize: 5 }, grid: { color: '#f1f5f9' } },
       },
     },
