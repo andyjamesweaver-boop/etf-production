@@ -140,6 +140,578 @@ ARTICLES = [
     # ── ETF Basics ──────────────────────────────────────────────────────────────
 
     {
+        "slug": "what-is-an-index",
+        "title": "What Is an Index?",
+        "subtitle": "Every passive ETF tracks one. But what actually is an index, who builds them, and why does the construction methodology matter so much?",
+        "date": "2026-03-17",
+        "category": "Education",
+        "summary": "An index is a rulebook for selecting and weighting a set of securities. Understanding how that rulebook works — who writes it, how it handles size and liquidity, and when it rebalances — tells you exactly what you own when you buy an index ETF.",
+        "body": """
+<p>When you buy VAS, you are buying the S&P/ASX 300. When you buy IVV, you are buying the S&P 500. The fund is just the wrapper — the real product is the <strong>index</strong>. Understanding what an index is, who builds it, and how it makes decisions is the foundation of understanding what you own.</p>
+
+<h2>An index is a set of rules</h2>
+<p>An index is not a fund and it is not a portfolio. It is a <em>methodology</em> — a written set of rules that specifies which securities to include, how to weight them, and when to update the list. An independent organisation (the index provider) applies these rules systematically, and any fund that claims to track the index must hold the same securities in approximately the same weights.</p>
+
+<p>The rules typically cover:</p>
+<ul>
+  <li><strong>Eligibility</strong>: What types of securities qualify? Common requirements include minimum market capitalisation, minimum daily trading volume, listing exchange, and domicile.</li>
+  <li><strong>Weighting</strong>: How much of each security is included? The most common approach is market-capitalisation weighting.</li>
+  <li><strong>Reconstitution</strong>: When are new securities added or removed? Most indices rebalance quarterly or semi-annually.</li>
+  <li><strong>Corporate actions</strong>: How are mergers, delistings, spin-offs, and dividend payments handled?</li>
+</ul>
+
+<h2>The major index providers</h2>
+<p>A small number of firms dominate index construction globally. Their names appear on nearly every passive ETF:</p>
+
+<table>
+  <thead><tr><th>Provider</th><th>Key indices</th><th>Geographic focus</th></tr></thead>
+  <tbody>
+    <tr><td>S&amp;P Dow Jones Indices</td><td>S&amp;P 500, S&amp;P/ASX 200, S&amp;P/ASX 300</td><td>US, Australia, global</td></tr>
+    <tr><td>MSCI</td><td>MSCI World, MSCI Emerging Markets, MSCI ACWI</td><td>International, global</td></tr>
+    <tr><td>FTSE Russell</td><td>FTSE 100, Russell 2000, FTSE All-World</td><td>UK, US small cap, global</td></tr>
+    <tr><td>Bloomberg</td><td>Bloomberg Global Aggregate, Bloomberg AusBond</td><td>Fixed income</td></tr>
+    <tr><td>Nasdaq</td><td>Nasdaq-100</td><td>US large-cap tech/growth</td></tr>
+  </tbody>
+</table>
+
+<p>Index providers charge licensing fees to fund managers who use their indices. These fees are a material cost for ETF providers, particularly for widely-used indices like the MSCI World — one reason why some managers have developed proprietary indices for their cheapest products (BetaShares uses a Solactive-constructed index for A200 rather than the more expensive S&P/ASX 200 index used by IOZ and STW).</p>
+
+<h2>Market capitalisation weighting</h2>
+<p>The vast majority of equity indices are weighted by <strong>market capitalisation</strong> — a company's total market value (share price × shares outstanding). Larger companies get larger weights. In the S&P/ASX 200, BHP and CBA each represent around 10% of the index because they are Australia's two largest listed companies by market value.</p>
+
+<p>Market cap weighting has an elegant logic: it reflects the collective judgement of all investors about what each company is worth. It also has a well-documented quirk: it automatically overweights companies that have become <em>expensive</em> (their price has risen faster than fundamentals justify) and underweights companies that have become cheap. Critics call this a momentum-chasing feature built in by design.</p>
+
+<h2>Alternative weighting methods</h2>
+<p>Recognising this limitation, index providers have developed alternatives:</p>
+
+<ul>
+  <li><strong>Equal weight</strong>: Every constituent gets the same allocation regardless of size. VanEck's MVW holds all ASX 200 companies at equal weight. Small companies get far more representation; rebalancing costs are higher.</li>
+  <li><strong>Fundamental weight</strong>: Weight by accounting metrics (earnings, dividends, book value) rather than market price. Tends to tilt toward value stocks.</li>
+  <li><strong>Factor/smart beta</strong>: Screen for a specific characteristic — quality (QUAL), minimum volatility (MVOL), dividend yield (VHY). The index rules select and weight based on factor scores rather than market cap.</li>
+  <li><strong>Fixed weight</strong>: Some multi-asset and thematic indices specify fixed percentage allocations, rebalanced periodically back to target.</li>
+</ul>
+
+<h2>Why index construction matters</h2>
+<p>Two ETFs that both claim to track "Australian equities" can produce meaningfully different returns depending on which index they follow. The S&P/ASX 200 covers the 200 largest companies; the S&P/ASX 300 adds 100 smaller companies; the S&P/ASX All Ordinaries includes ~500. Over time, the performance differences are usually modest, but they are not zero — particularly in years when small-cap and large-cap returns diverge significantly.</p>
+
+<p>Similarly, whether an international index <em>includes</em> or <em>excludes</em> Australia matters: VGS (MSCI World) excludes Australia (because it is typically used alongside an Australian equity ETF), while IWLD explicitly notes "ex Australia" in its name. Buying both IVV (S&P 500) and VGS (MSCI World) gives you significant overlap in US holdings, since the US represents 70%+ of the MSCI World index.</p>
+
+<h2>Rebalancing and index changes</h2>
+<p>Most indices reconstitute quarterly. When a company grows large enough to be added to the ASX 200 — or shrinks below the cut-off and gets removed — all ETFs tracking that index must adjust their portfolios. This creates predictable buying and selling pressure around index rebalance dates, which is both a trading opportunity for sophisticated investors and a small performance drag for index fund holders.</p>
+""",
+    },
+
+    {
+        "slug": "what-is-active-management",
+        "title": "What Is Active Management?",
+        "subtitle": "Active managers read company reports, meet executives, and build models. The question is whether any of that produces better returns than a low-cost index fund.",
+        "date": "2026-03-17",
+        "category": "Education",
+        "summary": "Active management means a human (or algorithm) making deliberate decisions about what to buy and sell, rather than following a rulebook. We explain how active managers work, what types exist, and what the long-run evidence says about their performance.",
+        "body": """
+<p>Every time you buy an index ETF, you are implicitly accepting the market's assessment of what every stock is worth. Active managers reject this premise. They believe that through research, analysis, and judgment, they can identify securities that are mispriced — and that buying cheap and avoiding expensive will produce better returns than the index over time.</p>
+
+<h2>What active managers actually do</h2>
+<p>The specifics vary enormously, but most fundamental active managers follow some version of this process:</p>
+
+<ol>
+  <li><strong>Idea generation</strong>: Screen for companies with interesting characteristics (cheap valuation, high returns on capital, unusual growth, event-driven catalysts) or conduct thematic research to identify sectors worth investigating.</li>
+  <li><strong>Fundamental research</strong>: Read annual reports, talk to management, speak to customers and competitors, build financial models to project future cash flows.</li>
+  <li><strong>Valuation</strong>: Estimate what the company is worth. If the market price is substantially below the estimated value, the stock is a candidate for purchase.</li>
+  <li><strong>Portfolio construction</strong>: Decide how much to hold in each position, balancing conviction, correlation with other holdings, and liquidity constraints.</li>
+  <li><strong>Ongoing monitoring</strong>: Watch for changes in the investment thesis — deteriorating fundamentals, management changes, competitive threats — and sell when the thesis breaks or the price reaches fair value.</li>
+</ol>
+
+<h2>Types of active management</h2>
+<p>Active management is not a single approach. The major styles include:</p>
+
+<table>
+  <thead><tr><th>Style</th><th>Approach</th><th>Australian examples</th></tr></thead>
+  <tbody>
+    <tr><td>Fundamental growth</td><td>Seeks companies with superior earnings growth; willing to pay premium valuations</td><td>Hyperion (HYGG), Magellan (MGOC)</td></tr>
+    <tr><td>Fundamental value</td><td>Seeks undervalued companies with improving fundamentals; avoids expensive growth</td><td>Airlie (AASF), Dimensional (DAVA)</td></tr>
+    <tr><td>Income / yield</td><td>Focuses on dividend-paying or yield-generating assets</td><td>BetaShares Hybrids (HBRD), Ausbil (DIVI)</td></tr>
+    <tr><td>Infrastructure / real assets</td><td>Holds listed infrastructure, property, or real-asset companies for stable cash flows</td><td>Magellan MICH, VanEck IFRA</td></tr>
+    <tr><td>Systematic / quantitative</td><td>Uses quantitative models to systematically select and weight securities based on factors</td><td>Dimensional (DACE, DGCE), VanEck QUAL</td></tr>
+    <tr><td>Global macro</td><td>Takes positions based on macroeconomic views — currencies, rates, commodities</td><td>Rare in listed ETF form</td></tr>
+  </tbody>
+</table>
+
+<h2>The evidence on active management performance</h2>
+<p>The S&P SPIVA (S&P Indices Versus Active) report is the most comprehensive ongoing study of active fund performance against benchmarks. It publishes data semi-annually for Australia and globally. The consistent finding: most active managers underperform their benchmark index after fees, and the gap widens over longer periods.</p>
+
+<p>For Australian equity funds over the ten years to December 2025, approximately <strong>80% underperformed</strong> the S&P/ASX 200 index. For international equity funds, the underperformance rate was even higher — around 90%.</p>
+
+<p>This does not mean active management is worthless. A minority of managers do deliver persistent outperformance. The challenge for investors is that:</p>
+<ul>
+  <li>Past performance is a poor predictor of future performance — many managers who outperform in one period underperform in the next</li>
+  <li>The managers who charge the most are not more likely to outperform</li>
+  <li>Identifying skill in advance requires deep knowledge of a manager's process, risk controls, and team stability</li>
+</ul>
+
+<h2>Where active management has a better case</h2>
+<p>The case for active management is strongest in markets where information is less widely distributed and prices are more likely to be mispriced. Empirically, smaller companies tend to be less efficiently priced than large caps (fewer analysts covering them, less media attention). Similarly, emerging market equities, high-yield bonds, and illiquid credit tend to reward active managers more reliably than large-cap developed market equities.</p>
+
+<p>Systematic active management — such as Dimensional's evidence-based factor approach — occupies a middle ground. It uses quantitative rules to systematically overweight stocks with characteristics historically associated with higher returns (small size, value, profitability), without relying on individual stock-picking judgment. The result looks more like a dynamic index than traditional stockpicking, but with deliberate tilts designed to capture well-documented return premiums.</p>
+
+<h2>What to look for before investing in an active ETF</h2>
+<p>If you are considering an active ETF, the key questions are:</p>
+<ul>
+  <li><strong>Is the process clearly defined and consistently applied?</strong> Vague statements about "conviction-based investing" are less reassuring than a documented, repeatable methodology.</li>
+  <li><strong>How long is the track record?</strong> Three years is not long enough to distinguish skill from luck. Seven-to-ten years across a full market cycle is more meaningful.</li>
+  <li><strong>Is the team stable?</strong> Many managed funds — including several that have converted to ETFs — had their strongest performance delivered by a team that no longer exists at the firm.</li>
+  <li><strong>Does the fee justify the expected outperformance?</strong> A manager charging 1% needs to outperform by more than 1% just to match the index after fees. That is a meaningful hurdle.</li>
+</ul>
+""",
+    },
+
+    {
+        "slug": "what-is-a-market-maker",
+        "title": "What Is a Market Maker?",
+        "subtitle": "Every time you buy or sell an ETF on the ASX, a market maker is on the other side. They are the reason you can trade instantly at a fair price.",
+        "date": "2026-03-17",
+        "category": "Education",
+        "summary": "Market makers are specialised firms that continuously quote buy and sell prices on the exchange, providing liquidity to investors. We explain how they work, how they make money, and why they matter particularly for ETF investors.",
+        "body": """
+<p>When you place an order to buy 100 units of VGS on the ASX, you do not wait for another retail investor to decide they want to sell exactly 100 units at that moment. In almost every case, your order is filled by a <strong>market maker</strong> — a specialised firm whose job is to continuously buy and sell securities, ensuring investors can transact whenever they want to.</p>
+
+<h2>What market makers do</h2>
+<p>A market maker simultaneously posts a <em>bid price</em> (the price at which they will buy) and an <em>ask price</em> (the price at which they will sell) on the exchange at all times during market hours. The difference between these two prices is the <strong>bid-ask spread</strong> — the market maker's gross revenue per round trip.</p>
+
+<p>For example, if VGS has a bid of $116.40 and an ask of $116.50, the spread is $0.10. A retail investor buying one unit pays $116.50 (the ask). A retail investor selling one unit receives $116.40 (the bid). The market maker collects $0.10 per unit per round trip on average, before their hedging costs and operational expenses.</p>
+
+<h2>How market makers manage risk</h2>
+<p>A market maker who only buys VGS all day would quickly accumulate a large position — and a large exposure to the Australian sharemarket declining. Sophisticated market makers hedge in real time:</p>
+
+<ul>
+  <li>They may <strong>short the underlying basket</strong>: sell S&P/ASX 300 futures or the individual shares that VAS holds, offsetting the market exposure of their ETF inventory.</li>
+  <li>They use the <strong>creation and redemption mechanism</strong> to manage large imbalances: if they accumulate too many ETF units, they can redeem them with the fund manager and receive the underlying shares instead.</li>
+  <li>They trade <strong>correlated instruments</strong> (e.g. index futures) to neutralise directional risk quickly and cheaply.</li>
+</ul>
+
+<p>The result is that market makers operate on very thin margins, with their profit coming from the spread multiplied by very high turnover — not from taking directional bets on the market.</p>
+
+<h2>Market makers vs authorised participants</h2>
+<p>These terms are related but distinct:</p>
+
+<table>
+  <thead><tr><th>Role</th><th>What they do</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Market maker</strong></td><td>Quotes continuous bid/ask prices on the exchange; provides intraday liquidity to retail investors; hedges their inventory</td></tr>
+    <tr><td><strong>Authorised participant (AP)</strong></td><td>Creates or redeems ETF units in large blocks (typically $500K+) directly with the fund manager; keeps ETF price aligned with NAV; often the same firm as the market maker, but not always</td></tr>
+  </tbody>
+</table>
+
+<p>Most large ETF market makers in Australia are also authorised participants — they use the creation/redemption mechanism to source or offload large ETF positions efficiently. Smaller market makers who are not APs rely on buying and selling ETF units on market rather than going directly to the issuer.</p>
+
+<h2>Why spreads vary so much across ETFs</h2>
+<p>The bid-ask spread on a liquid ETF like VAS or IVV is typically <strong>1–3 cents</strong> on a unit price of $80–$120, representing a cost of around 0.01–0.04%. For a small or illiquid ETF, the spread might be $0.30–$1.00 or more — a far more meaningful transaction cost.</p>
+
+<p>Several factors drive spread width:</p>
+<ul>
+  <li><strong>Underlying liquidity</strong>: An ETF holding liquid Australian shares is easy to hedge. An ETF holding illiquid small-cap stocks or physical commodities in a foreign market is harder — so the market maker demands more spread to compensate for hedging risk.</li>
+  <li><strong>Trading volume</strong>: High-turnover ETFs allow market makers to turn over their inventory quickly, reducing the average holding period and therefore risk. Low-volume ETFs sit in inventory longer.</li>
+  <li><strong>NAV transparency</strong>: Most equity ETFs publish an indicative NAV (iNAV) in near-real-time during market hours. This tight reference price lets market makers quote narrowly. For some fixed-income or less-transparent products, the NAV is harder to calculate intraday, so spreads are wider.</li>
+  <li><strong>Number of market makers</strong>: Competition between multiple market makers on the same ETF compresses spreads. Less popular ETFs may have only one market maker quoting, reducing competitive pressure.</li>
+</ul>
+
+<h2>What this means for you as an investor</h2>
+<p>For long-term buy-and-hold investors in the large liquid ETFs (VAS, VGS, IVV, A200), the bid-ask spread is nearly irrelevant — it amounts to a few dollars on a $10,000 transaction. But for anyone trading frequently, dealing in less-liquid products, or making large trades in smaller ETFs, spread costs can add up.</p>
+
+<p>Two practical habits help: always use <strong>limit orders</strong> (specify a price rather than accepting whatever the ask is), and check the bid-ask spread before buying an unfamiliar ETF. If the spread is wider than 0.20%, factor that cost into your total cost calculation alongside the MER and brokerage commission.</p>
+
+<p>Market makers also add value beyond just the daily bid-ask. They provide a shock absorber during volatile market conditions, continuing to quote prices when many retail participants have pulled back. In the March 2020 COVID sell-off, the creation/redemption arbitrage mechanism and active market-making kept most Australian ETF prices within a few percentage points of their underlying NAVs — a meaningful benefit compared to unlisted managed funds, which can gate redemptions entirely in stress periods.</p>
+""",
+    },
+
+    # ── Issuer Profiles ─────────────────────────────────────────────────────────
+
+    {
+        "slug": "issuer-profile-vanguard",
+        "title": "Issuer Profile: Vanguard",
+        "subtitle": "The largest ETF provider in Australia manages $90 billion across 32 funds. How a Pennsylvania mutual company built Australia's most dominant investment franchise.",
+        "date": "2026-03-17",
+        "category": "Issuer Profile",
+        "summary": "Vanguard entered Australia in 1996 and launched its first ETF in 2009. Today it manages $89.7 billion in Australian ETF assets across 32 funds, with fees as low as 0.03%. We profile its history, philosophy, and product range.",
+        "body": """
+<p>By almost any measure, Vanguard is Australia's dominant ETF provider. Its 32 listed funds manage <strong>$89.7 billion</strong> in assets — more than BetaShares and iShares combined. Its flagship, VAS, is the largest ETF in the country at $22.7 billion. And its average management fee of 0.25% sits well below the industry average.</p>
+
+<h2>Background</h2>
+<p>Vanguard was founded in 1975 by <strong>John C. Bogle</strong> in Valley Forge, Pennsylvania. Bogle's founding idea was radical: create an investment company owned by its own funds (and therefore by its fund investors), with no outside shareholders to profit from. Without the need to generate profit for external owners, Vanguard could continuously reduce fees and pass savings to investors.</p>
+
+<p>The Vanguard Group launched the first retail index mutual fund in 1976, tracking the S&P 500. It took years for the concept to catch on — early critics dismissed it as "Bogle's folly." By the time Bogle died in 2019, Vanguard had grown to become the world's second-largest asset manager with over $7 trillion under management, and the index fund had become the dominant vehicle for retail investing globally.</p>
+
+<p>Vanguard Australia was established in <strong>1996</strong> as a wholesale operation serving institutional and adviser clients. Its first Australian ETF, <strong>VAS</strong> (Vanguard Australian Shares Index ETF), listed on the ASX in <strong>May 2009</strong> — one of the earliest ETFs listed in Australia. The range has since grown to 32 products covering every major asset class.</p>
+
+<h2>Size and market position</h2>
+<p>Vanguard is the <strong>#1 ETF issuer in Australia</strong> by FUM with $89.7B, commanding roughly 27% of the total market. Its nearest competitors — BetaShares ($63.3B) and iShares ($54.5B) — trail by a significant margin. The gap is partly structural: Vanguard entered the market early, established trusted brands, and benefited from the low-cost advantage that compounds as assets grow.</p>
+
+<h2>Philosophy</h2>
+<p>Vanguard's investment philosophy is built on four principles: set clear goals, balance across asset classes, minimise costs, and maintain discipline (avoid market-timing). This translates into a product range that is almost entirely passive index products, with fees as low as possible and a deliberate reluctance to launch trendy or speculative themes.</p>
+
+<p>Vanguard does not have a thematic range. It does not offer leveraged or inverse ETFs. Its most complex products are the diversified multi-asset funds (VDHG, VDGR etc.) which are simply blends of its own single-asset-class ETFs. This restraint is a feature, not a limitation.</p>
+
+<h2>Key products</h2>
+<table>
+  <thead><tr><th>ETF</th><th>Name</th><th>FUM</th><th>Fee</th><th>1Y Return</th></tr></thead>
+  <tbody>
+    <tr><td>VAS</td><td>Australian Shares Index (ASX 300)</td><td>$22.7B</td><td>0.07%</td><td>+7.6%</td></tr>
+    <tr><td>VGS</td><td>MSCI Index International Shares</td><td>$14.0B</td><td>0.18%</td><td>+5.8%</td></tr>
+    <tr><td>VHY</td><td>Australian Shares High Yield</td><td>$6.8B</td><td>0.25%</td><td>+12.2%</td></tr>
+    <tr><td>VGAD</td><td>MSCI International Shares (Hedged)</td><td>$6.2B</td><td>0.21%</td><td>+15.5%</td></tr>
+    <tr><td>VTS</td><td>US Total Market Shares</td><td>$6.0B</td><td>0.03%</td><td>+1.7%</td></tr>
+    <tr><td>VEU</td><td>All-World Ex-US Shares</td><td>$5.1B</td><td>0.07%</td><td>+19.5%</td></tr>
+    <tr><td>VBND</td><td>Global Aggregate Bond (Hedged)</td><td>$3.9B</td><td>0.20%</td><td>+4.4%</td></tr>
+    <tr><td>VDHG</td><td>Diversified High Growth (90/10)</td><td>$3.5B</td><td>0.27%</td><td>+9.0%</td></tr>
+  </tbody>
+</table>
+
+<h2>Fee structure</h2>
+<p>Vanguard consistently prices at or near the lowest fee in each category it competes in. VTS (US Total Market) charges just <strong>0.03%</strong> — among the cheapest ETFs in the world. VAS at 0.07% is the cheapest Australian equity ETF on market. VGS at 0.18% is competitive for broad international exposure.</p>
+
+<p>The diversified funds (VDHG, VDGR etc.) charge 0.27%, which is slightly higher than assembling the components yourself but includes automatic rebalancing — a tangible value-add for investors who would otherwise let allocations drift.</p>
+
+<h2>Recent developments</h2>
+<p>In 2022 Vanguard launched <strong>Vanguard Personal Investor</strong> in Australia — a direct-to-consumer investment platform allowing Australians to invest in Vanguard's managed funds and ETFs without going through a broker. This brought Vanguard closer to its US model of dealing directly with end investors, rather than purely through financial advisers and brokers.</p>
+""",
+    },
+
+    {
+        "slug": "issuer-profile-betashares",
+        "title": "Issuer Profile: BetaShares",
+        "subtitle": "Australia's homegrown ETF giant has 102 funds, $63 billion in assets, and a product range that spans from 0.04% index funds to leveraged bear ETFs. The story of how a Sydney startup became a market leader.",
+        "date": "2026-03-17",
+        "category": "Issuer Profile",
+        "summary": "Founded in Sydney in 2009, BetaShares is Australia's largest ETF provider by number of products and second-largest by FUM. We profile its history, its product philosophy, and its most important funds.",
+        "body": """
+<p>BetaShares is the only major ETF provider in Australia that was founded here. While its competitors are Australian arms of global giants (BlackRock, Vanguard, State Street), BetaShares was built from scratch in Sydney in 2009 and has grown to manage <strong>$63.3 billion</strong> across <strong>102 ETFs</strong> — the broadest product range of any issuer in the country.</p>
+
+<h2>Background</h2>
+<p>BetaShares was co-founded in 2009 by <strong>Alex Vynokur</strong> (CEO) and <strong>Drew Corbett</strong>. Vynokur had previously worked in law and financial services in Australia and South Africa; Corbett had an investment banking background. The pair identified that Australian investors were underserved by the ETF market compared to the US and UK, where ETF adoption was already accelerating.</p>
+
+<p>The company's first ETF, <strong>QAU</strong> (Gold Bullion Currency Hedged), listed in December 2010. Early growth was modest — the Australian ETF market was small and the concept unfamiliar to most retail investors. BetaShares grew by expanding the product range aggressively, launching not just vanilla index ETFs but currency funds, cash products, leveraged and inverse ETFs, and thematic ideas that weren't available elsewhere.</p>
+
+<p>A major milestone came with the launch of <strong>NDQ</strong> (Nasdaq 100) in 2015. Retail appetite for US technology exposure was growing rapidly, and NDQ became one of the fastest-growing ETFs in Australian history. It now manages $7.2 billion. The <strong>AAA</strong> high-interest cash ETF (launched 2012) was another landmark product that filled a genuine gap — a way to hold cash earning the best available overnight rate without needing a term deposit.</p>
+
+<p>In 2021, BetaShares received a significant investment from <strong>TA Associates</strong>, a US-based growth equity firm, valuing the company at approximately $1.5 billion. The investment supported further product development and international expansion.</p>
+
+<h2>Size and market position</h2>
+<p>BetaShares is <strong>#1 in Australia by ETF count</strong> (102 funds) and <strong>#2 by FUM</strong> ($63.3B). Its scale across categories is remarkable: it competes in ultra-cheap index ETFs (A200 at 0.04%), income products (AAA, HBRD), ESG (ETHI), thematic (NDQ, URNM), active (HBRD), and leveraged/inverse products (BBOZ, BBUS). No other Australian issuer spans this breadth.</p>
+
+<h2>Philosophy</h2>
+<p>BetaShares' approach is less ideologically committed to passive indexing than Vanguard. It will launch active ETFs, smart-beta products, thematic funds, and complex structured products if it sees investor demand. This pragmatism has produced a broader range with more variety in quality — some products have accumulated strong followings; others have remained small.</p>
+
+<h2>Key products</h2>
+<table>
+  <thead><tr><th>ETF</th><th>Name</th><th>FUM</th><th>Fee</th><th>1Y Return</th></tr></thead>
+  <tbody>
+    <tr><td>A200</td><td>Australia 200 ETF</td><td>$9.2B</td><td>0.04%</td><td>+7.2%</td></tr>
+    <tr><td>NDQ</td><td>Nasdaq 100 ETF</td><td>$7.2B</td><td>0.48%</td><td>+6.0%</td></tr>
+    <tr><td>AAA</td><td>Australian High Interest Cash ETF</td><td>$4.9B</td><td>0.18%</td><td>+3.9%</td></tr>
+    <tr><td>ETHI</td><td>Global Sustainability Leaders ETF</td><td>$3.5B</td><td>0.59%</td><td>-4.1%</td></tr>
+    <tr><td>BGBL</td><td>Global Shares ETF</td><td>$3.4B</td><td>0.08%</td><td>+6.5%</td></tr>
+    <tr><td>HBRD</td><td>Australian Hybrids Active ETF</td><td>$2.6B</td><td>0.55%</td><td>+4.9%</td></tr>
+    <tr><td>HGBL</td><td>Global Shares Currency Hedged</td><td>$2.0B</td><td>0.11%</td><td>+16.3%</td></tr>
+    <tr><td>QPON</td><td>Australian Bank Senior Floating Rate Bond</td><td>$1.9B</td><td>0.22%</td><td>+5.1%</td></tr>
+  </tbody>
+</table>
+
+<h2>The A200–VAS fee war</h2>
+<p>BetaShares' most significant competitive move has been in Australian equities. A200 tracks the ASX 200 at <strong>0.04%</strong>, significantly undercutting Vanguard's VAS (ASX 300, 0.07%) and iShares' IOZ (ASX 200, 0.05%). It uses a Solactive index rather than S&P's ASX 200, which avoids the S&P licensing fee and enables the lower price. A200 has grown to $9.2 billion — substantial scale but still well behind VAS at $22.7B, reflecting VAS's head start and the natural stickiness of existing holdings.</p>
+
+<h2>Income and fixed income range</h2>
+<p>BetaShares has one of the strongest fixed income and income ETF ranges in Australia. AAA provides cash-rate returns in ETF form — an innovative product that has attracted nearly $5 billion from investors seeking yield without term deposit lockups. HBRD (Australian hybrids, active) and QPON (floating rate bonds) address specific income needs that passive products don't easily capture. This breadth in fixed income is a meaningful differentiator versus competitors.</p>
+""",
+    },
+
+    {
+        "slug": "issuer-profile-ishares",
+        "title": "Issuer Profile: iShares (BlackRock)",
+        "subtitle": "The Australian arm of the world's largest asset manager runs 56 ETFs and $54.5 billion. iShares built Australia's second-ever ETF in 2007 and today offers some of the cheapest products on the market.",
+        "date": "2026-03-17",
+        "category": "Issuer Profile",
+        "summary": "iShares is the Australian ETF brand of BlackRock, the world's largest asset manager. We profile its history, its ultra-low-cost Core range, and the key funds that have made it the third-largest ETF provider in Australia.",
+        "body": """
+<p><strong>BlackRock</strong> is the world's largest asset manager, with over $11 trillion in assets under management globally. Its ETF brand, <strong>iShares</strong>, is the largest ETF provider in the world by assets. In Australia, iShares runs <strong>56 ETFs</strong> managing <strong>$54.5 billion</strong> — making it the third-largest provider in the country behind Vanguard and BetaShares.</p>
+
+<h2>Background</h2>
+<p>The iShares brand originated at <strong>Barclays Global Investors (BGI)</strong>, the quantitative investment arm of Barclays Bank. BGI launched the first iShares products in the US in 2000, building on the ETF structure that State Street had pioneered with SPY in 1993. BGI's quantitative heritage gave it a particular strength in index and factor investing.</p>
+
+<p>In 2009, <strong>BlackRock acquired Barclays Global Investors</strong> for approximately $13.5 billion, gaining the iShares brand and its global ETF operation. The acquisition transformed BlackRock from a large fixed-income manager into the world's dominant ETF provider overnight.</p>
+
+<p>iShares Australia launched in <strong>October 2007</strong> with the listing of IVV (S&P 500) and IOZ (ASX 200) — among the earliest ETFs on the ASX. The Australian operation has grown steadily, benefiting from BlackRock's global scale in index licensing, technology, and capital markets relationships.</p>
+
+<h2>Size and market position</h2>
+<p>iShares is <strong>#3 in Australia by FUM</strong> at $54.5B. Its range spans Australian equities, international equities, bonds, and thematic products. The average management fee of 0.27% reflects its strength in low-cost core products — its Core range includes some of the cheapest ETFs available in Australia.</p>
+
+<h2>The Core range</h2>
+<p>iShares' most important strategic move in Australia was the development of a dedicated <strong>Core range</strong> — a set of low-cost, broad-market building blocks explicitly designed for long-term portfolio construction rather than trading. The Core range products are priced at cost:</p>
+
+<table>
+  <thead><tr><th>ETF</th><th>Name</th><th>FUM</th><th>Fee</th><th>1Y Return</th></tr></thead>
+  <tbody>
+    <tr><td>IVV</td><td>S&amp;P 500 ETF (Core)</td><td>$12.4B</td><td>0.04%</td><td>+2.4%</td></tr>
+    <tr><td>IOZ</td><td>Core S&amp;P/ASX 200 ETF</td><td>$8.1B</td><td>0.05%</td><td>+7.2%</td></tr>
+    <tr><td>IAF</td><td>Core Composite Bond ETF</td><td>$3.6B</td><td>0.10%</td><td>+3.1%</td></tr>
+    <tr><td>IHVV</td><td>S&amp;P 500 AUD Hedged (Core)</td><td>$3.2B</td><td>0.10%</td><td>+14.5%</td></tr>
+    <tr><td>IWLD</td><td>Core MSCI World ex Australia ESG</td><td>$1.4B</td><td>0.09%</td><td>+6.8%</td></tr>
+  </tbody>
+</table>
+
+<p>IVV at <strong>0.04%</strong> is the joint-cheapest ETF in Australia (alongside BetaShares A200). At $12.4 billion it is Australia's third-largest ETF. Its fee has been cut multiple times over the years as BlackRock's scale economies improved — IVV once charged 0.07%, then 0.05%, now 0.04%.</p>
+
+<h2>Beyond the Core range</h2>
+<p>Outside the Core range, iShares offers:</p>
+<ul>
+  <li><strong>Global thematic</strong>: IOO (Global 100, 0.40%) is Australia's fifth-largest ETF at $5.0B, offering exposure to the world's 100 largest companies across all sectors.</li>
+  <li><strong>Infrastructure</strong>: GLIN (Global Infrastructure AUD Hedged, 0.15%) at $1.65B covers listed infrastructure companies globally.</li>
+  <li><strong>Emerging markets</strong>: IEM (MSCI Emerging Markets, 0.69%) at $1.5B for developing-world equity exposure.</li>
+  <li><strong>ESG</strong>: Several ESG-screened variants of core indices, including IWLD's ex-controversial weapons, tobacco and civilian firearms screen.</li>
+</ul>
+
+<h2>BlackRock's global advantage</h2>
+<p>iShares benefits from BlackRock's extraordinary scale in ways that are not always visible to retail investors. BlackRock's capital markets team maintains relationships with hundreds of market makers globally, helping ensure tight spreads on iShares products. Its securities lending programmes generate revenue that can offset fund costs. And its negotiating power with index providers (S&P, MSCI) on licensing fees helps keep the Core range priced at levels that competitors struggle to match.</p>
+""",
+    },
+
+    {
+        "slug": "issuer-profile-vaneck",
+        "title": "Issuer Profile: VanEck",
+        "subtitle": "The Dutch-American specialist runs 48 ETFs and $31 billion in Australia, built around its flagship QUAL quality-factor ETF. A profile of a manager who resisted going cheap and won.",
+        "date": "2026-03-17",
+        "category": "Issuer Profile",
+        "summary": "VanEck entered Australia with a focus on smart beta and factor investing, not plain vanilla index ETFs. Its QUAL ETF (quality factor, 0.40%) has grown to $7.8 billion — one of Australia's top 10 ETFs. We profile VanEck's history, product range, and investment approach.",
+        "body": """
+<p>VanEck's Australian operation is a study in focus. Rather than competing with Vanguard and iShares on pure cost in vanilla index ETFs, VanEck built its Australian franchise around factor investing, emerging markets, and fixed income niches. The strategy has worked: its <strong>48 ETFs</strong> manage <strong>$31 billion</strong>, and its flagship QUAL is one of Australia's largest ETFs at $7.8 billion — despite charging 0.40%, ten times what the cheapest ETFs cost.</p>
+
+<h2>Background</h2>
+<p>VanEck was founded in <strong>1955</strong> by <strong>John van Eck</strong> in New York. The firm was an early proponent of international investing for US investors at a time when domestic stocks dominated US portfolios. Van Eck's son <strong>Jan van Eck</strong>, who took over as CEO, extended the firm into commodities (it managed the first US gold ETF, GDX, in 2006) and into factors and smart beta.</p>
+
+<p>VanEck entered Australia in <strong>2013</strong>, initially with a small range of market access and emerging market products. The transformative Australian launch was <strong>QUAL</strong> — the MSCI International Quality ETF — which identified high-quality international companies (high return on equity, stable earnings, low financial leverage) and weighted them accordingly. QUAL's philosophy resonated with Australian self-managed super fund (SMSF) trustees and financial advisers who wanted international equity exposure with a quality screen rather than pure market-cap weight.</p>
+
+<h2>QUAL: the flagship</h2>
+<p>QUAL is one of the most successful non-plain-vanilla ETFs in Australian history. At $7.8 billion in assets, it is Australia's sixth-largest ETF. It charges 0.40% — a fee that would doom a plain index ETF in a competitive market — but which investors have accepted as reasonable for a differentiated factor exposure.</p>
+
+<p>The MSCI Quality index screens for three metrics: return on equity, earnings variability, and debt-to-equity. The resulting portfolio is concentrated in US technology and healthcare — companies like Apple, Microsoft, Nvidia, and Eli Lilly feature heavily. It is effectively a quality-filtered version of the US large-cap market with a modest tilt away from financial stocks (which tend to have high debt).</p>
+
+<p>VanEck has since extended the QUAL brand with <strong>QHAL</strong> (hedged version, $2.3B) and <strong>QSML</strong> (small company quality, $1.5B).</p>
+
+<h2>Key products</h2>
+<table>
+  <thead><tr><th>ETF</th><th>Name</th><th>FUM</th><th>Fee</th><th>1Y Return</th></tr></thead>
+  <tbody>
+    <tr><td>QUAL</td><td>MSCI International Quality ETF</td><td>$7.8B</td><td>0.40%</td><td>+2.2%</td></tr>
+    <tr><td>SUBD</td><td>Australian Subordinated Debt ETF</td><td>$3.5B</td><td>0.29%</td><td>+5.8%</td></tr>
+    <tr><td>MVW</td><td>Australian Equal Weight ETF</td><td>$3.1B</td><td>0.35%</td><td>+4.5%</td></tr>
+    <tr><td>QHAL</td><td>MSCI International Quality (Hedged)</td><td>$2.3B</td><td>0.43%</td><td>+11.9%</td></tr>
+    <tr><td>IFRA</td><td>FTSE Global Infrastructure (Hedged)</td><td>$1.9B</td><td>0.20%</td><td>+13.3%</td></tr>
+    <tr><td>GDX</td><td>Gold Miners ETF</td><td>$1.6B</td><td>0.53%</td><td>+137.9%</td></tr>
+    <tr><td>QSML</td><td>MSCI International Small Co. Quality</td><td>$1.5B</td><td>0.59%</td><td>-1.7%</td></tr>
+    <tr><td>FLOT</td><td>Australian Floating Rate ETF</td><td>$1.0B</td><td>0.22%</td><td>+4.8%</td></tr>
+  </tbody>
+</table>
+
+<h2>Fixed income and alternatives strength</h2>
+<p>Beyond equities, VanEck has built meaningful scale in Australian fixed income. <strong>SUBD</strong> (subordinated debt, $3.5B) fills a gap — it provides exposure to Australian bank subordinated bonds (Tier 2 capital instruments) that sit between senior debt and hybrids in the capital structure. <strong>FLOT</strong> (floating rate, $1.0B) and several other debt ETFs demonstrate VanEck's depth in fixed income niches that larger generalist providers have not prioritised.</p>
+
+<p><strong>GDX</strong> (Gold Miners, $1.6B) is VanEck's longest-standing commodity product in Australia. In the past year it returned <strong>+137.9%</strong>, as gold miner equities benefited from both rising gold prices and operating leverage. It is one of the few ETFs in Australia to have returned more than 100% in a single year.</p>
+
+<h2>Philosophy</h2>
+<p>VanEck's positioning is explicit: it occupies the space between passive vanilla index ETFs and high-cost active management. Its smart beta and factor products charge more than plain index ETFs but less than most active managers, offering systematic exposures with low-to-moderate cost. Whether that positioning proves durable as competitors launch competing factor products at lower prices will be one of the defining competitive questions for the Australian ETF market in the years ahead.</p>
+""",
+    },
+
+    {
+        "slug": "issuer-profile-global-x",
+        "title": "Issuer Profile: Global X",
+        "subtitle": "Australia's fourth-largest ETF provider started as a gold vault operator in 2003 and grew into a 49-fund thematic powerhouse. The story behind GOLD, ETPMAG, and FANG.",
+        "date": "2026-03-17",
+        "category": "Issuer Profile",
+        "summary": "Global X Australia has its roots in ETF Securities, a company founded by Graham Tuckwell that pioneered physically-backed commodity ETPs in Australia in 2003. Today it manages $17.3 billion across 49 funds. We profile its history and product range.",
+        "body": """
+<p>Global X Australia has an unusually rich history. The business traces its origins to <strong>ETF Securities</strong>, which launched the world's first physically-backed gold ETP in 2003 — years before the US or UK equivalents. Today, as part of the global Global X network, it manages <strong>$17.3 billion</strong> across <strong>49 ETFs</strong>, with an emphasis on physical commodities and thematic investing.</p>
+
+<h2>Background: ETF Securities and Graham Tuckwell</h2>
+<p>In 2003, <strong>Graham Tuckwell</strong> — a former Goldman Sachs banker — established <strong>Gold Bullion Securities</strong> in Australia, creating the world's first exchange-listed product backed by physical gold. Each unit represented a fractional claim on gold stored in a secure vault. The product, later rebranded under the ETF Securities umbrella, proved enormously successful and spawned equivalents in London, New York, and across Europe.</p>
+
+<p>ETF Securities Australia went on to launch silver, platinum, palladium, and other commodity products using the same physical-backing model. GOLD (Global X Physical Gold) and ETPMAG (Global X Physical Silver) are direct descendants of those original products, and GOLD at $6.8 billion is Australia's fourth-largest ETF.</p>
+
+<p>In <strong>2021</strong>, Mirae Asset — a South Korean asset management giant — acquired ETF Securities' Australian and European operations, rebranding them under the <strong>Global X</strong> name. Global X had been a US ETF provider that Mirae had separately acquired in 2018. The combination created a significant global thematic ETF network, with the Australian arm gaining access to Global X's established US product shelf.</p>
+
+<h2>Size and market position</h2>
+<p>Global X is <strong>#4 in Australia by FUM</strong> at $17.3B across 49 ETFs. Its product range is distinctly different from the top three — it is the clear leader in physical commodity products and has a strong thematic range. Its average fee of 0.47% reflects this premium-product orientation.</p>
+
+<h2>Key products</h2>
+<table>
+  <thead><tr><th>ETF</th><th>Name</th><th>FUM</th><th>Fee</th><th>1Y Return</th></tr></thead>
+  <tbody>
+    <tr><td>GOLD</td><td>Physical Gold Structured Product</td><td>$6.8B</td><td>0.40%</td><td>+64.7%</td></tr>
+    <tr><td>ETPMAG</td><td>Physical Silver Structured Product</td><td>$2.4B</td><td>0.49%</td><td>+212.6%</td></tr>
+    <tr><td>FANG</td><td>FANG+ ETF</td><td>$1.3B</td><td>0.35%</td><td>+0.6%</td></tr>
+    <tr><td>GXLD</td><td>Gold Bullion ETF (trust structure)</td><td>$650M</td><td>0.15%</td><td>+65.3%</td></tr>
+    <tr><td>ACDC</td><td>Battery Tech &amp; Lithium ETF</td><td>$687M</td><td>0.69%</td><td>+64.0%</td></tr>
+    <tr><td>WIRE</td><td>Copper Miners ETF</td><td>$672M</td><td>0.65%</td><td>+109.8%</td></tr>
+    <tr><td>USTB</td><td>US Treasury Bond (Currency Hedged)</td><td>$608M</td><td>0.19%</td><td>+5.0%</td></tr>
+    <tr><td>SEMI</td><td>Semiconductor ETF</td><td>$535M</td><td>0.45%</td><td>+59.2%</td></tr>
+  </tbody>
+</table>
+
+<h2>Physical commodities: the heritage business</h2>
+<p>GOLD and ETPMAG are the crown jewels of the Australian operation. Physical gold ETPs differ structurally from equity ETFs: each unit is backed by a fractional entitlement to physical gold held in HSBC's London vaults. Investors effectively own gold without needing to arrange storage and insurance themselves.</p>
+
+<p>GOLD's $6.8B in assets makes it both the largest gold product and the largest non-equity ETF in Australia. Over the past year it returned <strong>+64.7%</strong>, driven by a strong gold price. ETPMAG's +212.6% return made it the best-performing ETF of any type in Australia over that period. A second gold product, GXLD, offers the same physical gold exposure at a lower fee (0.15%) through a different trust structure.</p>
+
+<h2>Thematic range</h2>
+<p>Following the 2021 rebrand, Global X significantly expanded its thematic offering, importing products from the US shelf. FANG+ tracks the ten most-traded non-financial large-cap US tech and consumer companies (including Meta, Apple, Nvidia, Tesla). SEMI tracks semiconductor companies. WIRE tracks copper miners. ACDC tracks battery technology and lithium companies.</p>
+
+<p>This thematic range positions Global X as the natural destination for investors seeking exposure to specific trends in the energy transition, technology, or commodities, rather than broad market index products.</p>
+""",
+    },
+
+    {
+        "slug": "issuer-profile-spdr-state-street",
+        "title": "Issuer Profile: SPDR / State Street",
+        "subtitle": "State Street created the world's first ETF in 1993 and listed the first ETF in Australia in 2001. Its combined SPDR and StateStreet range now manages $11.4 billion across 17 products.",
+        "date": "2026-03-17",
+        "category": "Issuer Profile",
+        "summary": "State Street Global Advisors created SPY — the world's first ETF — in 1993 and STW, Australia's first ETF, in 2001. Today it runs 17 ETFs managing $11.4 billion, including the iconic STW and a growing ESG-focused range.",
+        "body": """
+<p>State Street Global Advisors (SSGA) occupies a unique place in ETF history. It launched <strong>SPY</strong> — the SPDR S&P 500 ETF — on the American Stock Exchange on 22 January 1993, making it the world's first modern ETF. SPY remains the most traded security in the world by dollar volume. In Australia, SSGA was equally first: <strong>STW</strong> (SPDR S&P/ASX 200) listed on the ASX in <strong>August 2001</strong>, making it Australia's first ETF.</p>
+
+<h2>Background</h2>
+<p>State Street Corporation was founded in 1792 in Boston, making it one of the oldest financial institutions in the United States. Its asset management arm, State Street Global Advisors, is the third-largest asset manager globally with over $4 trillion under management. SSGA was a pioneer in quantitative and index investing from the 1970s onward.</p>
+
+<p>The creation of SPY in 1993 was a collaboration between SSGA, the American Stock Exchange, and the Options Clearing Corporation. The product was designed to make it easier for institutional investors to take broad market exposure quickly — few anticipated that retail investors would ultimately become the dominant user base. SPY now manages over $600 billion in the US alone.</p>
+
+<p>In Australia, STW's early-mover advantage was substantial but not permanent. As Vanguard, iShares, and BetaShares entered the market with lower fees and broader product ranges, STW's dominance eroded. It remains a significant product at $6.25B but now faces intense competition in its core ASX 200 market from IOZ (0.05%), A200 (0.04%), and E200 (0.05%).</p>
+
+<h2>The two brands: SPDR and StateStreet</h2>
+<p>Confusingly, SSGA operates two ETF brands in Australia. <strong>SPDR</strong> (pronounced "spider") is the consumer-facing brand for its main products. <strong>StateStreet</strong> is used for a separate range of products targeted at institutional and ESG-focused investors. Both are legally managed by State Street Global Advisors Trust Company.</p>
+
+<h2>Key products</h2>
+<table>
+  <thead><tr><th>ETF</th><th>Name</th><th>FUM</th><th>Fee</th><th>1Y Return</th></tr></thead>
+  <tbody>
+    <tr><td>STW</td><td>SPDR S&amp;P/ASX 200 ETF</td><td>$6.3B</td><td>0.05%</td><td>+7.3%</td></tr>
+    <tr><td>WXOZ</td><td>SPDR S&amp;P World ex Australia Carbon Aware</td><td>$620M</td><td>0.07%</td><td>+4.8%</td></tr>
+    <tr><td>SYI</td><td>SPDR MSCI Australia Select High Dividend Yield</td><td>$611M</td><td>0.35%</td><td>+11.0%</td></tr>
+    <tr><td>SFY</td><td>SPDR S&amp;P/ASX 50 ETF</td><td>$726M</td><td>0.20%</td><td>+4.4%</td></tr>
+    <tr><td>DJRE</td><td>SPDR Dow Jones Global Real Estate ESG</td><td>$508M</td><td>0.50%</td><td>-2.7%</td></tr>
+    <tr><td>SPY</td><td>SPDR S&amp;P 500 ETF (AU-listed)</td><td>$371M</td><td>0.09%</td><td>+2.3%</td></tr>
+    <tr><td>QMIX</td><td>SPDR MSCI World Quality Mix</td><td>$372M</td><td>0.35%</td><td>+6.5%</td></tr>
+    <tr><td>E200</td><td>SPDR S&amp;P/ASX 200 ESG ETF</td><td>$273M</td><td>0.13%</td><td>+6.6%</td></tr>
+  </tbody>
+</table>
+
+<h2>ESG focus as a differentiator</h2>
+<p>SSGA has invested heavily in ESG as a product differentiator. Several of its newer products — WXOZ (carbon-aware world ex Australia), E200 (ASX 200 ESG) — incorporate climate and sustainability screens. SSGA's parent company has also been prominent in shareholder engagement on environmental issues, including the Fearless Girl campaign and its proxy voting framework through its asset stewardship team.</p>
+
+<h2>STW vs the competition</h2>
+<p>STW was Australia's only ETF for several years after its 2001 launch. Today it faces at least four direct competitors in the ASX 200 space alone. At 0.05%, it is priced competitively with IOZ (iShares, 0.05%) but above A200 (BetaShares, 0.04%) and E200 (its own ESG product at 0.13%). STW's $6.3B reflects its historical head start more than any current product superiority.</p>
+
+<p>SSGA's global reputation and institutional relationships keep it relevant in the Australian market despite its narrower product range compared to BetaShares or iShares. For many institutional allocators, the SPDR brand carries a trust premium that newer entrants have not yet earned.</p>
+""",
+    },
+
+    {
+        "slug": "issuer-profile-dimensional",
+        "title": "Issuer Profile: Dimensional (DFA)",
+        "subtitle": "The academic factor investing pioneer launched its first Australian ETFs in late 2023 and immediately attracted $18 billion. Why Dimensional's approach is unlike anything else in the market.",
+        "date": "2026-03-17",
+        "category": "Issuer Profile",
+        "summary": "Dimensional Fund Advisors brought its evidence-based, factor-tilted approach to the Australian ETF market in November 2023. Within 18 months it had accumulated $18 billion across 6 ETFs — one of the fastest institutional-to-retail launches in market history.",
+        "body": """
+<p>Dimensional Fund Advisors (DFA) is unlike any other ETF provider in the Australian market. Its products are active ETFs — a manager is making decisions — but the approach is systematic and evidence-based, drawing on decades of academic research rather than individual stock selection. The result sits between passive index funds and traditional active management in both philosophy and cost.</p>
+
+<h2>Background</h2>
+<p>DFA was founded in <strong>1981</strong> in Santa Monica, California, by David Booth and Rex Sinquefield. The founding insight came from academic research: <strong>Eugene Fama</strong> and <strong>Kenneth French</strong>, whose three-factor model (market, size, and value) identified systematic return premiums that could be captured by investing deliberately in small-cap and value stocks.</p>
+
+<p>DFA built its entire business around these academic insights. Rather than trying to pick individual outperforming stocks, it tilts portfolios systematically toward stocks with characteristics historically associated with higher expected returns — small size, low price relative to book value (value), and high profitability. The portfolio construction is rules-based but not mechanical; DFA maintains some flexibility in implementation (e.g. patient trading to reduce market impact) that distinguishes it from pure passive index funds.</p>
+
+<p>For decades, DFA was famously <strong>exclusive</strong>: its funds were only accessible through a narrow network of approved financial advisers who had completed DFA's training programme. This adviser-only distribution built institutional credibility and a loyal client base, but limited retail access. The launch of ETFs in the US (2020) and Australia (2023) represented a fundamental shift — DFA products were now available to any investor with a brokerage account.</p>
+
+<h2>The Australian launch</h2>
+<p>DFA listed its first six Australian ETFs in <strong>November 2023</strong> and <strong>August 2024</strong>. The early FUM figures were extraordinary: within months, DACE had accumulated several billion dollars. This reflected a large pool of existing DFA investors who had held unlisted managed fund versions of the same strategies and <strong>converted</strong> their holdings into the ETF wrappers. But there was also genuine new investment from self-directed investors who had known of DFA's reputation but previously couldn't access its products.</p>
+
+<h2>Key products</h2>
+<table>
+  <thead><tr><th>ETF</th><th>Name</th><th>FUM</th><th>Fee</th><th>1Y Return</th></tr></thead>
+  <tbody>
+    <tr><td>DACE</td><td>Dimensional Australian Core Equity Trust</td><td>$6.3B</td><td>0.28%</td><td>+14.1%</td></tr>
+    <tr><td>DGCE</td><td>Dimensional Global Core Equity (Unhedged)</td><td>$4.8B</td><td>0.36%</td><td>+6.7%</td></tr>
+    <tr><td>DFGH</td><td>Dimensional Global Core Equity (Hedged)</td><td>$3.8B</td><td>0.36%</td><td>+16.2%</td></tr>
+    <tr><td>DAVA</td><td>Dimensional Australian Value Trust</td><td>$1.4B</td><td>0.34%</td><td>+20.7%</td></tr>
+    <tr><td>DGVA</td><td>Dimensional Global Value Trust</td><td>$1.1B</td><td>0.45%</td><td>+11.8%</td></tr>
+    <tr><td>DGSM</td><td>Dimensional Global Small Company Trust</td><td>$636M</td><td>0.65%</td><td>+4.6%</td></tr>
+  </tbody>
+</table>
+
+<h2>How the approach works</h2>
+<p>DFA's funds are classified as <em>active ETFs</em> because a portfolio manager makes discretionary implementation decisions. But the strategy itself is systematic: the funds tilt toward stocks with higher expected returns based on three criteria:</p>
+<ul>
+  <li><strong>Size</strong>: Overweight smaller companies relative to a market-cap-weighted index</li>
+  <li><strong>Value</strong>: Overweight stocks with low price-to-book ratios</li>
+  <li><strong>Profitability</strong>: Overweight stocks with high operating profitability</li>
+</ul>
+
+<p>DFA's DACE (Australian Core Equity) returned <strong>+14.1%</strong> over the past year, significantly outperforming VAS (+7.6%) and A200 (+7.2%). The value and profitability tilts have favoured Australian financials and resources, which performed strongly. Whether this advantage persists through a full market cycle is the central question for potential investors.</p>
+
+<h2>Fee positioning</h2>
+<p>At 0.28–0.65%, DFA's fees are higher than plain index ETFs but lower than most active managers. DACE at 0.28% — cheaper than VGS (0.18%) is comparably priced and much cheaper than most active Australian equity funds. This positions DFA as a "better index" rather than competing directly with high-conviction active managers charging 0.80%+.</p>
+
+<p>DFA's rapid accumulation of $18 billion since late 2023 suggests strong demand for its middle-ground positioning — more rigorous than market-cap indexing, more systematic and cheaper than traditional active management.</p>
+""",
+    },
+
+    {
+        "slug": "issuer-profile-magellan",
+        "title": "Issuer Profile: Magellan",
+        "subtitle": "Australia's most famous active manager had the sharpest rise and the most dramatic fall in recent ETF history. What happened to Magellan, and where does it stand today?",
+        "date": "2026-03-17",
+        "category": "Issuer Profile",
+        "summary": "Magellan Financial Group went from managing $100 billion to less than $40 billion in under two years. Its ETFs have been caught in the fallout. We profile the rise, the collapse, and the cautious recovery.",
+        "body": """
+<p>No story in Australian asset management has been more dramatic in recent years than Magellan Financial Group. Founded in 2006, it became Australia's most celebrated active manager by delivering exceptional risk-adjusted returns through the 2010s. Then, beginning in late 2021, it unravelled in ways that few had anticipated — producing important lessons for ETF investors about manager risk.</p>
+
+<h2>The rise</h2>
+<p>Magellan was co-founded in 2006 by <strong>Hamish Douglass</strong> and <strong>Chris Mackay</strong>. Douglass, the more prominent face, built a reputation as a deep-thinking global equity investor with a particular focus on quality businesses with durable competitive advantages — consumer franchises, payment networks, and US technology companies with genuine moats.</p>
+
+<p>The strategy worked spectacularly through the 2010s. Magellan's global equity strategies delivered strong risk-adjusted returns with lower volatility than the index, making them attractive to both retail investors and institutional clients (superannuation funds). FUM grew from a standing start to over <strong>$100 billion</strong> by 2021, making Magellan one of the largest active managers in Australia by a significant margin.</p>
+
+<p>The <strong>MGOC</strong> ETF (Magellan Global Fund Open Class) listed in 2015 and grew to over $14 billion at its peak — at the time the largest active ETF in the world. Magellan's stock price, listed on the ASX itself, became a bellwether for the company's success.</p>
+
+<h2>The collapse</h2>
+<p>The decline began in late 2021. Magellan's global equity portfolio, with significant weights in Chinese technology companies and defensively-positioned global franchises, underperformed severely as global growth stocks sold off and Chinese regulatory action hit the sector. Returns trailed the index substantially — the inverse of what the fund's marketing had promised for a decade.</p>
+
+<p>Investors withdrew funds rapidly. Then, in early 2022, a series of personal and governance shocks made matters worse: Douglass took a medical leave, then resigned; the company's lead institutional client terminated its mandate; and the Magellan-backed FutureFund mandate was also not renewed. FUM fell from $100B+ to under $40B in under two years.</p>
+
+<h2>Where things stand today</h2>
+<p>By March 2026, Magellan manages <strong>$7.6 billion</strong> across 6 ETFs. That is a fraction of its peak but still represents a substantial active manager. The firm has undergone significant leadership change and has shifted its positioning toward infrastructure (MICH and MCSI) — where its track record is stronger — while the global equity strategies slowly rebuild credibility under new portfolio management.</p>
+
+<h2>Key products</h2>
+<table>
+  <thead><tr><th>ETF</th><th>Name</th><th>FUM</th><th>Fee</th><th>1Y Return</th></tr></thead>
+  <tbody>
+    <tr><td>MGOC</td><td>Magellan Global Fund (Open Class)</td><td>$5.2B</td><td>1.35%</td><td>-5.1%</td></tr>
+    <tr><td>AASF</td><td>Airlie Australian Share Fund</td><td>$937M</td><td>0.78%</td><td>-0.04%</td></tr>
+    <tr><td>MICH</td><td>Magellan Infrastructure Fund (Hedged)</td><td>$539M</td><td>1.06%</td><td>+16.2%</td></tr>
+    <tr><td>MCSI</td><td>Magellan Core Infrastructure Fund</td><td>$510M</td><td>0.50%</td><td>+18.4%</td></tr>
+    <tr><td>OPPT</td><td>Magellan Global Opportunities Fund</td><td>$311M</td><td>0.75%</td><td>-6.9%</td></tr>
+    <tr><td>MHG</td><td>Magellan Global Equity Fund (Hedged)</td><td>$97M</td><td>1.35%</td><td>+3.0%</td></tr>
+  </tbody>
+</table>
+
+<h2>Airlie: the Australian equity bright spot</h2>
+<p>Magellan acquired <strong>Airlie Funds Management</strong> in 2018, and Airlie has been the more stable part of the business. Airlie manages AASF (Australian Share Fund), a concentrated active Australian equity ETF charging 0.78%. While returns have been modest (-0.04% over 1 year), the team — led by Matt Williams — has maintained a consistent process and avoided the strategic confusion that affected Magellan's global equity products.</p>
+
+<h2>The lesson for ETF investors</h2>
+<p>Magellan's trajectory illustrates a risk specific to active ETFs: <em>manager risk</em>. Unlike an index ETF where the methodology is locked down by rules, an active ETF's returns depend on the continued skill and stability of the investment team. When a star manager departs, strategy drifts, or a process breaks down, the ETF's performance can deteriorate rapidly — and because active ETFs are marketed on the strength of past performance, investors may be slow to recognise that the product they bought no longer exists in any meaningful sense.</p>
+
+<p>This is not an argument against all active management. But it does argue for investing in active ETFs based on the robustness of the process, not the track record of a single individual.</p>
+""",
+    },
+
+    {
         "slug": "what-is-an-etf",
         "title": "What Is an ETF?",
         "subtitle": "Exchange traded funds combine the diversification of a managed fund with the simplicity of buying a single share. Here is how they work.",
