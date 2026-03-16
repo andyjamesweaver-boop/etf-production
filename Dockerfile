@@ -14,7 +14,6 @@ COPY scrapers/ ./scrapers/
 COPY migrations/ ./migrations/
 RUN mkdir -p /app/logs /data
 
-COPY etf_data.db /app/etf_data.db.seed
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 

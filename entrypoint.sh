@@ -3,21 +3,26 @@ set -e
 
 DB_PATH="${DATABASE_PATH:-/data/etf_data.db}"
 
-# Seed the database from the image copy if the volume is empty
+# Initialise schema if no database exists yet
 if [ ! -f "$DB_PATH" ]; then
-    echo "No database found at $DB_PATH — seeding from image copy..."
-    cp /app/etf_data.db.seed "$DB_PATH"
-    echo "Seed complete."
-fi
-
-# Run any pending migrations
-python3 -c "
-import sys, os
+    echo "No database found at $DB_PATH — initialising empty schema..."
+    python3 -c "
+import sys
+sys.path.insert(0, '/app')
+from setup_db import setup_database
+setup_database('$DB_PATH')
+print('Schema initialised.')
+"
+else
+    # Run any pending migrations on existing DB
+    python3 -c "
+import sys
 sys.path.insert(0, '/app')
 from setup_db import setup_database
 setup_database('$DB_PATH')
 print('Migrations complete.')
 "
+fi
 
 echo "Starting ETF dashboard server on port ${PORT:-8080}..."
 exec python3 /app/etf_server_with_dashboard.py
