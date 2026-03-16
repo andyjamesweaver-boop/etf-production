@@ -43,7 +43,7 @@ if os.path.isdir(mig_dir):
             print(f'  Applying migration: {name}')
             import importlib.util
             spec = importlib.util.spec_from_file_location(name, os.path.join(mig_dir, fname))
-            mod = importlib.util.load_from_spec(spec)
+            mod = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(mod)
             mod.up(conn)
             conn.execute('INSERT INTO schema_migrations (name) VALUES (?)', (name,))
