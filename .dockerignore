@@ -1,0 +1,24 @@
+# Never bake the live database into the image (use the seed copy below)
+etf_data.db-shm
+etf_data.db-wal
+
+# Local development artifacts
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.env
+
+# Logs and scratch
+logs/
+data/
+*.log
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/

@@ -7,10 +7,16 @@ RUN apt-get update && apt-get install -y curl gcc sqlite3 && rm -rf /var/lib/apt
 
 WORKDIR /app
 COPY requirements.txt .
-RUN pip install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY *.py ./
-RUN mkdir -p data logs
+COPY scrapers/ ./scrapers/
+COPY migrations/ ./migrations/
+RUN mkdir -p /app/logs /data
+
+COPY etf_data.db /app/etf_data.db.seed
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 EXPOSE 8080
-CMD ["uvicorn", "phase1_production_api:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["/app/entrypoint.sh"]

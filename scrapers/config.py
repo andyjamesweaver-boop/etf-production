@@ -6,7 +6,7 @@ import os
 
 # ---------- Paths ----------
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_PATH = os.path.join(PROJECT_DIR, 'etf_data.db')
+DB_PATH = os.environ.get('DATABASE_PATH', os.path.join(PROJECT_DIR, 'etf_data.db'))
 DATA_DIR = os.path.join(PROJECT_DIR, 'data')
 
 # ---------- Rate limiting (seconds between requests per domain) ----------

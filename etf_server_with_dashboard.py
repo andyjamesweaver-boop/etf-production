@@ -17,7 +17,8 @@ import os
 import sys
 import re
 
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'etf_data.db')
+DB_PATH = os.environ.get('DATABASE_PATH',
+          os.path.join(os.path.dirname(os.path.abspath(__file__)), 'etf_data.db'))
 
 
 def get_db():
@@ -66,6 +67,7 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
             '/insights/expense':  lambda: self.handle_insights_page('expense'),
             '/insights/issuers':  lambda: self.handle_insights_page('issuers'),
             '/insights/nav':      lambda: self.handle_insights_page('nav'),
+            '/admin/sync-db':     self.handle_sync_db,
         }
 
         handler = routes.get(path)
@@ -97,6 +99,13 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
             return
 
         self.send_json({'error': 'Not found'}, 404)
+
+    def do_POST(self):
+        parsed = urllib.parse.urlparse(self.path)
+        if parsed.path.rstrip('/') == '/admin/sync-db':
+            self.handle_sync_db()
+        else:
+            self.send_json({'error': 'Not found'}, 404)
 
     # ------------------------------------------------------------------ helpers
     def send_json(self, data, status=200):
@@ -1258,6 +1267,49 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
             self.send_json({'error': str(e)}, 500)
         finally:
             conn.close()
+
+    # ================================================================== DB SYNC
+    def handle_sync_db(self):
+        """
+        POST /admin/sync-db
+        Accepts a gzipped SQLite database upload and atomically replaces the
+        live database. Protected by SYNC_TOKEN env var.
+        """
+        import gzip, tempfile, shutil
+        from scrapers.config import DB_PATH
+
+        expected = os.getenv('SYNC_TOKEN', '')
+        if not expected:
+            self.send_json({'error': 'SYNC_TOKEN not configured on server'}, 500)
+            return
+
+        auth = self.headers.get('Authorization', '')
+        if auth != f'Bearer {expected}':
+            self.send_json({'error': 'Unauthorized'}, 401)
+            return
+
+        length = int(self.headers.get('Content-Length', 0))
+        if length == 0:
+            self.send_json({'error': 'Empty body'}, 400)
+            return
+
+        try:
+            compressed = self.rfile.read(length)
+            data = gzip.decompress(compressed)
+
+            # Write to a temp file first, then atomically replace
+            db_dir = os.path.dirname(DB_PATH)
+            os.makedirs(db_dir, exist_ok=True)
+            with tempfile.NamedTemporaryFile(dir=db_dir, delete=False, suffix='.tmp') as f:
+                f.write(data)
+                tmp_path = f.name
+
+            shutil.move(tmp_path, DB_PATH)
+
+            size_mb = len(data) / 1_048_576
+            self.send_json({'ok': True, 'size_mb': round(size_mb, 2), 'path': DB_PATH})
+        except Exception as e:
+            self.send_json({'error': str(e)}, 500)
 
     # ================================================================== DASHBOARD
     def handle_dashboard(self):
@@ -3914,7 +3966,7 @@ document.addEventListener('keydown', e => {
 # ===================================================================== main
 def run_server(port=None):
     if port is None:
-        port = int(os.getenv('ETF_PORT', '8081'))
+        port = int(os.getenv('PORT') or os.getenv('ETF_PORT', '8081'))
 
     socketserver.TCPServer.allow_reuse_address = True
     with socketserver.TCPServer(("", port), ETFAPIHandler) as httpd:
