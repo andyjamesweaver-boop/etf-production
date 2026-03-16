@@ -1278,17 +1278,24 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
         import gzip, tempfile, shutil
         from scrapers.config import DB_PATH
 
+        length = int(self.headers.get('Content-Length', 0))
+
         expected = os.getenv('SYNC_TOKEN', '')
+        auth = self.headers.get('Authorization', '')
+
+        # Always drain the request body before sending any error response —
+        # closing the connection mid-upload causes Varnish to return 503.
+        if length > 0 and (not expected or auth != f'Bearer {expected}'):
+            self.rfile.read(length)
+
         if not expected:
             self.send_json({'error': 'SYNC_TOKEN not configured on server'}, 500)
             return
 
-        auth = self.headers.get('Authorization', '')
         if auth != f'Bearer {expected}':
             self.send_json({'error': 'Unauthorized'}, 401)
             return
 
-        length = int(self.headers.get('Content-Length', 0))
         if length == 0:
             self.send_json({'error': 'Empty body'}, 400)
             return
