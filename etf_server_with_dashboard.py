@@ -68,11 +68,19 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
             '/insights/issuers':  lambda: self.handle_insights_page('issuers'),
             '/insights/nav':      lambda: self.handle_insights_page('nav'),
             '/admin/sync-db':     self.handle_sync_db,
+            # Articles
+            '/articles':          self.handle_articles_list,
         }
 
         handler = routes.get(path)
         if handler:
             handler()
+            return
+
+        # Articles detail: /articles/{slug}
+        m = re.match(r'^/articles/([a-z0-9\-]+)$', path)
+        if m:
+            self.handle_article_detail(m.group(1))
             return
 
         # Parameterised routes: /api/v1/etfs/{code}[/sub]
@@ -1528,6 +1536,10 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
       <button class="main-tab" data-view="compare">Compare</button>
       <button class="main-tab" data-view="holdings">Holdings Search</button>
       <button class="main-tab" data-view="analytics">Analytics</button>
+      <a href="/articles" class="main-tab flex items-center gap-1" style="text-decoration:none">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        Articles
+      </a>
     </div>
   </div>
 
@@ -4010,6 +4022,125 @@ document.addEventListener('keydown', e => {
 </script>
 </body>
 </html>'''
+
+
+# ===================================================================== articles
+
+def _articles_head(title):
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{title} — Australian ETF Market</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body {{ font-family: Inter, system-ui, -apple-system, sans-serif; background: #f8fafc; color: #1e293b; }}
+  article h2 {{ font-size: 1.15rem; font-weight: 700; margin: 1.5rem 0 .6rem; color: #1e293b; }}
+  article p  {{ margin-bottom: 1rem; line-height: 1.7; font-size: .9rem; color: #374151; }}
+  article table {{ width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: .82rem; }}
+  article th {{ text-align: left; padding: .4rem .7rem; background: #f1f5f9; border-bottom: 1px solid #e2e8f0;
+                font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #64748b; }}
+  article td {{ padding: .4rem .7rem; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }}
+  article tr:last-child td {{ border-bottom: none; }}
+  article tr:hover td {{ background: #f8fafc; }}
+  .pos {{ color: #16a34a; font-weight: 600; }}
+  .neg {{ color: #dc2626; font-weight: 600; }}
+</style>
+</head>"""
+
+
+def _articles_nav(active_slug=None):
+    return """
+<header class="bg-gradient-to-r from-blue-900 to-blue-700 shadow-xl">
+  <div class="max-w-4xl mx-auto px-5 py-3 flex items-center gap-4">
+    <a href="/dashboard" class="text-white/70 hover:text-white text-sm flex items-center gap-1.5">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      Dashboard
+    </a>
+    <span class="text-white/30">|</span>
+    <a href="/articles" class="text-white font-semibold text-sm">Articles</a>
+  </div>
+</header>"""
+
+
+def _handle_articles_list(self):
+    from articles import get_all_articles
+    articles = get_all_articles()
+
+    cards = ''
+    category_colors = {
+        'Performance': ('bg-green-100', 'text-green-800'),
+        'Market Trends': ('bg-blue-100', 'text-blue-800'),
+        'Thematic': ('bg-purple-100', 'text-purple-800'),
+        'Research': ('bg-amber-100', 'text-amber-800'),
+    }
+    for a in articles:
+        bg, fg = category_colors.get(a['category'], ('bg-gray-100', 'text-gray-800'))
+        cards += f"""
+    <a href="/articles/{a['slug']}" class="block bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow p-5">
+      <span class="inline-block {bg} {fg} text-xs font-semibold px-2 py-0.5 rounded mb-2">{a['category']}</span>
+      <h2 class="text-base font-bold text-gray-900 leading-snug mb-1">{a['title']}</h2>
+      <p class="text-sm text-gray-500 line-clamp-2">{a['subtitle']}</p>
+      <p class="text-xs text-gray-400 mt-3">{a['date']}</p>
+    </a>"""
+
+    html = _articles_head('Market Articles') + _articles_nav() + f"""
+<body class="bg-slate-100 min-h-screen">
+<main class="max-w-4xl mx-auto px-5 py-8">
+  <h1 class="text-2xl font-bold text-gray-900 mb-1">Market Articles</h1>
+  <p class="text-sm text-gray-500 mb-6">Analysis and commentary on the Australian ETF market.</p>
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    {cards}
+  </div>
+</main>
+</body>
+</html>"""
+    self.send_html(html)
+
+
+def _handle_article_detail(self, slug):
+    from articles import get_article
+    a = get_article(slug)
+    if not a:
+        self.send_json({'error': 'Article not found'}, 404)
+        return
+
+    category_colors = {
+        'Performance': ('bg-green-100', 'text-green-800'),
+        'Market Trends': ('bg-blue-100', 'text-blue-800'),
+        'Thematic': ('bg-purple-100', 'text-purple-800'),
+        'Research': ('bg-amber-100', 'text-amber-800'),
+    }
+    bg, fg = category_colors.get(a['category'], ('bg-gray-100', 'text-gray-800'))
+
+    html = _articles_head(a['title']) + _articles_nav(slug) + f"""
+<body class="bg-slate-100 min-h-screen">
+<main class="max-w-4xl mx-auto px-5 py-8">
+  <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-7">
+    <span class="inline-block {bg} {fg} text-xs font-semibold px-2 py-0.5 rounded mb-3">{a['category']}</span>
+    <h1 class="text-2xl font-bold text-gray-900 leading-tight mb-2">{a['title']}</h1>
+    <p class="text-gray-500 text-sm mb-1">{a['subtitle']}</p>
+    <p class="text-xs text-gray-400 mb-6">{a['date']}</p>
+    <article class="prose max-w-none">
+      {a['body']}
+    </article>
+  </div>
+  <div class="mt-5">
+    <a href="/articles" class="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      Back to all articles
+    </a>
+  </div>
+</main>
+</body>
+</html>"""
+    self.send_html(html)
+
+
+# Attach to the real handler class (defined earlier in the file)
+ETFAPIHandler.handle_articles_list = _handle_articles_list
+ETFAPIHandler.handle_article_detail = _handle_article_detail
 
 
 # ===================================================================== main
