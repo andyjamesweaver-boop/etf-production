@@ -4349,8 +4349,7 @@ def _handle_articles_list(self):
     from articles import get_all_articles
     articles = get_all_articles()
 
-    cards = ''
-    category_colors = {
+    CAT_COLORS = {
         'Performance':    ('bg-green-100',  'text-green-800'),
         'Market Trends':  ('bg-blue-100',   'text-blue-800'),
         'Thematic':       ('bg-purple-100', 'text-purple-800'),
@@ -4358,24 +4357,64 @@ def _handle_articles_list(self):
         'Education':      ('bg-teal-100',   'text-teal-800'),
         'Issuer Profile': ('bg-orange-100', 'text-orange-800'),
     }
-    for a in articles:
-        bg, fg = category_colors.get(a['category'], ('bg-gray-100', 'text-gray-800'))
-        cards += f"""
-    <a href="/articles/{a['slug']}" class="block bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow p-5">
+
+    NEWS_CATS    = {'Performance', 'Market Trends', 'Thematic', 'Research'}
+    BASICS_CATS  = {'Education'}
+    ISSUER_CATS  = {'Issuer Profile'}
+
+    BASICS_ORDER = [
+        'what-is-an-etf', 'what-is-an-index', 'etf-costs-explained',
+        'passive-vs-active-etfs', 'what-is-active-management',
+        'what-is-a-market-maker', 'building-a-portfolio-with-etfs',
+    ]
+
+    news_arts   = [a for a in articles if a['category'] in NEWS_CATS]
+    basics_arts = sorted(
+        [a for a in articles if a['category'] in BASICS_CATS],
+        key=lambda a: BASICS_ORDER.index(a['slug']) if a['slug'] in BASICS_ORDER else 99
+    )
+    issuer_arts = [a for a in articles if a['category'] in ISSUER_CATS]
+
+    def card(a, wide=False):
+        bg, fg = CAT_COLORS.get(a['category'], ('bg-gray-100', 'text-gray-800'))
+        cols = 'sm:col-span-2' if wide else ''
+        return f"""
+    <a href="/articles/{a['slug']}" class="block {cols} bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow p-5">
       <span class="inline-block {bg} {fg} text-xs font-semibold px-2 py-0.5 rounded mb-2">{a['category']}</span>
       <h2 class="text-base font-bold text-gray-900 leading-snug mb-1">{a['title']}</h2>
       <p class="text-sm text-gray-500 line-clamp-2">{a['subtitle']}</p>
       <p class="text-xs text-gray-400 mt-3">{a['date']}</p>
     </a>"""
 
-    html = _articles_head('Market Articles') + _articles_nav() + f"""
+    def section(heading, subheading, arts, cols=2, wide_first=False):
+        if not arts:
+            return ''
+        grid_cols = f'grid-cols-1 sm:grid-cols-{cols}'
+        cards_html = ''.join(card(a, wide=(i == 0 and wide_first and cols == 2)) for i, a in enumerate(arts))
+        return f"""
+  <section class="mb-10">
+    <div class="mb-4">
+      <h2 class="text-lg font-bold text-gray-900">{heading}</h2>
+      <p class="text-sm text-gray-500 mt-0.5">{subheading}</p>
+    </div>
+    <div class="grid {grid_cols} gap-4">{cards_html}</div>
+  </section>"""
+
+    news_html   = section('Latest Analysis', 'Market data, performance and thematic coverage.',
+                           news_arts, cols=2, wide_first=True)
+    basics_html = section('Learn the Basics', 'Everything you need to know about how ETFs work.',
+                           basics_arts, cols=3)
+    issuer_html = section('Issuer Profiles', 'Background, size and product range for each major ETF provider.',
+                           issuer_arts, cols=2)
+
+    html = _articles_head('Articles') + _articles_nav() + f"""
 <body class="bg-slate-100 min-h-screen">
-<main class="max-w-4xl mx-auto px-5 py-8">
-  <h1 class="text-2xl font-bold text-gray-900 mb-1">Market Articles</h1>
-  <p class="text-sm text-gray-500 mb-6">Analysis and commentary on the Australian ETF market.</p>
-  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-    {cards}
-  </div>
+<main class="max-w-5xl mx-auto px-5 py-8">
+  <h1 class="text-2xl font-bold text-gray-900 mb-1">Articles</h1>
+  <p class="text-sm text-gray-500 mb-8">Analysis, education and issuer profiles for the Australian ETF market.</p>
+  {news_html}
+  {basics_html}
+  {issuer_html}
 </main>
 </body>
 </html>"""

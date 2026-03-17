@@ -4,6 +4,143 @@ Each article is a dict with: slug, title, subtitle, date, category, summary, bod
 """
 
 ARTICLES = [
+
+    {
+        "slug": "etf-fund-flows-march-2026",
+        "title": "Where the Money Went: $5.2 Billion in ETF Inflows",
+        "subtitle": "Australian investors poured a record $5.2 billion into ETFs last month. International equities led, fixed income surged, and Magellan kept bleeding.",
+        "date": "2026-03-17",
+        "category": "Market Trends",
+        "summary": "The latest monthly fund flow data shows $5.2 billion in net ETF inflows across 466 funds. We break down where capital is flowing — and where it is leaving.",
+        "body": """
+<p>Australian investors added a net <strong>$5.24 billion</strong> to ETFs last month, spread across 466 funds. It is one of the strongest monthly flow figures on record, and the breakdown tells a clear story about where investor conviction currently sits.</p>
+
+<h2>International equities dominate</h2>
+<p>The single largest category by inflows was <strong>international equities</strong> at $2.38 billion — nearly half of all net flows. VGS led all individual ETFs with <strong>$328 million</strong> in inflows, its strongest month in recent memory, followed closely by VAS ($316M) and A200 ($218M). iShares IVV (S&P 500) attracted $136 million.</p>
+
+<p>The preference for internationally-diversified index ETFs is consistent with the theme that has driven ETF market growth for several years: retail investors and self-managed super funds systematically rebalancing away from concentrated domestic exposure toward global diversification. The continued narrowing of fees — IVV at 0.04%, BGBL at 0.08% — makes this an increasingly cheap decision.</p>
+
+<table>
+  <thead><tr><th>ETF</th><th>Name</th><th>Category</th><th>Monthly Inflow</th><th>Total FUM</th></tr></thead>
+  <tbody>
+    <tr><td>VGS</td><td>Vanguard MSCI International Shares</td><td>Int'l Equities</td><td class="pos">+$328M</td><td>$14.0B</td></tr>
+    <tr><td>VAS</td><td>Vanguard Australian Shares</td><td>Aus Equities</td><td class="pos">+$316M</td><td>$22.7B</td></tr>
+    <tr><td>A200</td><td>BetaShares Australia 200</td><td>Aus Equities</td><td class="pos">+$218M</td><td>$9.2B</td></tr>
+    <tr><td>BGBL</td><td>BetaShares Global Shares</td><td>Int'l Equities</td><td class="pos">+$187M</td><td>$3.4B</td></tr>
+    <tr><td>IVV</td><td>iShares S&amp;P 500</td><td>Int'l Equities</td><td class="pos">+$136M</td><td>$12.4B</td></tr>
+    <tr><td>VHY</td><td>Vanguard Australian High Yield</td><td>Aus Equities</td><td class="pos">+$119M</td><td>$6.8B</td></tr>
+    <tr><td>ETPMAG</td><td>Global X Physical Silver</td><td>Commodities</td><td class="pos">+$115M</td><td>$2.4B</td></tr>
+    <tr><td>WIRE</td><td>Global X Copper Miners</td><td>Commodities</td><td class="pos">+$109M</td><td>$672M</td></tr>
+  </tbody>
+</table>
+
+<h2>Fixed income makes a comeback</h2>
+<p>The second surprise of the month is the strength of <strong>fixed income</strong> flows at $917 million — the asset class's strongest showing in over a year. VAF (Vanguard Australian Fixed Interest) attracted $93 million; AAA (BetaShares Cash) added $92 million; SUBD (VanEck Subordinated Debt) pulled in $76 million. MONY, VanEck's newly-launched Cash Plus Active ETF, attracted exactly $100 million — its entire FUM — in its first month of operation.</p>
+
+<p>The fixed income renaissance reflects growing conviction that Australian interest rates have peaked. As the RBA has held rates steady for several consecutive meetings, term deposit rates are beginning to ease, making bond ETF duration risk look more attractive at current yield levels. The 5.35% running yield on SUBD is competitive with any term deposit, with the added benefit of daily liquidity.</p>
+
+<h2>Commodities momentum continued</h2>
+<p>Commodity ETFs attracted $491 million in net flows despite already carrying very elevated recent returns. ETPMAG (physical silver, +212% 1Y) still pulled in $115 million — suggesting momentum investors remain committed even at current prices. WIRE (copper miners, +109% 1Y) added $109 million. GXLD (Global X physical gold) attracted $69 million.</p>
+
+<h2>Digital assets: indifference despite volatility</h2>
+<p>Crypto ETFs attracted just <strong>$6 million</strong> in aggregate net flows despite significant price moves in both directions. VBTC, IBTC, and EBTC are all down roughly 29% over the past year. Investors appear to be neither panic-selling (which would show up as large outflows) nor adding aggressively to falling prices. The category is being effectively ignored.</p>
+
+<h2>The outflows: where money is leaving</h2>
+<p>The most notable outflows came from a handful of specific situations:</p>
+
+<table>
+  <thead><tr><th>ETF</th><th>Name</th><th>Monthly Outflow</th><th>Context</th></tr></thead>
+  <tbody>
+    <tr><td>GEAR</td><td>BetaShares Geared Australian Equities</td><td class="neg">-$49M</td><td>Leveraged product, position-sizing</td></tr>
+    <tr><td>QRE</td><td>BetaShares Australian Resources Sector</td><td class="neg">-$43M</td><td>Profit-taking after strong resources run</td></tr>
+    <tr><td>MGOC</td><td>Magellan Global Fund (Open Class)</td><td class="neg">-$38M</td><td>Ongoing manager redemptions; -5.1% 1Y</td></tr>
+    <tr><td>OZR</td><td>SPDR S&amp;P/ASX 200 Resources</td><td class="neg">-$21M</td><td>Resources sector rotation</td></tr>
+    <tr><td>GRNV</td><td>VanEck MSCI Australian Sustainable</td><td class="neg">-$21M</td><td>ESG outflow trend continues</td></tr>
+  </tbody>
+</table>
+
+<p>Magellan's continued outflows are notable. MGOC has now shed over $9 billion from its peak FUM of $14+ billion. At $5.2 billion remaining with ongoing monthly outflows, the question is where the floor is. The fund's -5.1% one-year return makes the 1.35% management fee particularly difficult to justify when index alternatives charge a fraction of that cost.</p>
+
+<p>The resources outflow from QRE and OZR suggests some profit-taking after a strong run in commodities. Interestingly, investors appear to be rotating out of broad resources ETFs while simultaneously adding to specific metals themes (silver, copper) — a preference for targeted thematic exposure over broad sector coverage.</p>
+
+<h2>The big picture</h2>
+<p>Total Australian ETF market FUM now sits at approximately <strong>$336 billion</strong> across 472 products. At $5.2 billion in a single month, net new investment represents about 1.5% of the market being added per month — a pace that, if sustained, would push the market through $400 billion before the end of 2026. The structural growth story in Australian ETFs remains firmly intact.</p>
+""",
+    },
+
+    {
+        "slug": "defence-etf-surge-2026",
+        "title": "Defence ETFs: The Unlikely Stars of the Past Year",
+        "subtitle": "Three defence ETFs returned between 55% and 72% as NATO spending commitments and geopolitical realignment drove defence contractors to record valuations.",
+        "date": "2026-03-17",
+        "category": "Thematic",
+        "summary": "DFND, ARMR and DTEC have surged 55–72% in twelve months, collectively attracting $60 million in new investment last month alone. We profile the funds, their holdings, and the geopolitical backdrop driving the rally.",
+        "body": """
+<p>Defence stocks are not a typical destination for Australian ETF investors. The sector is dominated by US and European contractors, carries political complexity, and has historically been overlooked by the retail market. But over the past twelve months, three defence-focused ETFs available on the ASX have delivered some of the strongest returns of any thematic category.</p>
+
+<table>
+  <thead><tr><th>ETF</th><th>Name</th><th>Issuer</th><th>1Y Return</th><th>FUM</th><th>Fee</th><th>Last Month Inflow</th></tr></thead>
+  <tbody>
+    <tr><td>DTEC</td><td>Global X Defence Tech ETF</td><td>Global X</td><td class="pos">+72.0%</td><td>$136M</td><td>0.50%</td><td class="pos">+$11.7M</td></tr>
+    <tr><td>DFND</td><td>VanEck Global Defence ETF</td><td>VanEck</td><td class="pos">+68.7%</td><td>$312M</td><td>0.65%</td><td class="pos">+$24.9M</td></tr>
+    <tr><td>ARMR</td><td>BetaShares Global Defence ETF</td><td>BetaShares</td><td class="pos">+54.9%</td><td>$248M</td><td>0.55%</td><td class="pos">+$24.2M</td></tr>
+  </tbody>
+</table>
+
+<p>Combined, these three funds manage <strong>$696 million</strong> and attracted <strong>$60.8 million</strong> in new investment last month — a meaningful vote of confidence from investors who believe the rally has further to run.</p>
+
+<h2>What is driving defence stocks higher</h2>
+<p>The defence sector has been transformed by a series of geopolitical shocks that have fundamentally altered Western governments' attitudes toward defence spending:</p>
+
+<ul>
+  <li><strong>NATO commitments</strong>: Following Russia's invasion of Ukraine, NATO members agreed to raise defence spending targets from 2% to potentially 3% of GDP. Most European members had been well below even the original 2% target for years. Closing that gap requires hundreds of billions in new procurement over the next decade.</li>
+  <li><strong>European rearmament</strong>: Germany broke a decades-long taboo by committing to a €100 billion special defence fund — the Sondervermögen — in 2022. That spending is now flowing into contracts for companies like Rheinmetall, Thales, Leonardo, and Saab.</li>
+  <li><strong>Indo-Pacific tensions</strong>: Growing concerns about Taiwan and broader Asia-Pacific security have driven increased defence procurement in the region, boosting South Korean contractors like Hanwha Aerospace.</li>
+  <li><strong>Drone warfare revolution</strong>: The Ukraine conflict demonstrated that autonomous systems, electronic warfare, and precision strike capabilities now dominate land warfare. This is creating demand for a new generation of defence technology rather than just legacy platforms.</li>
+</ul>
+
+<h2>Inside the holdings: same names, different weights</h2>
+<p>The three funds overlap significantly in their core holdings but make different bets on specific companies:</p>
+
+<table>
+  <thead><tr><th>Company</th><th>DFND weight</th><th>ARMR weight</th><th>DTEC weight</th></tr></thead>
+  <tbody>
+    <tr><td>Lockheed Martin</td><td>—</td><td>9.7%</td><td>9.2%</td></tr>
+    <tr><td>RTX Corp (Raytheon)</td><td>7.7%</td><td>8.0%</td><td>7.9%</td></tr>
+    <tr><td>Northrop Grumman</td><td>—</td><td>8.1%</td><td>4.9%</td></tr>
+    <tr><td>General Dynamics</td><td>—</td><td>7.1%</td><td>6.9%</td></tr>
+    <tr><td>BAE Systems</td><td>—</td><td>7.0%</td><td>4.9%</td></tr>
+    <tr><td>Rheinmetall</td><td>—</td><td>6.3%</td><td>6.2%</td></tr>
+    <tr><td>Hanwha Aerospace</td><td>7.7%</td><td>—</td><td>5.0%</td></tr>
+    <tr><td>Leonardo</td><td>7.6%</td><td>—</td><td>—</td></tr>
+    <tr><td>Thales</td><td>7.3%</td><td>—</td><td>—</td></tr>
+    <tr><td>Saab</td><td>6.2%</td><td>—</td><td>—</td></tr>
+    <tr><td>Elbit Systems</td><td>6.0%</td><td>—</td><td>—</td></tr>
+    <tr><td>Palantir Technologies</td><td>5.4%</td><td>5.7%</td><td>6.1%</td></tr>
+    <tr><td>Curtiss-Wright</td><td>5.1%</td><td>—</td><td>—</td></tr>
+    <tr><td>Safran</td><td>—</td><td>6.9%</td><td>—</td></tr>
+  </tbody>
+</table>
+
+<p><strong>DFND</strong> (VanEck) is the most European-weighted of the three, with significant allocations to Hanwha (South Korea), Leonardo (Italy), Thales (France), Saab (Sweden), and Elbit (Israel). This mix has benefited from European rearmament and Middle East tensions driving Israeli defence contractors.</p>
+
+<p><strong>ARMR</strong> (BetaShares) skews more toward traditional US prime contractors — Lockheed Martin, Northrop Grumman, General Dynamics — reflecting the established US defence industrial base.</p>
+
+<p><strong>DTEC</strong> (Global X) emphasises defence technology and dual-use tech over pure-play contractors. Its Palantir position (6.1%) is the largest across the three funds — a bet on AI-enabled defence intelligence and autonomous systems rather than legacy hardware.</p>
+
+<h2>Palantir: the cross-fund consensus</h2>
+<p>One name appears in all three ETFs: <strong>Palantir Technologies</strong>, the data analytics and AI company whose government and defence contracts have become central to its growth story. Palantir's Gotham platform is used extensively by US defence and intelligence agencies; its AIP (AI Platform) product has been increasingly deployed by military customers. Palantir has been one of the top-performing S&P 500 stocks over the past year, contributing meaningfully to all three defence ETFs' returns.</p>
+
+<h2>Fees and structure</h2>
+<p>At 0.50–0.65%, defence ETFs charge a thematic premium over plain index ETFs — consistent with the broader pattern where specialised exposures cost more than vanilla market-cap products. ARMR at 0.55% is the cheapest; DFND at 0.65% is the most expensive but also the most differentiated in its European and emerging market defence exposure.</p>
+
+<h2>The risks</h2>
+<p>The geopolitical events that drove these returns could also reverse them. A durable ceasefire in Ukraine, renewed multilateral disarmament negotiations, or a US policy shift on defence spending commitments could quickly re-rate defence stocks downward. Some ESG frameworks explicitly exclude defence companies, meaning some institutional investors cannot hold these ETFs regardless of valuation. And concentration in the sector is real — all three funds are entirely dependent on one industry's fortunes.</p>
+
+<p>For investors who are comfortable with the sector exposure and believe the structural uplift in Western defence spending is durable, any of these three funds provides genuine access to a theme that was previously difficult to express through listed products in Australia. The choice between them comes down to your geographic preference: more US if you like ARMR, more European if DFND suits, more defence-tech and AI if DTEC appeals.</p>
+""",
+    },
+
     {
         "slug": "silver-surge-etpmag-2026",
         "title": "The Silver Surge: ETPMAG's 212% Year in Review",
