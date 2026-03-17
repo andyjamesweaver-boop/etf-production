@@ -51,7 +51,8 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
             '/api/v1/search': lambda: self.handle_search(qs),
             '/api/v1/scrape-status': self.handle_scrape_status,
             '/api/v1/screener': lambda: self.handle_screener(qs),
-            '/api/v1/compare': lambda: self.handle_compare(qs),
+            '/api/v1/compare':         lambda: self.handle_compare(qs),
+            '/api/v1/compare/overlap': lambda: self.handle_compare_overlap(qs),
             '/api/v1/holdings/search': lambda: self.handle_holdings_search(qs),
             # Insights API
             '/api/v1/insights/fum':      self.handle_insights_fum,
@@ -697,6 +698,105 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
                 codes
             ).fetchall()
             self.send_json({'data': [dict(r) for r in rows]})
+        except Exception as e:
+            self.send_json({'error': str(e)}, 500)
+        finally:
+            conn.close()
+
+    # ----- Compare overlap (shared holdings between selected ETFs) -----
+    def handle_compare_overlap(self, qs):
+        import re as _re
+        codes_str = self._str(qs, 'codes', '')
+        codes = [c.strip().upper() for c in codes_str.split(',') if c.strip()][:5]
+        if len(codes) < 2:
+            self.send_json({'error': 'Need at least 2 codes'}, 400)
+            return
+
+        conn = get_db()
+        try:
+            placeholders = ','.join('?' * len(codes))
+            rows = conn.execute(
+                f"SELECT etf_code, ticker, name, weight_pct FROM etf_holdings "
+                f"WHERE etf_code IN ({placeholders}) AND weight_pct IS NOT NULL AND weight_pct > 0",
+                codes
+            ).fetchall()
+
+            if not rows:
+                self.send_json({'codes': codes, 'overlap': [], 'coverage': {}, 'total_overlap_count': 0})
+                return
+
+            # Build name→ticker lookup for canonicalisation (same logic as similar ETFs)
+            name_to_ticker = {}
+            for r in rows:
+                if not r['ticker'] or not r['name']:
+                    continue
+                norm_t = _re.sub(r'-[A-Z]{2,3}$', '', r['ticker'].upper().strip())
+                if not norm_t:
+                    continue
+                norm_n = _re.sub(r'\s+', ' ', r['name'].upper().strip())
+                name_to_ticker[norm_n] = norm_t
+                if len(norm_n) > 28:
+                    name_to_ticker[norm_n[:28]] = norm_t
+
+            def _key(ticker, name):
+                if ticker:
+                    return _re.sub(r'-[A-Z]{2,3}$', '', ticker.upper().strip())
+                if name:
+                    norm_n = _re.sub(r'\s+', ' ', name.upper().strip())
+                    return name_to_ticker.get(norm_n, norm_n)
+                return ''
+
+            # Build per-ETF weight dicts and best display name per key
+            etf_weights = {code: {} for code in codes}
+            key_to_name = {}
+
+            for r in rows:
+                ec = r['etf_code']
+                if ec not in etf_weights:
+                    continue
+                k = _key(r['ticker'], r['name'])
+                if not k:
+                    continue
+                etf_weights[ec][k] = etf_weights[ec].get(k, 0) + r['weight_pct']
+                if k not in key_to_name and r['name']:
+                    key_to_name[k] = r['name']
+
+            # Find holdings that appear in 2+ of the selected ETFs
+            all_keys = set()
+            for weights in etf_weights.values():
+                all_keys.update(weights.keys())
+
+            overlap_items = []
+            for k in all_keys:
+                etf_count = sum(1 for c in codes if k in etf_weights[c])
+                if etf_count < 2:
+                    continue
+                weights_per_etf = {c: round(etf_weights[c].get(k, 0), 4) for c in codes}
+                max_weight = max(w for w in weights_per_etf.values())
+                overlap_items.append({
+                    'key': k,
+                    'name': key_to_name.get(k, k),
+                    'etf_count': etf_count,
+                    'weights': weights_per_etf,
+                    'max_weight': max_weight,
+                })
+
+            # Sort: most ETFs first, then by max weight descending
+            overlap_items.sort(key=lambda x: (-x['etf_count'], -x['max_weight']))
+
+            # Coverage: sum of weights in overlap holdings for each ETF
+            overlap_keys = {item['key'] for item in overlap_items}
+            coverage = {
+                code: round(sum(w for k, w in etf_weights[code].items() if k in overlap_keys), 2)
+                for code in codes
+            }
+
+            self.send_json({
+                'codes': codes,
+                'overlap': overlap_items[:60],
+                'coverage': coverage,
+                'total_overlap_count': len(overlap_items),
+            })
         except Exception as e:
             self.send_json({'error': str(e)}, 500)
         finally:
@@ -1928,6 +2028,18 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
                       rounded-xl shadow-2xl max-h-60 overflow-y-auto"></div>
         </div>
         <div id="cmp-chips" class="flex flex-wrap gap-2 items-center"></div>
+      </div>
+    </div>
+
+    <!-- Holdings overlap analysis -->
+    <div id="cmp-overlap-wrap" class="mb-6 hidden">
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+        <div class="flex items-center justify-between mb-1">
+          <h3 class="font-semibold text-gray-700">Holdings Overlap</h3>
+          <span id="cmp-overlap-badge" class="text-xs text-gray-400"></span>
+        </div>
+        <div id="cmp-overlap-coverage" class="flex flex-wrap gap-3 mb-4"></div>
+        <div id="cmp-overlap-body"></div>
       </div>
     </div>
 
@@ -3716,6 +3828,7 @@ function cmpRemove(code) {
 function renderCmpHint() {
   document.getElementById('cmp-hint').classList.remove('hidden');
   document.getElementById('cmp-table-container').classList.add('hidden');
+  document.getElementById('cmp-overlap-wrap').classList.add('hidden');
 }
 
 async function cmpFetch() {
@@ -3723,6 +3836,109 @@ async function cmpFetch() {
   const codes = [...cmpSet].join(',');
   const d = await api('/api/v1/compare?codes=' + codes);
   renderCmpTable(d.data || []);
+  cmpFetchOverlap();
+}
+
+async function cmpFetchOverlap() {
+  const wrap = document.getElementById('cmp-overlap-wrap');
+  const badge = document.getElementById('cmp-overlap-badge');
+  const coverageEl = document.getElementById('cmp-overlap-coverage');
+  const bodyEl = document.getElementById('cmp-overlap-body');
+
+  if (cmpSet.size < 2) {
+    wrap.classList.add('hidden');
+    return;
+  }
+
+  wrap.classList.remove('hidden');
+  bodyEl.innerHTML = '<p class="text-sm text-gray-400 text-center py-4">Loading overlap…</p>';
+  coverageEl.innerHTML = '';
+  badge.textContent = '';
+
+  const codes = [...cmpSet];
+  const d = await api('/api/v1/compare/overlap?codes=' + codes.join(','));
+
+  if (d.error || !d.overlap) {
+    bodyEl.innerHTML = '<p class="text-sm text-gray-400 text-center py-4">Overlap data unavailable.</p>';
+    return;
+  }
+
+  const { overlap, coverage, total_overlap_count } = d;
+
+  if (total_overlap_count === 0) {
+    badge.textContent = '';
+    coverageEl.innerHTML = '';
+    bodyEl.innerHTML = '<p class="text-sm text-gray-400 text-center py-4">No shared holdings found — these ETFs have no constituents in common, or holdings data is unavailable for one or more funds.</p>';
+    return;
+  }
+
+  badge.textContent = total_overlap_count + ' shared holding' + (total_overlap_count !== 1 ? 's' : '');
+
+  // Coverage pills: "VAS — 94.2% covered by shared holdings"
+  coverageEl.innerHTML = codes.map(code => {
+    const pct = coverage[code] != null ? coverage[code].toFixed(1) + '%' : '—';
+    const col = coverage[code] >= 50 ? 'bg-green-50 text-green-700 border-green-200'
+              : coverage[code] >= 20 ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
+              : 'bg-gray-50 text-gray-600 border-gray-200';
+    return `<div class="border rounded-lg px-3 py-1.5 text-xs ${col}">
+      <span class="font-bold">${code}</span>
+      <span class="ml-1">${pct} in shared holdings</span>
+    </div>`;
+  }).join('');
+
+  // Table header
+  const maxWeightPerCode = {};
+  codes.forEach(c => {
+    maxWeightPerCode[c] = Math.max(...overlap.map(item => item.weights[c] || 0));
+  });
+
+  const thCols = codes.map(c =>
+    `<th class="px-3 py-2 text-right text-xs font-semibold text-green-700 uppercase tracking-wide whitespace-nowrap">${c}</th>`
+  ).join('');
+
+  const rows = overlap.map((item, i) => {
+    const bg = i % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+    // Badge if it's in all selected ETFs
+    const inAll = item.etf_count === codes.length;
+    const countBadge = inAll
+      ? '<span class="ml-1.5 text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">all</span>'
+      : (codes.length > 2
+          ? `<span class="ml-1.5 text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">${item.etf_count}/${codes.length}</span>`
+          : '');
+
+    const weightCells = codes.map(c => {
+      const w = item.weights[c];
+      if (!w) return `<td class="px-3 py-2 text-right text-xs text-gray-300">—</td>`;
+      const barPct = maxWeightPerCode[c] > 0 ? Math.round(w / maxWeightPerCode[c] * 64) : 0;
+      return `<td class="px-3 py-2 text-right text-xs">
+        <div class="flex items-center justify-end gap-1.5">
+          <div class="h-1.5 rounded-full bg-green-200" style="width:${barPct}px;min-width:2px"></div>
+          <span class="font-medium text-gray-700 tabular-nums">${w.toFixed(2)}%</span>
+        </div>
+      </td>`;
+    }).join('');
+
+    return `<tr class="${bg} hover:bg-green-50 transition-colors">
+      <td class="px-3 py-2 text-xs text-gray-800 font-medium max-w-xs truncate">
+        ${item.name}${countBadge}
+      </td>
+      ${weightCells}
+    </tr>`;
+  }).join('');
+
+  bodyEl.innerHTML = `
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="border-b border-gray-100">
+          <tr>
+            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Holding</th>
+            ${thCols}
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    ${total_overlap_count > 60 ? `<p class="text-xs text-gray-400 text-center mt-3">Showing top 60 of ${total_overlap_count} shared holdings.</p>` : ''}`;
 }
 
 // Fetch similar ETFs for all codes in the compare set
