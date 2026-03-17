@@ -98,14 +98,14 @@ function hbar(label, value, maxVal, fillColor, valStr, subStr) {
 def _page(title, subtitle, body_html, init_js):
     return f"""{_HEAD.replace('{title}', title)}
 <body>
-<header class="bg-gradient-to-r from-blue-700 via-blue-800 to-indigo-900 text-white">
+<header class="bg-gradient-to-r from-green-700 via-green-800 to-indigo-900 text-white">
   <div class="max-w-7xl mx-auto px-5 py-4 flex items-center gap-5">
-    <a href="/dashboard" class="text-blue-200 hover:text-white text-sm font-medium transition-colors shrink-0">&#8592; Dashboard</a>
+    <a href="/dashboard" class="text-green-200 hover:text-white text-sm font-medium transition-colors shrink-0">&#8592; Dashboard</a>
     <div class="flex-1 min-w-0">
       <h1 class="text-xl font-bold">{title}</h1>
-      <p class="text-blue-200 text-xs mt-0.5">{subtitle}</p>
+      <p class="text-green-200 text-xs mt-0.5">{subtitle}</p>
     </div>
-    <span id="ts" class="text-blue-300 text-xs shrink-0"></span>
+    <span id="ts" class="text-green-300 text-xs shrink-0"></span>
   </div>
 </header>
 <main class="max-w-7xl mx-auto px-4 py-6">
@@ -195,13 +195,13 @@ async function init() {
   const topMax = d.top_etfs[0]?.fum || 1;
   document.getElementById('fum-table').innerHTML = d.top_etfs.map((e, i) => `<tr>
     <td class="text-gray-400 tabular-nums">${i + 1}</td>
-    <td class="font-bold text-blue-600">${e.code}</td>
+    <td class="font-bold text-green-600">${e.code}</td>
     <td class="text-gray-600 max-w-xs" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.name}">${e.name}</td>
     <td class="text-gray-500">${e.issuer || '—'}</td>
     <td><span class="badge" style="background:${acColor(e.asset_class)}22;color:${acColor(e.asset_class)}">${e.asset_class || '—'}</span></td>
     <td class="text-right font-semibold tabular-nums">${fmtFum(e.fum)}</td>
     <td class="text-right text-gray-500 tabular-nums">${e.pct}%</td>
-    <td><div class="bar-track"><div class="bar-fill bg-blue-400" style="width:${Math.min(e.fum / topMax * 100, 100).toFixed(1)}%"></div></div></td>
+    <td><div class="bar-track"><div class="bar-fill bg-green-400" style="width:${Math.min(e.fum / topMax * 100, 100).toFixed(1)}%"></div></div></td>
   </tr>`).join('');
 
   // Per class mini tables
@@ -209,7 +209,7 @@ async function init() {
     <div class="text-xs font-bold uppercase mb-2" style="color:${acColor(ac_name)}">${ac_name}</div>
     ${etfs.map((e, i) => `<div class="flex items-center gap-2 py-1 ${i < etfs.length - 1 ? 'border-b border-gray-50' : ''}">
       <span class="text-gray-300 text-xs w-3 tabular-nums">${i + 1}</span>
-      <span class="font-bold text-blue-600 text-xs w-10">${e.code}</span>
+      <span class="font-bold text-green-600 text-xs w-10">${e.code}</span>
       <span class="flex-1 text-xs text-gray-500 truncate" title="${e.name}">${e.name}</span>
       <span class="text-xs font-semibold text-gray-700 ml-1 tabular-nums">${fmtFum(e.fum)}</span>
     </div>`).join('')}
@@ -223,7 +223,7 @@ async function init() {
       <div class="text-xs font-bold uppercase mb-2" style="color:${issColor(iss_name)}">${iss_name}</div>
       ${etfs.map((e, i) => `<div class="flex items-center gap-2 py-1 ${i < etfs.length - 1 ? 'border-b border-gray-50' : ''}">
         <span class="text-gray-300 text-xs w-3 tabular-nums">${i + 1}</span>
-        <span class="font-bold text-blue-600 text-xs w-10">${e.code}</span>
+        <span class="font-bold text-green-600 text-xs w-10">${e.code}</span>
         <span class="flex-1 text-xs text-gray-500 truncate" title="${e.name}">${e.name}</span>
         <span class="text-xs font-semibold text-gray-700 ml-1 tabular-nums">${fmtFum(e.fum)}</span>
       </div>`).join('')}
@@ -426,8 +426,8 @@ function renderYearChart() {
 function renderTables() {
   // Annotations for notable ETFs
   const NOTES = {
-    STW: { label: "Australia's first ETF", cls: 'bg-blue-50 text-blue-700' },
-    SFY: { label: "Australia's first ETF", cls: 'bg-blue-50 text-blue-700' },
+    STW: { label: "Australia's first ETF", cls: 'bg-green-50 text-green-700' },
+    SFY: { label: "Australia's first ETF", cls: 'bg-green-50 text-green-700' },
     PMGOLD: { label: 'Date as per ASX report', cls: 'bg-amber-50 text-amber-700' },
   };
 
@@ -435,7 +435,7 @@ function renderTables() {
     const note = NOTES[e.code];
     const badge = note ? `<span class="badge ${note.cls}">${note.label}</span>` : '';
     return `<tr>
-      <td class="font-bold text-blue-600">${e.code}</td>
+      <td class="font-bold text-green-600">${e.code}</td>
       <td class="text-gray-600" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.name||''}">${e.name||'—'}</td>
       <td class="text-gray-500">${e.issuer||'—'}</td>
       <td class="text-gray-400 tabular-nums text-xs">${e.inception_date||'—'}</td>
@@ -558,7 +558,7 @@ async function init() {
 
   const perfRow = (e, i) => `<tr>
     <td class="text-gray-400 tabular-nums">${i + 1}</td>
-    <td class="font-bold text-blue-600">${e.code}</td>
+    <td class="font-bold text-green-600">${e.code}</td>
     <td class="text-gray-600" style="max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.name}">${e.name}</td>
     <td class="text-gray-500 text-xs">${e.issuer || '—'}</td>
     <td class="text-right font-semibold ${pcls(e.return_1y)} tabular-nums">${pct(e.return_1y, 1)}</td>
@@ -694,7 +694,7 @@ async function init() {
   // Cheapest / priciest tables
   const merRow = (e, i) => `<tr>
     <td class="text-gray-400 tabular-nums">${i + 1}</td>
-    <td class="font-bold text-blue-600">${e.code}</td>
+    <td class="font-bold text-green-600">${e.code}</td>
     <td class="text-gray-600" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.name}">${e.name}</td>
     <td class="text-gray-500 text-xs">${e.issuer || '—'}</td>
     <td class="text-right font-semibold tabular-nums">${mer(e.effective_mer)}</td>
@@ -847,7 +847,7 @@ async function init() {
       <td class="text-right tabular-nums">${r.etf_count}</td>
       <td class="text-right tabular-nums">${mer(r.avg_mer)}</td>
       <td class="text-right font-semibold ${pcls(r.avg_return_1y)} tabular-nums">${pct(r.avg_return_1y, 1)}</td>
-      <td class="font-bold text-blue-600 text-xs">${r.top_etf?.code || '—'}<span class="text-gray-400 font-normal ml-1">${fmtFum(r.top_etf?.fund_size_aud_millions)}</span></td>
+      <td class="font-bold text-green-600 text-xs">${r.top_etf?.code || '—'}<span class="text-gray-400 font-normal ml-1">${fmtFum(r.top_etf?.fund_size_aud_millions)}</span></td>
       <td><span class="badge" style="background:${acColor(primaryAC)}22;color:${acColor(primaryAC)}">${primaryAC}</span></td>
     </tr>`;
   }).join('');
@@ -918,10 +918,10 @@ _NAV_BODY = """
 <div class="card">
   <div class="flex flex-wrap items-center gap-3 mb-4">
     <h2 class="font-semibold text-sm text-gray-700">Historical Premium/Discount Explorer</h2>
-    <select id="etf-picker" class="border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm bg-gray-50 focus:ring-2 focus:ring-blue-200 outline-none min-w-[200px]">
+    <select id="etf-picker" class="border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm bg-gray-50 focus:ring-2 focus:ring-green-200 outline-none min-w-[200px]">
       <option value="">— select an ETF —</option>
     </select>
-    <select id="period-picker" class="border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm bg-gray-50 focus:ring-2 focus:ring-blue-200 outline-none">
+    <select id="period-picker" class="border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm bg-gray-50 focus:ring-2 focus:ring-green-200 outline-none">
       <option value="3m">3 months</option>
       <option value="1y" selected>1 year</option>
       <option value="3y">3 years</option>
@@ -938,8 +938,8 @@ _NAV_BODY = """
     <h2 class="font-semibold text-sm text-gray-700">Today's Snapshot — All ETFs</h2>
     <div class="flex items-center gap-2">
       <input id="snap-search" type="text" placeholder="Filter by code or name…"
-             class="border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm bg-gray-50 focus:ring-2 focus:ring-blue-200 outline-none w-52">
-      <select id="snap-sort" class="border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm bg-gray-50 focus:ring-2 focus:ring-blue-200 outline-none">
+             class="border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm bg-gray-50 focus:ring-2 focus:ring-green-200 outline-none w-52">
+      <select id="snap-sort" class="border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm bg-gray-50 focus:ring-2 focus:ring-green-200 outline-none">
         <option value="pd-desc">Largest premium first</option>
         <option value="pd-asc">Largest discount first</option>
         <option value="fum-desc">FUM (largest first)</option>

@@ -1483,25 +1483,25 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
 <body class="bg-slate-100 min-h-screen text-sm text-gray-800 antialiased">
 
 <!-- ── Header ── -->
-<header class="bg-gradient-to-r from-blue-900 to-blue-700 shadow-xl">
+<header class="bg-gradient-to-r from-green-900 to-green-700 shadow-xl">
   <div class="max-w-[1400px] mx-auto px-5 py-3 flex flex-wrap items-center gap-4">
     <div class="flex-1 min-w-[180px]">
       <h1 class="text-lg font-bold text-white tracking-tight leading-tight">
-        Australian ETF Dashboard
+        ☘️ Australian ETF Dashboard
       </h1>
-      <p id="subtitle" class="text-blue-300 text-xs mt-0.5">Loading market data…</p>
+      <p id="subtitle" class="text-green-300 text-xs mt-0.5">Loading market data…</p>
     </div>
 
     <!-- Search -->
     <div class="relative w-80">
-      <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-300 pointer-events-none"
+      <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-green-300 pointer-events-none"
            fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
               d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
       </svg>
       <input id="search" type="text" placeholder="Search code or name…"
              autocomplete="off"
-             class="w-full bg-white/10 border border-white/20 text-white placeholder-blue-300
+             class="w-full bg-white/10 border border-white/20 text-white placeholder-green-300
                     rounded-xl pl-9 pr-3 py-2 text-sm outline-none
                     focus:ring-2 focus:ring-white/40 focus:bg-white/20">
       <div id="search-results"
@@ -1509,7 +1509,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
     </div>
 
     <!-- Live indicator -->
-    <div class="flex items-center gap-2 text-xs text-blue-300">
+    <div class="flex items-center gap-2 text-xs text-green-300">
       <span class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
       <span id="last-refresh">Live</span>
     </div>
@@ -1523,37 +1523,37 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
     <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer" onclick="goCard('fum')" title="View FUM breakdown by asset class">
       <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Total FUM</p>
       <p id="c-fum" class="text-2xl font-bold text-gray-900 mt-1 leading-tight">—</p>
-      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">AUD <span class="text-blue-300">›</span></p>
+      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">AUD <span class="text-green-300">›</span></p>
     </div>
     <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer" onclick="goCard('count')" title="Browse all ETFs sorted by size">
       <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">ETFs Listed</p>
       <p id="c-count" class="text-2xl font-bold text-gray-900 mt-1 leading-tight">—</p>
-      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">all exchanges <span class="text-blue-300">›</span></p>
+      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">all exchanges <span class="text-green-300">›</span></p>
     </div>
     <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer" onclick="goCard('return')" title="See top performing ETFs">
       <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Avg 1Y Return</p>
       <p id="c-ret" class="text-2xl font-bold mt-1 leading-tight">—</p>
-      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">market average <span class="text-blue-300">›</span></p>
+      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">market average <span class="text-green-300">›</span></p>
     </div>
     <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer" onclick="goCard('expense')" title="See lowest cost ETFs">
       <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Avg Expense</p>
       <p id="c-exp" class="text-2xl font-bold text-gray-900 mt-1 leading-tight">—</p>
-      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">management fee <span class="text-blue-300">›</span></p>
+      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">management fee <span class="text-green-300">›</span></p>
     </div>
     <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer" onclick="goCard('top')" title="Open top performer detail">
       <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Top Performer</p>
       <p id="c-top" class="text-2xl font-bold text-green-600 mt-1 leading-tight">—</p>
-      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">best 1Y return <span class="text-blue-300">›</span></p>
+      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">best 1Y return <span class="text-green-300">›</span></p>
     </div>
     <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer" onclick="goCard('issuers')" title="View issuer market share">
       <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Issuers</p>
       <p id="c-issuers" class="text-2xl font-bold text-gray-900 mt-1 leading-tight">—</p>
-      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">fund managers <span class="text-blue-300">›</span></p>
+      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">fund managers <span class="text-green-300">›</span></p>
     </div>
     <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer" onclick="goCard('nav')" title="Premium / Discount to NAV analysis">
       <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Prem / Disc</p>
       <p id="c-nav" class="text-2xl font-bold text-gray-900 mt-1 leading-tight">—</p>
-      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">vs NAV <span class="text-blue-300">›</span></p>
+      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">vs NAV <span class="text-green-300">›</span></p>
     </div>
   </div>
 
@@ -1561,7 +1561,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
   <div class="mb-5">
     <div class="flex items-center justify-between mb-2 px-0.5">
       <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Latest Articles</span>
-      <a href="/articles" class="text-xs text-blue-500 hover:text-blue-700 font-medium">View all →</a>
+      <a href="/articles" class="text-xs text-green-500 hover:text-green-700 font-medium">View all →</a>
     </div>
     <div class="relative">
       <div id="article-carousel" class="flex gap-3 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-1"
@@ -1571,13 +1571,13 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
       <button onclick="carouselScroll(-1)"
               class="hidden lg:flex absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4
                      w-8 h-8 items-center justify-center rounded-full bg-white shadow border
-                     border-gray-200 text-gray-500 hover:text-blue-600 z-10">
+                     border-gray-200 text-gray-500 hover:text-green-600 z-10">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
       <button onclick="carouselScroll(1)"
               class="hidden lg:flex absolute right-0 top-1/2 -translate-y-1/2 translate-x-4
                      w-8 h-8 items-center justify-center rounded-full bg-white shadow border
-                     border-gray-200 text-gray-500 hover:text-blue-600 z-10">
+                     border-gray-200 text-gray-500 hover:text-green-600 z-10">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
       </button>
     </div>
@@ -1617,7 +1617,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             <label class="block text-xs text-gray-500 mb-1">Exchange</label>
             <select id="f-exchange"
                     class="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm bg-gray-50
-                           focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
+                           focus:ring-2 focus:ring-green-200 focus:border-green-400 outline-none">
               <option value="">All Exchanges</option>
             </select>
           </div>
@@ -1625,7 +1625,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             <label class="block text-xs text-gray-500 mb-1">Issuer</label>
             <select id="f-issuer"
                     class="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm bg-gray-50
-                           focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
+                           focus:ring-2 focus:ring-green-200 focus:border-green-400 outline-none">
               <option value="">All Issuers</option>
             </select>
           </div>
@@ -1633,7 +1633,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             <label class="block text-xs text-gray-500 mb-1">Asset Class</label>
             <select id="f-asset"
                     class="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm bg-gray-50
-                           focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
+                           focus:ring-2 focus:ring-green-200 focus:border-green-400 outline-none">
               <option value="">All Asset Classes</option>
             </select>
           </div>
@@ -1641,7 +1641,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             <label class="block text-xs text-gray-500 mb-1">Management Style</label>
             <select id="f-type"
                     class="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm bg-gray-50
-                           focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
+                           focus:ring-2 focus:ring-green-200 focus:border-green-400 outline-none">
               <option value="">All Types</option>
               <option value="ETF">Passive / Index</option>
               <option value="Active">Active</option>
@@ -1654,13 +1654,13 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             <label class="block text-xs text-gray-500 mb-1">Benchmark / Index</label>
             <input id="f-benchmark" type="text" placeholder="e.g. MSCI, S&amp;P/ASX…"
                    class="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm bg-gray-50
-                          focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none"/>
+                          focus:ring-2 focus:ring-green-200 focus:border-green-400 outline-none"/>
           </div>
           <div>
             <label class="block text-xs text-gray-500 mb-1">Sort By</label>
             <select id="f-sort"
                     class="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm bg-gray-50
-                           focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
+                           focus:ring-2 focus:ring-green-200 focus:border-green-400 outline-none">
               <option value="rank">Rank by FUM</option>
               <option value="fum">FUM (largest)</option>
               <option value="return_1y">1Y Return</option>
@@ -1674,11 +1674,11 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             <label class="block text-xs text-gray-500 mb-1">Extra Columns</label>
             <div class="space-y-1">
               <label class="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
-                <input id="col-3y" type="checkbox" class="accent-blue-600">
+                <input id="col-3y" type="checkbox" class="accent-green-600">
                 3Y Return
               </label>
               <label class="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
-                <input id="col-5y" type="checkbox" class="accent-blue-600">
+                <input id="col-5y" type="checkbox" class="accent-green-600">
                 5Y Return
               </label>
             </div>
@@ -1733,7 +1733,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
     <div class="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-4">
       <div>
         <div class="flex items-center gap-2 flex-wrap">
-          <span id="d-code" class="text-2xl font-bold text-blue-700"></span>
+          <span id="d-code" class="text-2xl font-bold text-green-700"></span>
           <span id="d-badge" class="text-xs px-2 py-0.5 rounded-full font-medium"></span>
         </div>
         <p id="d-name" class="text-gray-500 text-sm mt-0.5"></p>
@@ -1796,7 +1796,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
           <div class="flex items-center justify-between">
             <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Screener Filters</h3>
             <button id="sc-clear"
-                    class="text-xs text-blue-600 hover:underline">Clear All</button>
+                    class="text-xs text-green-600 hover:underline">Clear All</button>
           </div>
 
           <!-- Exchange toggles -->
@@ -1804,11 +1804,11 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             <p class="text-xs text-gray-500 mb-1.5">Exchange</p>
             <div class="flex gap-1.5">
               <button class="sc-exch active flex-1 py-1 rounded-lg border text-xs font-medium
-                             bg-blue-600 text-white border-blue-600" data-exch="">All</button>
+                             bg-green-600 text-white border-green-600" data-exch="">All</button>
               <button class="sc-exch flex-1 py-1 rounded-lg border text-xs font-medium
-                             text-gray-600 border-gray-200 hover:border-blue-400" data-exch="ASX">ASX</button>
+                             text-gray-600 border-gray-200 hover:border-green-400" data-exch="ASX">ASX</button>
               <button class="sc-exch flex-1 py-1 rounded-lg border text-xs font-medium
-                             text-gray-600 border-gray-200 hover:border-blue-400" data-exch="CXA">CXA</button>
+                             text-gray-600 border-gray-200 hover:border-green-400" data-exch="CXA">CXA</button>
             </div>
           </div>
 
@@ -1828,7 +1828,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
           <div>
             <p class="text-xs text-gray-500 mb-1.5">Max Management Fee: <span id="sc-fee-val" class="font-semibold text-gray-700">2.00%</span></p>
             <input id="sc-fee" type="range" min="0" max="2" step="0.05" value="2"
-                   class="w-full accent-blue-600">
+                   class="w-full accent-green-600">
           </div>
 
           <!-- Min FUM -->
@@ -1836,7 +1836,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             <p class="text-xs text-gray-500 mb-1">Min Fund Size (AUD M)</p>
             <input id="sc-fum" type="number" min="0" placeholder="e.g. 100"
                    class="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm bg-gray-50
-                          focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
+                          focus:ring-2 focus:ring-green-200 focus:border-green-400 outline-none">
           </div>
 
           <!-- 1Y Return range -->
@@ -1845,10 +1845,10 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             <div class="flex gap-2">
               <input id="sc-ret-min" type="number" placeholder="Min"
                      class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-gray-50
-                            focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
+                            focus:ring-2 focus:ring-green-200 focus:border-green-400 outline-none">
               <input id="sc-ret-max" type="number" placeholder="Max"
                      class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-gray-50
-                            focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
+                            focus:ring-2 focus:ring-green-200 focus:border-green-400 outline-none">
             </div>
           </div>
 
@@ -1857,12 +1857,12 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             <p class="text-xs text-gray-500 mb-1">Min Distribution Yield (%)</p>
             <input id="sc-yield" type="number" min="0" placeholder="e.g. 3"
                    class="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm bg-gray-50
-                          focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
+                          focus:ring-2 focus:ring-green-200 focus:border-green-400 outline-none">
           </div>
 
           <!-- FX hedged -->
           <label class="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
-            <input id="sc-hedged" type="checkbox" class="accent-blue-600">
+            <input id="sc-hedged" type="checkbox" class="accent-green-600">
             FX Hedged only
           </label>
 
@@ -1879,7 +1879,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
               <span id="sc-result-count" class="text-xs text-gray-400"></span>
               <button id="sc-export"
                       class="flex items-center gap-1 px-3 py-1.5 border border-gray-200 rounded-lg
-                             text-xs text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors">
+                             text-xs text-gray-600 hover:border-green-400 hover:text-green-600 transition-colors">
                 &#8595; CSV
               </button>
             </div>
@@ -1922,7 +1922,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
           <input id="cmp-search" type="text" placeholder="Search ETF code or name…"
                  autocomplete="off"
                  class="w-full border border-gray-200 rounded-xl pl-9 pr-3 py-2 text-sm bg-gray-50
-                        focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
+                        focus:ring-2 focus:ring-green-200 focus:border-green-400 outline-none">
           <div id="cmp-dropdown"
                class="hidden absolute z-50 top-full mt-1 left-0 right-0 bg-white border border-gray-200
                       rounded-xl shadow-2xl max-h-60 overflow-y-auto"></div>
@@ -1967,19 +1967,19 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
           </svg>
           <input id="hs-input" type="text" placeholder="e.g. Apple, BHP, AAPL, NVDA…"
                  class="w-full border border-gray-200 rounded-xl pl-9 pr-3 py-2.5 text-sm bg-gray-50
-                        focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
+                        focus:ring-2 focus:ring-green-200 focus:border-green-400 outline-none">
         </div>
         <div class="flex items-center gap-2 text-sm text-gray-500">
           <label class="text-xs">Min Weight %</label>
           <input id="hs-min-weight" type="number" min="0" step="0.1" value="0" placeholder="0"
                  class="w-20 border border-gray-200 rounded-lg px-2 py-2 text-sm bg-gray-50
-                        focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
+                        focus:ring-2 focus:ring-green-200 focus:border-green-400 outline-none">
         </div>
       </div>
     </div>
 
     <!-- Summary + results -->
-    <div id="hs-summary" class="hidden bg-blue-50 border border-blue-100 rounded-xl px-5 py-3 mb-4 text-sm text-blue-800"></div>
+    <div id="hs-summary" class="hidden bg-green-50 border border-green-100 rounded-xl px-5 py-3 mb-4 text-sm text-green-800"></div>
 
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
       <div id="hs-empty" class="py-16 text-center text-gray-400 text-sm">
@@ -2325,7 +2325,7 @@ function renderSortHeaders() {
     const arrow = isActive ? (tableSortDir === 'asc' ? ' ▲' : ' ▼') : ' ⇅';
     // Strip any existing indicator and re-add
     th.textContent = th.textContent.replace(/\s[▲▼⇅]$/, '') + arrow;
-    th.classList.toggle('text-blue-600', isActive);
+    th.classList.toggle('text-green-600', isActive);
     th.classList.toggle('text-gray-500', !isActive);
   });
 }
@@ -2497,7 +2497,7 @@ function renderOverviewTab(d) {
     if (s) {
       const risksHtml = Array.isArray(s.key_risks) && s.key_risks.length
         ? `<details class="mt-2">
-             <summary class="text-xs text-blue-600 cursor-pointer hover:underline select-none">
+             <summary class="text-xs text-green-600 cursor-pointer hover:underline select-none">
                Key risks (${s.key_risks.length})
              </summary>
              <ul class="mt-1.5 space-y-1 list-disc list-inside">
@@ -2506,8 +2506,8 @@ function renderOverviewTab(d) {
            </details>`
         : '';
       aiSummaryHtml = `
-        <div class="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 mb-3">
-          <p class="text-blue-500 text-xs font-medium uppercase tracking-wide mb-1.5">AI Summary</p>
+        <div class="bg-green-50 border border-green-100 rounded-lg px-4 py-3 mb-3">
+          <p class="text-green-500 text-xs font-medium uppercase tracking-wide mb-1.5">AI Summary</p>
           ${s.summary ? `<p class="text-sm text-gray-700 leading-relaxed">${s.summary}</p>` : ''}
           ${s.objective ? `<p class="mt-2 text-xs text-gray-500"><span class="font-medium text-gray-600">Objective:</span> ${s.objective}</p>` : ''}
           ${s.suitable_for ? `<p class="mt-1 text-xs text-gray-500"><span class="font-medium text-gray-600">Suitable for:</span> ${s.suitable_for}</p>` : ''}
@@ -2528,8 +2528,8 @@ function renderOverviewTab(d) {
       ${docLinks.map(([label, url]) => `
         <a href="${url}" target="_blank" rel="noopener"
            class="inline-flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-200
-                  rounded-full text-xs font-medium text-gray-600 hover:border-blue-400
-                  hover:text-blue-600 transition-colors">
+                  rounded-full text-xs font-medium text-gray-600 hover:border-green-400
+                  hover:text-green-600 transition-colors">
           &#128196; ${label}
         </a>`).join('')}
     </div>` : '';
@@ -2558,7 +2558,7 @@ function renderOverviewTab(d) {
     </div>
     ${d.description ? `<p class="mt-4 text-sm text-gray-600 leading-relaxed border-t pt-4">${d.description}</p>` : ''}
     ${d.issuer_url ? `<a href="${d.issuer_url}" target="_blank" rel="noopener"
-       class="mt-3 inline-flex items-center gap-1 text-blue-600 hover:underline text-sm">
+       class="mt-3 inline-flex items-center gap-1 text-green-600 hover:underline text-sm">
        View on issuer site &#8594;</a>` : ''}`;
 }
 
@@ -2594,7 +2594,7 @@ async function showTab(tab) {
 
     el.innerHTML = `
       <div class="flex flex-wrap items-center gap-2 mb-3">
-        <span class="bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full text-xs font-semibold">${all.length} holdings</span>
+        <span class="bg-green-50 text-green-700 px-2.5 py-1 rounded-full text-xs font-semibold">${all.length} holdings</span>
         <span class="text-xs text-gray-500">Top 10 concentration:
           <strong class="text-gray-700">${top10Wt.toFixed(1)}%</strong></span>
         ${topCountries.length > 1 ? `<span class="text-xs text-gray-400">·</span>
@@ -2603,7 +2603,7 @@ async function showTab(tab) {
         ${holdingsTs ? `<span class="ml-auto text-xs text-gray-400" title="Holdings last updated by issuer scraper">As of ${fmtTs(holdingsTs)}</span>` : ''}
       </div>
       <input id="holding-filter" type="text" placeholder="Filter by name or ticker…"
-        class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-200">
+        class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-green-200">
       <div class="text-xs text-gray-400 grid gap-x-3 mb-1 pr-1"
            style="grid-template-columns:3.5rem 1fr 7rem 5rem">
         <span class="text-right">Ticker</span><span>Name</span><span>Sector</span><span class="hidden sm:block">Country</span>
@@ -2617,10 +2617,10 @@ async function showTab(tab) {
             <div class="flex-1 min-w-0">
               <div class="flex items-center justify-between mb-0.5">
                 <span class="text-xs font-medium text-gray-700 truncate">${r.name || ''}</span>
-                <span class="text-xs font-bold text-blue-700 ml-2 shrink-0">${r.weight_pct != null ? r.weight_pct.toFixed(2) + '%' : '—'}</span>
+                <span class="text-xs font-bold text-green-700 ml-2 shrink-0">${r.weight_pct != null ? r.weight_pct.toFixed(2) + '%' : '—'}</span>
               </div>
               <div class="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                <div class="h-full bg-blue-400 rounded-full pbar"
+                <div class="h-full bg-green-400 rounded-full pbar"
                      style="width:${maxW > 0 ? ((r.weight_pct || 0) / maxW * 100).toFixed(1) : 0}%"></div>
               </div>
             </div>
@@ -2630,7 +2630,7 @@ async function showTab(tab) {
       </div>
       ${all.length > 50 ? `
         <button id="show-all-holdings"
-          class="mt-2 w-full text-xs text-blue-600 hover:text-blue-800 hover:underline py-1.5 border-t border-gray-100">
+          class="mt-2 w-full text-xs text-green-600 hover:text-green-800 hover:underline py-1.5 border-t border-gray-100">
           Show all ${all.length} holdings ↓
         </button>` : ''}`;
 
@@ -2730,9 +2730,9 @@ async function showTab(tab) {
           <p class="text-xs text-gray-400 font-medium">Income / Unit</p>
           <p class="text-xl font-bold text-gray-800 mt-0.5">${money(incomePerUnit)}</p>
         </div>` : ''}
-        ${incomePerTenK != null ? `<div class="bg-blue-50 rounded-lg p-3 border border-blue-100">
-          <p class="text-xs text-blue-600 font-medium">Est. Income / $10K</p>
-          <p class="text-xl font-bold text-blue-700 mt-0.5">${money(incomePerTenK)}<span class="text-xs font-normal text-blue-400">/yr</span></p>
+        ${incomePerTenK != null ? `<div class="bg-green-50 rounded-lg p-3 border border-green-100">
+          <p class="text-xs text-green-600 font-medium">Est. Income / $10K</p>
+          <p class="text-xl font-bold text-green-700 mt-0.5">${money(incomePerTenK)}<span class="text-xs font-normal text-green-400">/yr</span></p>
         </div>` : ''}
       </div>` : '';
 
@@ -2836,7 +2836,7 @@ async function renderPerformanceTab(code) {
         ${periods.map(p => `
           <button data-period="${p}"
                   class="perf-period px-3 py-1 text-xs rounded-lg border font-medium transition-colors
-                         ${p === '1y' ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-200 text-gray-500 hover:border-blue-400 hover:text-blue-600'}">
+                         ${p === '1y' ? 'bg-green-600 text-white border-green-600' : 'border-gray-200 text-gray-500 hover:border-green-400 hover:text-green-600'}">
             ${labels[p]}
           </button>`).join('')}
       </div>
@@ -2857,11 +2857,11 @@ async function renderPerformanceTab(code) {
     const btn = e.target.closest('[data-period]');
     if (!btn) return;
     document.querySelectorAll('.perf-period').forEach(b => {
-      b.className = b.className.replace('bg-blue-600 text-white border-blue-600',
-                                        'border-gray-200 text-gray-500 hover:border-blue-400 hover:text-blue-600');
+      b.className = b.className.replace('bg-green-600 text-white border-green-600',
+                                        'border-gray-200 text-gray-500 hover:border-green-400 hover:text-green-600');
     });
-    btn.className = btn.className.replace('border-gray-200 text-gray-500 hover:border-blue-400 hover:text-blue-600',
-                                          'bg-blue-600 text-white border-blue-600');
+    btn.className = btn.className.replace('border-gray-200 text-gray-500 hover:border-green-400 hover:text-green-600',
+                                          'bg-green-600 text-white border-green-600');
     await loadPerfData(code, btn.dataset.period);
   });
 }
@@ -3071,7 +3071,7 @@ function renderPerfTable(d, code, prices) {
       <thead>
         <tr class="border-b border-gray-200">
           <th class="pb-2 pr-3 text-left text-xs text-gray-400 font-semibold uppercase">Period</th>
-          <th class="pb-2 px-3 text-right text-xs text-blue-600 font-semibold uppercase">${code} Return</th>
+          <th class="pb-2 px-3 text-right text-xs text-green-600 font-semibold uppercase">${code} Return</th>
           ${headerCols}
         </tr>
       </thead>
@@ -3103,7 +3103,7 @@ document.getElementById('search').addEventListener('input', function () {
       return;
     }
     el.innerHTML = d.results.slice(0, 10).map(r => `
-      <div class="px-3 py-2.5 hover:bg-blue-50 cursor-pointer flex justify-between items-center border-b last:border-b-0"
+      <div class="px-3 py-2.5 hover:bg-green-50 cursor-pointer flex justify-between items-center border-b last:border-b-0"
            data-code="${r.code}">
         <div>
           <span class="font-bold text-gray-900">${r.code}</span>
@@ -3481,7 +3481,7 @@ async function initScreener() {
   (cats.categories || []).forEach(c => {
     const id = 'sca-' + c.asset_class.replace(/\W/g, '_');
     const label = document.createElement('label');
-    label.innerHTML = `<input type="checkbox" id="${id}" value="${c.asset_class}" class="sc-ac accent-blue-600">
+    label.innerHTML = `<input type="checkbox" id="${id}" value="${c.asset_class}" class="sc-ac accent-green-600">
       <span class="truncate">${c.asset_class} <span class="text-gray-400">(${c.etf_count})</span></span>`;
     label.querySelector('input').addEventListener('change', e => {
       if (e.target.checked) scFilters.assetClasses.add(e.target.value);
@@ -3495,7 +3495,7 @@ async function initScreener() {
   (issuers.issuers || []).forEach(i => {
     const id = 'sci-' + i.name.replace(/\W/g, '_');
     const label = document.createElement('label');
-    label.innerHTML = `<input type="checkbox" id="${id}" value="${i.name}" class="sc-is accent-blue-600">
+    label.innerHTML = `<input type="checkbox" id="${id}" value="${i.name}" class="sc-is accent-green-600">
       <span class="truncate">${i.name} <span class="text-gray-400">(${i.etf_count})</span></span>`;
     label.querySelector('input').addEventListener('change', e => {
       if (e.target.checked) scFilters.issuers.add(e.target.value);
@@ -3509,10 +3509,10 @@ async function initScreener() {
   document.querySelectorAll('.sc-exch').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.sc-exch').forEach(b => {
-        b.classList.remove('active', 'bg-blue-600', 'text-white', 'border-blue-600');
+        b.classList.remove('active', 'bg-green-600', 'text-white', 'border-green-600');
         b.classList.add('text-gray-600', 'border-gray-200');
       });
-      btn.classList.add('active', 'bg-blue-600', 'text-white', 'border-blue-600');
+      btn.classList.add('active', 'bg-green-600', 'text-white', 'border-green-600');
       btn.classList.remove('text-gray-600', 'border-gray-200');
       scFilters.exchange = btn.dataset.exch;
       scDebounceFetch();
@@ -3560,11 +3560,11 @@ async function initScreener() {
     document.querySelectorAll('#sc-asset-list input, #sc-issuer-list input').forEach(cb =>
       cb.checked = false);
     document.querySelectorAll('.sc-exch').forEach(b => {
-      b.classList.remove('active','bg-blue-600','text-white','border-blue-600');
+      b.classList.remove('active','bg-green-600','text-white','border-green-600');
       b.classList.add('text-gray-600','border-gray-200');
     });
     document.querySelector('.sc-exch[data-exch=""]').classList.add(
-      'active','bg-blue-600','text-white','border-blue-600');
+      'active','bg-green-600','text-white','border-green-600');
     scFetch();
   });
 
@@ -3659,8 +3659,8 @@ function initCompare() {
         return;
       }
       dd.innerHTML = d.results.slice(0, 8).map(r => `
-        <div class="px-3 py-2 hover:bg-blue-50 cursor-pointer flex justify-between items-center
-                    border-b last:border-b-0 ${cmpSet.has(r.code) ? 'bg-blue-50' : ''}"
+        <div class="px-3 py-2 hover:bg-green-50 cursor-pointer flex justify-between items-center
+                    border-b last:border-b-0 ${cmpSet.has(r.code) ? 'bg-green-50' : ''}"
              data-code="${r.code}" data-name="${r.name || ''}">
           <div>
             <span class="font-bold text-gray-900">${r.code}</span>
@@ -3697,11 +3697,11 @@ function initCompare() {
 function renderCmpChips() {
   const el = document.getElementById('cmp-chips');
   el.innerHTML = [...cmpSet].map(code => `
-    <span class="inline-flex items-center gap-1 bg-blue-100 text-blue-800 text-xs font-semibold
+    <span class="inline-flex items-center gap-1 bg-green-100 text-green-800 text-xs font-semibold
                  px-2.5 py-1 rounded-full">
       ${code}
       <button onclick="cmpRemove('${code}')"
-              class="ml-0.5 text-blue-500 hover:text-blue-800 font-bold text-sm leading-none">×</button>
+              class="ml-0.5 text-green-500 hover:text-green-800 font-bold text-sm leading-none">×</button>
     </span>`).join('');
 }
 
@@ -3771,9 +3771,9 @@ async function cmpFetchSimilar() {
                        : s.overlap_pct >= 20 ? 'bg-yellow-100 text-yellow-700'
                        : 'bg-gray-100 text-gray-500';
     return `
-      <div class="bg-white border ${dimmed ? 'border-dashed border-gray-200 opacity-80' : 'border-gray-200'} rounded-xl p-4 hover:shadow-md hover:border-blue-200 transition-all">
+      <div class="bg-white border ${dimmed ? 'border-dashed border-gray-200 opacity-80' : 'border-gray-200'} rounded-xl p-4 hover:shadow-md hover:border-green-200 transition-all">
         <div class="flex justify-between items-start mb-1">
-          <span class="font-bold text-blue-700 text-base">${s.code}</span>
+          <span class="font-bold text-green-700 text-base">${s.code}</span>
           <span class="text-xs ${overlapColor} font-semibold px-2 py-0.5 rounded-full">${s.overlap_pct.toFixed(0)}% overlap</span>
         </div>
         <p class="text-xs text-gray-500 mb-1 leading-snug">${(s.name || '').slice(0, 50)}</p>
@@ -3785,7 +3785,7 @@ async function cmpFetchSimilar() {
           ${s.return_1y != null ? `<span class="${pctCls(s.return_1y)}">${pct(s.return_1y)} 1Y</span>` : ''}
         </div>
         <button onclick="cmpAdd('${s.code}')"
-                class="mt-3 text-xs text-blue-600 hover:text-blue-800 font-medium border border-blue-200 hover:border-blue-400 rounded-lg px-3 py-1 transition-colors">
+                class="mt-3 text-xs text-green-600 hover:text-green-800 font-medium border border-green-200 hover:border-green-400 rounded-lg px-3 py-1 transition-colors">
           + Add to Compare
         </button>
       </div>`;
@@ -3872,7 +3872,7 @@ function renderCmpTable(etfs) {
 
   const thCols = etfs.map(e => `
     <th class="px-4 py-3 text-center min-w-[140px]">
-      <div class="font-bold text-blue-700 text-base">${e.code}</div>
+      <div class="font-bold text-green-700 text-base">${e.code}</div>
       <button onclick="cmpRemove('${e.code}')"
               class="text-xs text-gray-400 hover:text-red-500 mt-0.5">Remove</button>
     </th>`).join('');
@@ -3944,17 +3944,17 @@ async function hsFetch() {
   const maxW = Math.max(...d.results.map(r => r.weight_pct || 0));
   document.getElementById('holdings-table').innerHTML = d.results.map(r => `
     <tr class="cursor-pointer" onclick="showDetail('${r.etf_code}');document.querySelector('.main-tab[data-view=list]').click()">
-      <td class="px-3 py-2.5 font-bold text-blue-700">${r.etf_code}</td>
+      <td class="px-3 py-2.5 font-bold text-green-700">${r.etf_code}</td>
       <td class="px-3 py-2.5 text-gray-600 max-w-[160px] truncate text-xs">${r.etf_name || ''}</td>
       <td class="px-3 py-2.5 font-medium text-gray-800 max-w-[180px] truncate">${r.holding_name || ''}</td>
       <td class="px-3 py-2.5 font-mono text-xs text-gray-500">${r.ticker || '—'}</td>
       <td class="px-3 py-2.5 text-right">
         <div class="flex items-center justify-end gap-2">
           <div class="w-16 bg-gray-100 rounded-full h-1.5 overflow-hidden">
-            <div class="h-full bg-blue-400 rounded-full"
+            <div class="h-full bg-green-400 rounded-full"
                  style="width:${maxW > 0 ? (r.weight_pct / maxW * 100).toFixed(1) : 0}%"></div>
           </div>
-          <span class="font-bold text-blue-700 text-xs w-12 text-right">
+          <span class="font-bold text-green-700 text-xs w-12 text-right">
             ${r.weight_pct != null ? r.weight_pct.toFixed(2) + '%' : '—'}
           </span>
         </div>
@@ -4117,7 +4117,7 @@ def _articles_head(title):
 
 def _articles_nav(active_slug=None):
     return """
-<header class="bg-gradient-to-r from-blue-900 to-blue-700 shadow-xl">
+<header class="bg-gradient-to-r from-green-900 to-green-700 shadow-xl">
   <div class="max-w-4xl mx-auto px-5 py-3 flex items-center gap-4">
     <a href="/dashboard" class="text-white/70 hover:text-white text-sm flex items-center gap-1.5">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
@@ -4196,7 +4196,7 @@ def _handle_article_detail(self, slug):
     </article>
   </div>
   <div class="mt-5">
-    <a href="/articles" class="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1">
+    <a href="/articles" class="text-sm text-green-600 hover:text-green-800 flex items-center gap-1">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
       Back to all articles
     </a>
