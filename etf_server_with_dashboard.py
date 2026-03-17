@@ -2276,16 +2276,36 @@ function fmtFum(v) {
   if (v >= 1000) return '$' + (v / 1000).toFixed(1) + 'B';
   return '$' + Math.round(v) + 'M';
 }
-/* Return FUM in AUD millions: units × price where available, else ASX report figure */
-function calcFum(e) {
+/* CHESS FUM: units on issue × last price (null when units unavailable) */
+function chessFum(e) {
   if (e.units_on_issue && e.current_price)
     return e.units_on_issue * e.current_price / 1e6;
-  return e.fund_size_aud_millions;
+  return null;
+}
+/* Primary display FUM: CHESS preferred, fallback to ASX report total */
+function calcFum(e) {
+  return chessFum(e) ?? e.fund_size_aud_millions;
 }
 function fumTip(e) {
   return e.units_on_issue && e.current_price
-    ? 'FUM = units on issue × price · ' + (e.units_on_issue_date || 'issuer website')
-    : 'FUM · ASX Monthly Report · ' + fmtTs(tsFor('asx_report'));
+    ? 'CHESS FUM = units on issue × last price · ' + (e.units_on_issue_date || 'ASX monthly report')
+    : 'Total FUM · ASX Monthly Report · ' + fmtTs(tsFor('asx_report'));
+}
+/*
+ * fumDisplay(e) — shows CHESS FUM as primary with total FUM below when both exist.
+ * Used in list table and compare table.
+ */
+function fumDisplay(e) {
+  const chess = chessFum(e);
+  const total = e.fund_size_aud_millions;
+  if (chess != null && total != null) {
+    const chessTip = 'CHESS FUM = ' + (e.units_on_issue ? e.units_on_issue.toLocaleString() + ' units' : '') + ' × ' + (e.current_price ? '$' + e.current_price : 'last price');
+    return `<div>
+      <div class="font-medium text-gray-800 tabular-nums" title="${chessTip}">${fmtFum(chess)}</div>
+      <div class="text-xs text-gray-400 tabular-nums" title="Total FUM · ASX Monthly Report">Total ${fmtFum(total)}</div>
+    </div>`;
+  }
+  return `<span title="${fumTip(e)}">${fmtFum(chess ?? total)}</span>`;
 }
 function fmtUnits(v) {
   if (v == null) return '—';
@@ -2477,7 +2497,7 @@ function renderTable(etfs, total) {
         <span class="dated" title="Price · ${fmtTs(e.last_updated)}">${money(e.current_price)}</span>
       </td>
       <td class="px-3 py-2.5 text-right">
-        <span class="dated" title="${fumTip(e)}">${fmtFum(calcFum(e))}</span>
+        ${fumDisplay(e)}
       </td>
       <td class="px-3 py-2.5 text-right font-semibold ${pctCls(e.return_1y)}">
         <span class="dated" title="1Y Return · ASX Monthly Report · ${fmtTs(tsFor('asx_report'))}">${pct(e.return_1y)}</span>
@@ -2551,9 +2571,14 @@ async function showDetail(code) {
                           tip: '(Price − NAV) / NAV · positive = premium, negative = discount',
                           num: d.premium_discount_pct },
     { label: 'Day Chg',   value: pct(d.day_change_pct),            tip: _pSrc, num: d.day_change_pct },
-    { label: 'FUM',       value: fmtFum(calcFum(d)), tip: fumTip(d) },
+    { label: 'CHESS FUM', value: chessFum(d) != null ? fmtFum(chessFum(d)) : '—',
+                          tip: chessFum(d) != null
+                               ? 'CHESS units on issue × last price · ' + (d.units_on_issue_date || 'ASX monthly report')
+                               : 'Units on issue not available for this fund' },
+    { label: 'Total FUM', value: fmtFum(d.fund_size_aud_millions),
+                          tip: 'Total FUM · ASX Monthly Report · ' + fmtTs(tsFor('asx_report')) },
     { label: 'Units on Issue', value: fmtUnits(d.units_on_issue),
-                          tip: d.units_on_issue_date ? 'Issuer website · ' + d.units_on_issue_date : _aSrc },
+                          tip: d.units_on_issue_date ? 'ASX Monthly Report · ' + d.units_on_issue_date : _aSrc },
     { label: 'Units Change',  value: d.units_change != null
                                      ? (d.units_change >= 0 ? '+' : '-') + fmtUnits(Math.abs(d.units_change)) : '—',
                           tip: d.units_change_date
@@ -4070,7 +4095,8 @@ function renderCmpTable(etfs) {
     { label: 'Exchange',      fmt: e => `<span class="badge-${(e.exchange||'asx').toLowerCase()} px-1.5 py-0.5 rounded text-xs font-medium">${e.exchange || '—'}</span>` },
     { label: 'Asset Class',   fmt: e => acChip(e.asset_class) },
     { label: 'Benchmark',     fmt: e => e.benchmark ? `<span class="text-xs text-indigo-700">${e.benchmark}</span>` : '—' },
-    { label: 'FUM',           fmt: e => fmtFum(calcFum(e)) },
+    { label: 'CHESS FUM',     fmt: e => chessFum(e) != null ? `<span title="CHESS units on issue × last price">${fmtFum(chessFum(e))}</span>` : '<span class="text-gray-300">—</span>' },
+    { label: 'Total FUM',     fmt: e => `<span title="ASX Monthly Report">${fmtFum(e.fund_size_aud_millions)}</span>` },
     { label: 'Mgmt Fee',      fmt: e => miniBar(e.expense_ratio, maxFee, false), bar: true },
     { label: 'Dist. Yield',   fmt: e => miniBar(e.distribution_yield, maxYield, false), bar: true },
     { label: '1M Return',     fmt: e => `<span class="${pctCls(e.return_1m)}">${pct(e.return_1m)}</span>` },
