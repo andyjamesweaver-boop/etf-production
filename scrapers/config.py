@@ -219,6 +219,8 @@ VANGUARD_AU_PORT_IDS = {
     'VTS':  '0970',   # Vanguard US Total Market Shares Index ETF
     'VDAL': 'F100',   # Vanguard Diversified All Growth Index ETF
     'VDIF': 'F101',   # Vanguard Diversified Income ETF
+    'V500': 'F105',   # Vanguard S&P 500 US Shares Index ETF (listed 2026-03-04)
+    'V5AH': 'F106',   # Vanguard S&P 500 US Shares Index (Hedged) ETF (listed 2026-03-04)
 }
 
 # Map common issuer name variants to canonical names

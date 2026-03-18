@@ -751,17 +751,34 @@ def scrape_vanguard(db_path=None) -> int:
                     if api_name:
                         etf_base['name'] = api_name
 
-            # --- Overview: benchmark/index name ---
+            # --- Overview: benchmark, management fee, FUM, distribution frequency ---
             overview_url = f'{_VANGUARD_OVERVIEW_BASE}/{port_id}/overview'
             overview_resp = fetch_json(overview_url, headers=_VANGUARD_API_HEADERS)
             if overview_resp:
                 overview_data = overview_resp.get('data', [])
                 if overview_data and isinstance(overview_data, list):
-                    bm_raw = (overview_data[0].get('benchMarkNameFromECS')
-                              or overview_data[0].get('benchmarkName')
+                    ov = overview_data[0]
+                    bm_raw = (ov.get('benchMarkNameFromECS')
+                              or ov.get('benchmarkName')
                               or '')
                     if bm_raw:
                         etf_base['benchmark'] = html_module.unescape(bm_raw.strip())
+                    # Management fee / expense ratio from fundFees → expenseType ADJEXPRTPC
+                    for fee_group in (ov.get('fundFees') or []):
+                        for exp in (fee_group.get('expenseType') or []):
+                            if exp.get('eipcode') == 'ADJEXPRTPC':
+                                val = _safe_float(exp.get('value'))
+                                if val is not None:
+                                    etf_base['management_fee'] = val
+                                    etf_base['expense_ratio'] = val
+                    # FUM from aumAmountWhole (raw AUD; aumAmount is unreliable for new funds)
+                    aum = _safe_float(ov.get('aumAmountWhole'))
+                    if aum and aum > 0:
+                        etf_base['fund_size_aud_millions'] = round(aum / 1_000_000, 1)
+                    # Distribution frequency
+                    dist_freq = ov.get('distFrequency')
+                    if dist_freq:
+                        etf_base['distribution_frequency'] = dist_freq
             # Fallback for US-domiciled funds where benchMarkNameFromECS is absent
             if 'benchmark' not in etf_base and port_id in _VANGUARD_BENCHMARK_FALLBACK:
                 etf_base['benchmark'] = _VANGUARD_BENCHMARK_FALLBACK[port_id]
@@ -6289,7 +6306,7 @@ def scrape_vaughan_nelson(db_path=None) -> int:
 
 
 # ====================================================================
-# Firetrail (S3GO)
+# Firetrail (S3GO, FIRE)
 # ====================================================================
 # S3GO = Firetrail S3 Global Opportunities Fund Active ETF
 # Quarterly ASX portfolio disclosure PDF at stable URL.
@@ -6298,6 +6315,20 @@ def scrape_vaughan_nelson(db_path=None) -> int:
 
 _FIRETRAIL_HOLDINGS_URL = 'https://firetrail.com/wp-content/uploads/S3GO-Portfolio-Holdings.pdf'
 _FIRETRAIL_CODES = ['S3GO']
+
+# FIRE metadata — static fields known from the fund page (no holdings PDF available yet)
+_FIRETRAIL_FIRE_META = {
+    'code': 'FIRE',
+    'name': 'Firetrail Alpha Plus Fund - Complex ETF',
+    'issuer': 'Firetrail',
+    'exchange': 'ASX',
+    'fund_type': 'Complex ETF',
+    'benchmark': 'S&P/ASX 200 Accumulation Index',
+    'distribution_frequency': 'Semi-annually',
+    'inception_date': '2026-03-04',
+    'issuer_url': 'https://firetrail.com/funds/firetrail-alpha-plus-fund-complex-etf/',
+    'data_source': 'firetrail',
+}
 _FIRETRAIL_WEIGHT_RE = re.compile(r'^([\d]+\.[\d]+)%$')
 
 
@@ -6365,25 +6396,25 @@ def scrape_firetrail(db_path=None) -> int:
     updated = 0
 
     try:
+        # Always upsert static metadata for FIRE (no holdings PDF available)
+        upsert_etf(conn, _FIRETRAIL_FIRE_META)
+        conn.commit()
+        updated += 1
+        logger.info('Firetrail: upserted FIRE metadata')
+
+        # S3GO holdings from quarterly PDF
         resp = fetch(_FIRETRAIL_HOLDINGS_URL)
         if not resp or b'%PDF' not in resp.content[:10]:
-            logger.warning('Firetrail: could not download portfolio holdings PDF')
-            log_scrape(conn, source, 'error', error='PDF download failed',
-                       started_at=started.isoformat())
-            conn.close()
-            return 0
-
-        holdings = _parse_firetrail_holdings_pdf(resp.content)
-        if not holdings:
-            logger.warning('Firetrail: no holdings parsed from PDF')
-            log_scrape(conn, source, 'no_data', started_at=started.isoformat())
-            conn.close()
-            return 0
-
-        for asx_code in _FIRETRAIL_CODES:
-            upsert_holdings(conn, asx_code, holdings)
-            updated += 1
-            logger.info(f'Firetrail: {asx_code} — {len(holdings)} holdings')
+            logger.warning('Firetrail: could not download S3GO portfolio holdings PDF')
+        else:
+            holdings = _parse_firetrail_holdings_pdf(resp.content)
+            if not holdings:
+                logger.warning('Firetrail: no holdings parsed from S3GO PDF')
+            else:
+                for asx_code in _FIRETRAIL_CODES:
+                    upsert_holdings(conn, asx_code, holdings)
+                    updated += 1
+                    logger.info(f'Firetrail: {asx_code} — {len(holdings)} holdings')
 
     except Exception as e:
         logger.warning(f'Firetrail: error: {e}')
