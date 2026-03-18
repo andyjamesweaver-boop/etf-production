@@ -578,6 +578,61 @@ def _parse_detail_page(doc_no: str) -> list[dict] | None:
 
 
 # ---------------------------------------------------------------------------
+# Promote: insert newly-listed ETFs into the main etfs table
+# ---------------------------------------------------------------------------
+
+def _promote_to_etfs(conn) -> int:
+    """
+    For each upcoming listing with status='listed' and a known code that is
+    NOT yet in the etfs table, fetch basic data from the ASX API and insert it.
+    Returns the number of ETFs promoted.
+    """
+    from scrapers.asx_etf_scraper import fetch_etf_price
+    from scrapers.db_writer import upsert_etf
+
+    rows = conn.execute(
+        "SELECT ul.code, ul.name, ul.issuer, ul.exchange, ul.fund_type, "
+        "       ul.expected_listing_date, ul.arsn "
+        "FROM upcoming_listings ul "
+        "WHERE ul.status = 'listed' AND ul.code IS NOT NULL "
+        "  AND NOT EXISTS (SELECT 1 FROM etfs WHERE code = ul.code)"
+    ).fetchall()
+
+    if not rows:
+        return 0
+
+    promoted = 0
+    for row in rows:
+        code = row['code']
+        logger.info(f'  Promoting {code} ({row["name"]}) to etfs table…')
+
+        # Start with what we know from the upcoming_listings record
+        etf_data = {
+            'code': code,
+            'name': row['name'],
+            'issuer': row['issuer'],
+            'exchange': row['exchange'] or 'ASX',
+            'fund_type': row['fund_type'],
+            'inception_date': row['expected_listing_date'],
+            'data_source': 'upcoming_listings',
+        }
+
+        # Enrich with live ASX API data (price, FUM, etc.)
+        api_data = fetch_etf_price(code)
+        if api_data:
+            etf_data.update(api_data)
+            etf_data['data_source'] = 'asx_api'
+
+        upsert_etf(conn, etf_data)
+        conn.commit()
+        promoted += 1
+        logger.info(f'    → Inserted {code}: price={etf_data.get("current_price")}, '
+                    f'FUM={etf_data.get("fund_size_aud_millions")}M')
+
+    return promoted
+
+
+# ---------------------------------------------------------------------------
 # Reconcile: mark pending listings as 'listed' when they appear in etfs table
 # ---------------------------------------------------------------------------
 
@@ -830,6 +885,11 @@ def scrape_upcoming_listings(db_path=None) -> int:
         logger.info('Scanning ASX Online admission notices for listing dates…')
         asx_matches = _scan_asxonline_notices(conn)
         logger.info(f'  Updated {asx_matches} pending listings from ASX Online')
+
+        # Promote newly-listed ETFs into the main etfs table
+        logger.info('Promoting newly-listed ETFs into main etfs table…')
+        etfs_added = _promote_to_etfs(conn)
+        logger.info(f'  Promoted {etfs_added} new ETFs')
 
     except Exception as e:
         logger.error(f'Upcoming listings scraper failed: {e}', exc_info=True)
