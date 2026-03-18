@@ -268,7 +268,31 @@ def create_tables(conn):
         )
     ''')
 
-    # 9. scrape_log
+    # 9. upcoming_listings — ETFs announced but not yet listed on ASX/Cboe
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS upcoming_listings (
+            id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+            asic_doc_no             TEXT UNIQUE NOT NULL,
+            code                    TEXT,
+            name                    TEXT,
+            scheme_name             TEXT,
+            issuer                  TEXT,
+            exchange                TEXT,
+            asset_class             TEXT,
+            fund_type               TEXT,
+            arsn                    TEXT,
+            expected_listing_date   TEXT,
+            pds_lodged_date         TEXT,
+            offer_doc_url           TEXT,
+            asic_detail_url         TEXT,
+            status                  TEXT DEFAULT 'pending',
+            notes                   TEXT,
+            created_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    # 10. scrape_log
     conn.execute('''
         CREATE TABLE IF NOT EXISTS scrape_log (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -61,6 +61,7 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
             '/api/v1/insights/expense':  self.handle_insights_expense,
             '/api/v1/insights/issuers':  self.handle_insights_issuers,
             '/api/v1/insights/nav':      self.handle_insights_nav,
+            '/api/v1/insights/upcoming': self.handle_insights_upcoming,
             # Insights pages
             '/insights/fum':      lambda: self.handle_insights_page('fum'),
             '/insights/listings': lambda: self.handle_insights_page('listings'),
@@ -68,6 +69,7 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
             '/insights/expense':  lambda: self.handle_insights_page('expense'),
             '/insights/issuers':  lambda: self.handle_insights_page('issuers'),
             '/insights/nav':      lambda: self.handle_insights_page('nav'),
+            '/insights/upcoming': lambda: self.handle_insights_page('upcoming'),
             '/admin/sync-db':     self.handle_sync_db,
             # Articles
             '/articles':          self.handle_articles_list,
@@ -468,6 +470,9 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
             stats = conn.execute('''
                 SELECT COUNT(*) as total_etfs,
                        COALESCE(SUM(fund_size_aud_millions),0) as total_fum_millions,
+                       COALESCE(SUM(CASE WHEN units_on_issue IS NOT NULL AND current_price IS NOT NULL
+                                         THEN units_on_issue * current_price / 1e6
+                                         ELSE fund_size_aud_millions END),0) as chess_fum_millions,
                        COALESCE(AVG(return_1y),0) as avg_return_1y,
                        COALESCE(AVG(expense_ratio),0) as avg_expense_ratio
                 FROM etfs
@@ -493,6 +498,7 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
 
             self.send_json({
                 'total_fum_millions': stats['total_fum_millions'],
+                'chess_fum_millions': stats['chess_fum_millions'],
                 'total_etfs': stats['total_etfs'],
                 'avg_return_1y': round(stats['avg_return_1y'], 2),
                 'avg_expense_ratio': round(stats['avg_expense_ratio'], 3),
@@ -1411,6 +1417,68 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
         finally:
             conn.close()
 
+    def handle_insights_upcoming(self):
+        conn = get_db()
+        try:
+            from datetime import date
+            today = date.today().isoformat()
+            ytd_start = date.today().replace(month=1, day=1).isoformat()
+            d30 = date.today().replace(day=1).isoformat()  # approx; use actual -30d
+            from datetime import timedelta
+            d30 = (date.today() - timedelta(days=30)).isoformat()
+            d90 = (date.today() - timedelta(days=90)).isoformat()
+
+            # --- Upcoming: pending listings from upcoming_listings table ---
+            has_upcoming_table = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='upcoming_listings'"
+            ).fetchone()
+
+            upcoming = []
+            if has_upcoming_table:
+                rows = conn.execute("""
+                    SELECT asic_doc_no, code, name, scheme_name, issuer, exchange,
+                           asset_class, fund_type, arsn, expected_listing_date,
+                           pds_lodged_date, offer_doc_url, asic_detail_url, status
+                    FROM upcoming_listings
+                    WHERE status = 'pending'
+                    ORDER BY expected_listing_date ASC NULLS LAST
+                """).fetchall()
+                upcoming = [dict(r) for r in rows]
+
+            # --- Recently listed: from etfs table by inception_date ---
+            recent = conn.execute("""
+                SELECT code, name, issuer, exchange, asset_class, fund_type,
+                       inception_date, management_fee, expense_ratio,
+                       fund_size_aud_millions
+                FROM etfs
+                WHERE inception_date >= ?
+                ORDER BY inception_date DESC
+            """, (d90,)).fetchall()
+            recent = [dict(r) for r in recent]
+
+            # Stats
+            upcoming_count = len(upcoming)
+            listed_last_30 = sum(1 for r in recent if r['inception_date'] and r['inception_date'] >= d30)
+            listed_last_90 = len(recent)
+            listed_ytd = conn.execute(
+                "SELECT COUNT(*) FROM etfs WHERE inception_date >= ?", (ytd_start,)
+            ).fetchone()[0]
+
+            self.send_json({
+                'upcoming': upcoming,
+                'recent': recent,
+                'stats': {
+                    'upcoming_count': upcoming_count,
+                    'listed_last_30': listed_last_30,
+                    'listed_last_90': listed_last_90,
+                    'listed_ytd': listed_ytd,
+                },
+            })
+        except Exception as e:
+            self.send_json({'error': str(e)}, 500)
+        finally:
+            conn.close()
+
     # ================================================================== DB SYNC
     def handle_sync_db(self):
         """
@@ -1620,10 +1688,10 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
 
   <!-- ── Stat cards ── -->
   <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 mb-5">
-    <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer" onclick="goCard('fum')" title="View FUM breakdown by asset class">
-      <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Total FUM</p>
+    <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer" onclick="goCard('fum')" title="CHESS FUM = units on issue × last price. View FUM breakdown by asset class.">
+      <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">CHESS FUM</p>
       <p id="c-fum" class="text-2xl font-bold text-gray-900 mt-1 leading-tight">—</p>
-      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">AUD <span class="text-green-300">›</span></p>
+      <p class="text-gray-400 text-xs mt-0.5 flex items-center justify-between">Total <span id="c-fum-total" class="tabular-nums">—</span> <span class="text-green-300">›</span></p>
     </div>
     <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer" onclick="goCard('count')" title="Browse all ETFs sorted by size">
       <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">ETFs Listed</p>
@@ -1654,6 +1722,11 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
       <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Prem / Disc</p>
       <p id="c-nav" class="text-2xl font-bold text-gray-900 mt-1 leading-tight">—</p>
       <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">vs NAV <span class="text-green-300">›</span></p>
+    </div>
+    <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer" onclick="goCard('upcoming')" title="Upcoming & recently listed ETFs">
+      <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Coming Soon</p>
+      <p id="c-upcoming" class="text-2xl font-bold text-indigo-600 mt-1 leading-tight">—</p>
+      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">new listings <span class="text-green-300">›</span></p>
     </div>
   </div>
 
@@ -1694,6 +1767,10 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
       <a href="/articles" class="main-tab flex items-center gap-1" style="text-decoration:none">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
         Articles
+      </a>
+      <a href="/insights/upcoming" class="main-tab flex items-center gap-1" style="text-decoration:none">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+        New Listings
       </a>
       <a href="/screener/preferences" class="main-tab flex items-center gap-1" style="text-decoration:none">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
@@ -2385,7 +2462,8 @@ async function loadFilters() {
 /* ======================================================= overview stats */
 async function loadOverview() {
   const m = await api('/api/v1/market/overview');
-  document.getElementById('c-fum').textContent = fmtFum(m.total_fum_millions);
+  document.getElementById('c-fum').textContent = fmtFum(m.chess_fum_millions ?? m.total_fum_millions);
+  document.getElementById('c-fum-total').textContent = fmtFum(m.total_fum_millions);
   document.getElementById('c-count').textContent = (m.total_etfs || 0).toLocaleString();
   const ret = document.getElementById('c-ret');
   ret.textContent = pct(m.avg_return_1y);
@@ -2403,9 +2481,15 @@ async function loadOverview() {
     navEl.textContent = (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
     navEl.className = 'text-2xl font-bold mt-1 leading-tight ' + (v >= 0 ? 'text-green-600' : 'text-red-500');
   }
+  // Upcoming listings stat card (best-effort, non-blocking)
+  try {
+    const up = await api('/api/v1/insights/upcoming');
+    const n = (up.stats || {}).upcoming_count || 0;
+    document.getElementById('c-upcoming').textContent = n > 0 ? n : '—';
+  } catch (_) {}
   const now = new Date().toLocaleTimeString();
   document.getElementById('subtitle').textContent =
-    `${(m.total_etfs || 0).toLocaleString()} ETFs · ${fmtFum(m.total_fum_millions)} FUM · ${now}`;
+    `${(m.total_etfs || 0).toLocaleString()} ETFs · ${fmtFum(m.chess_fum_millions ?? m.total_fum_millions)} CHESS FUM · ${now}`;
   document.getElementById('last-refresh').textContent = 'Live · ' + now;
 }
 
@@ -2419,6 +2503,7 @@ function goCard(type) {
     case 'top':      window.location.href = '/insights/returns';   break;
     case 'issuers':  window.location.href = '/insights/issuers';   break;
     case 'nav':      window.location.href = '/insights/nav';       break;
+    case 'upcoming': window.location.href = '/insights/upcoming';  break;
   }
 }
 
@@ -3580,7 +3665,49 @@ async function init() {
 }
 
 init();
-setInterval(() => { loadOverview(); loadTable(); }, 120000);
+/* ======================================================= detail panel live refresh */
+async function refreshDetailMetrics(code) {
+  const metricsEl = document.getElementById('d-metrics');
+  if (!metricsEl) return;
+  try {
+    const d = await api('/api/v1/etfs/' + code);
+    const _pSrc = 'ASX live data · ' + fmtTs(d.last_updated);
+    const updates = {
+      'Price':     { value: money(d.current_price), tip: _pSrc },
+      'Day Chg':   { value: pct(d.day_change_pct), tip: _pSrc, num: d.day_change_pct },
+      'Prem/Disc': { value: d.premium_discount_pct != null
+                             ? (d.premium_discount_pct >= 0 ? '+' : '') + d.premium_discount_pct.toFixed(3) + '%' : '—',
+                     tip: '(Price − NAV) / NAV · positive = premium, negative = discount',
+                     num: d.premium_discount_pct },
+      'CHESS FUM': { value: chessFum(d) != null ? fmtFum(chessFum(d)) : '—',
+                     tip: chessFum(d) != null
+                          ? 'CHESS units on issue × last price · ' + (d.units_on_issue_date || 'ASX monthly report')
+                          : 'Units on issue not available for this fund' },
+      'Total FUM': { value: fmtFum(d.fund_size_aud_millions),
+                     tip: 'Total FUM · ASX Monthly Report · ' + fmtTs(tsFor('asx_report')) },
+    };
+    metricsEl.querySelectorAll('div').forEach(cell => {
+      const label = cell.querySelector('p:first-child')?.textContent?.trim();
+      const upd = updates[label];
+      if (!upd) return;
+      const valEl = cell.querySelector('p:last-child');
+      if (!valEl) return;
+      valEl.textContent = upd.value;
+      if (upd.tip) valEl.title = upd.tip;
+      if (upd.num != null) {
+        valEl.className = `font-semibold text-sm mt-0.5 truncate ${pctCls(upd.num)} dated`;
+      }
+    });
+  } catch (e) { /* silent */ }
+}
+
+setInterval(() => {
+  loadOverview();
+  loadTable();
+  if (selectedCode && !document.getElementById('detail-panel').classList.contains('hidden')) {
+    refreshDetailMetrics(selectedCode);
+  }
+}, 120000);
 
 /* ======================================================= main view tabs */
 const VIEWS = ['list', 'screener', 'compare', 'holdings', 'analytics'];

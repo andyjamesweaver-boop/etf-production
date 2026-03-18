@@ -1292,6 +1292,226 @@ PAGE_NAV = _page(
 
 
 # ---------------------------------------------------------------------------
+# Upcoming ETF Listings
+# ---------------------------------------------------------------------------
+_UPCOMING_BODY = """
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5" id="stats-row">
+  <div class="card text-center">
+    <div class="sv text-indigo-600" id="s-upcoming">—</div>
+    <div class="sl mt-1">Coming Soon</div>
+    <div class="ss">pending on ASX/Cboe</div>
+  </div>
+  <div class="card text-center">
+    <div class="sv text-green-600" id="s-listed30">—</div>
+    <div class="sl mt-1">Listed (30d)</div>
+    <div class="ss">new listings this month</div>
+  </div>
+  <div class="card text-center">
+    <div class="sv text-blue-500" id="s-listed90">—</div>
+    <div class="sl mt-1">Listed (90d)</div>
+    <div class="ss">last three months</div>
+  </div>
+  <div class="card text-center">
+    <div class="sv text-amber-500" id="s-ytd">—</div>
+    <div class="sl mt-1">Listed (YTD)</div>
+    <div class="ss">this calendar year</div>
+  </div>
+</div>
+
+<!-- Upcoming -->
+<div class="card mb-5">
+  <div class="flex items-center justify-between mb-4">
+    <div>
+      <h2 class="text-base font-bold text-gray-800">Coming Soon</h2>
+      <p class="text-xs text-gray-400 mt-0.5">
+        Sourced from ASIC Offer Notice Board — PDS lodgements with 7-day exposure period complete.
+        Expected dates are approximate; actual listing may vary.
+      </p>
+    </div>
+    <a href="https://regulatoryportal.asic.gov.au/offer-notice-board" target="_blank"
+       class="text-xs text-indigo-500 hover:text-indigo-700 font-medium shrink-0 ml-4">
+      ASIC Portal ↗
+    </a>
+  </div>
+  <div id="upcoming-cards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+    <p class="text-sm text-gray-400 col-span-3">Loading…</p>
+  </div>
+</div>
+
+<!-- Recently Listed -->
+<div class="card">
+  <div class="flex items-center justify-between mb-3">
+    <h2 class="text-base font-bold text-gray-800">Recently Listed <span class="text-gray-400 font-normal text-sm">(last 90 days)</span></h2>
+    <div class="flex items-center gap-2">
+      <input id="recent-q" type="text" placeholder="Search…"
+             oninput="renderRecent()"
+             class="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs w-40 bg-gray-50">
+      <select id="recent-exchange" onchange="renderRecent()"
+              class="border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-gray-50">
+        <option value="">All exchanges</option>
+        <option value="ASX">ASX</option>
+        <option value="CXA">Cboe</option>
+      </select>
+    </div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Code</th><th>Fund Name</th><th>Issuer</th>
+        <th>Asset Class</th><th>Listing Date</th><th style="text-align:right">MER</th>
+        <th style="text-align:right">FUM</th>
+      </tr>
+    </thead>
+    <tbody id="recent-table"></tbody>
+  </table>
+  <p id="recent-empty" class="text-sm text-gray-400 text-center py-6 hidden">No recent listings found.</p>
+</div>
+"""
+
+_UPCOMING_JS = """
+let _upData = null;
+
+function daysUntil(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  const now = new Date();
+  now.setHours(0,0,0,0);
+  return Math.round((d - now) / 86400000);
+}
+
+function exchangeBadge(ex) {
+  if (!ex) return '';
+  const styles = {
+    'ASX': 'background:#e0f2fe;color:#0369a1',
+    'CXA': 'background:#fef3c7;color:#92400e',
+  };
+  const s = styles[ex] || 'background:#f1f5f9;color:#475569';
+  return `<span style="${s};font-size:.65rem;font-weight:700;padding:.15rem .4rem;border-radius:4px">${ex}</span>`;
+}
+
+function countdownBadge(days) {
+  if (days === null) return '';
+  if (days < 0)  return '<span style="background:#fef9c3;color:#854d0e;font-size:.65rem;font-weight:700;padding:.15rem .4rem;border-radius:4px">Date passed</span>';
+  if (days === 0) return '<span style="background:#dcfce7;color:#166534;font-size:.65rem;font-weight:700;padding:.15rem .4rem;border-radius:4px">Today</span>';
+  if (days <= 7)  return `<span style="background:#dcfce7;color:#166534;font-size:.65rem;font-weight:700;padding:.15rem .4rem;border-radius:4px">${days}d</span>`;
+  if (days <= 30) return `<span style="background:#e0f2fe;color:#0369a1;font-size:.65rem;font-weight:700;padding:.15rem .4rem;border-radius:4px">${days}d</span>`;
+  return `<span style="background:#f1f5f9;color:#475569;font-size:.65rem;font-weight:700;padding:.15rem .4rem;border-radius:4px">${days}d</span>`;
+}
+
+function newBadge(daysAgo) {
+  if (daysAgo <= 7)  return '<span style="background:#dcfce7;color:#166534;font-size:.62rem;font-weight:700;padding:.12rem .35rem;border-radius:4px;margin-left:4px">NEW</span>';
+  if (daysAgo <= 30) return '<span style="background:#e0f2fe;color:#0369a1;font-size:.62rem;font-weight:700;padding:.12rem .35rem;border-radius:4px;margin-left:4px">NEW</span>';
+  return '';
+}
+
+function renderUpcoming() {
+  const up = (_upData.upcoming || []);
+  const container = document.getElementById('upcoming-cards');
+  if (!up.length) {
+    container.innerHTML = '<p class="text-sm text-gray-400 col-span-3 py-4">No upcoming listings found. Run the upcoming listings scraper to populate.</p>';
+    return;
+  }
+  container.innerHTML = up.map(r => {
+    const days = daysUntil(r.expected_listing_date);
+    const dateStr = r.expected_listing_date
+      ? new Date(r.expected_listing_date).toLocaleDateString('en-AU', {day:'numeric',month:'short',year:'numeric'})
+      : '—';
+    const lodgedStr = r.pds_lodged_date
+      ? new Date(r.pds_lodged_date).toLocaleDateString('en-AU', {day:'numeric',month:'short',year:'numeric'})
+      : '—';
+    const links = [];
+    if (r.asic_detail_url) links.push(`<a href="${r.asic_detail_url}" target="_blank" style="color:#6366f1;font-size:.7rem">ASIC notice ↗</a>`);
+    if (r.offer_doc_url)   links.push(`<a href="${r.offer_doc_url}" target="_blank" style="color:#6366f1;font-size:.7rem">Offer doc ↗</a>`);
+    return `
+    <div style="border:1px solid #e2e8f0;border-radius:10px;padding:1rem;background:#fff">
+      <div class="flex items-start justify-between gap-2 mb-2">
+        <div class="flex-1 min-w-0">
+          <div style="font-weight:700;font-size:.82rem;line-height:1.3;color:#1e293b">${r.name || '—'}</div>
+          <div style="font-size:.7rem;color:#64748b;margin-top:.2rem">${r.issuer || '—'}</div>
+        </div>
+        <div class="flex flex-col items-end gap-1 shrink-0">
+          ${exchangeBadge(r.exchange)}
+          ${countdownBadge(days)}
+        </div>
+      </div>
+      ${r.fund_type ? `<div style="font-size:.68rem;color:#94a3b8;margin-bottom:.5rem">${r.fund_type}</div>` : ''}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.25rem;font-size:.7rem;color:#475569;margin-bottom:.75rem">
+        <div><span style="color:#94a3b8">Expected:</span> ${dateStr}</div>
+        <div><span style="color:#94a3b8">PDS lodged:</span> ${lodgedStr}</div>
+        ${r.arsn ? `<div style="grid-column:span 2"><span style="color:#94a3b8">ARSN:</span> ${r.arsn}</div>` : ''}
+      </div>
+      ${links.length ? `<div class="flex gap-3">${links.join('')}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function renderRecent() {
+  const q  = document.getElementById('recent-q').value.toLowerCase();
+  const ex = document.getElementById('recent-exchange').value;
+  let rows = (_upData.recent || []).filter(r =>
+    (!q  || (r.code||'').toLowerCase().includes(q) || (r.name||'').toLowerCase().includes(q) || (r.issuer||'').toLowerCase().includes(q)) &&
+    (!ex || r.exchange === ex)
+  );
+  const tbody = document.getElementById('recent-table');
+  const empty = document.getElementById('recent-empty');
+  if (!rows.length) {
+    tbody.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+  const today = new Date(); today.setHours(0,0,0,0);
+  tbody.innerHTML = rows.map(r => {
+    const listed = r.inception_date ? new Date(r.inception_date) : null;
+    const daysAgo = listed ? Math.round((today - listed) / 86400000) : null;
+    const daysStr = daysAgo !== null ? `${daysAgo}d ago` : '—';
+    const dateStr = listed
+      ? listed.toLocaleDateString('en-AU', {day:'numeric',month:'short',year:'numeric'})
+      : '—';
+    const mer = r.management_fee != null ? r.management_fee.toFixed(2)+'%' : (r.expense_ratio != null ? r.expense_ratio.toFixed(2)+'%' : '—');
+    return `<tr>
+      <td>
+        <span style="font-weight:700;font-family:monospace">${r.code}</span>
+        ${exchangeBadge(r.exchange)}
+        ${daysAgo !== null ? newBadge(daysAgo) : ''}
+      </td>
+      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.name||''}">${r.name||'—'}</td>
+      <td style="color:#64748b;font-size:.75rem">${r.issuer||'—'}</td>
+      <td>${r.asset_class||'—'}</td>
+      <td style="white-space:nowrap"><span style="font-family:monospace">${dateStr}</span><br><span style="font-size:.65rem;color:#94a3b8">${daysStr}</span></td>
+      <td style="text-align:right;font-family:monospace">${mer}</td>
+      <td style="text-align:right">${fmtFum(r.fund_size_aud_millions)}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function init() {
+  document.getElementById('ts').textContent = 'Updated ' + new Date().toLocaleTimeString('en-AU', {hour:'2-digit',minute:'2-digit'});
+  _upData = await api('/api/v1/insights/upcoming');
+
+  const s = _upData.stats || {};
+  document.getElementById('s-upcoming').textContent  = s.upcoming_count ?? '—';
+  document.getElementById('s-listed30').textContent  = s.listed_last_30  ?? '—';
+  document.getElementById('s-listed90').textContent  = s.listed_last_90  ?? '—';
+  document.getElementById('s-ytd').textContent       = s.listed_ytd      ?? '—';
+
+  renderUpcoming();
+  renderRecent();
+
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('page').classList.remove('hidden');
+}
+"""
+
+PAGE_UPCOMING = _page(
+    'Upcoming & Recent ETF Listings',
+    'New ETFs coming to ASX & Cboe — sourced from ASIC Offer Notice Board',
+    _UPCOMING_BODY,
+    _UPCOMING_JS,
+)
+
+
+# ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
 PAGES = {
@@ -1301,6 +1521,7 @@ PAGES = {
     'expense':  PAGE_EXPENSE,
     'issuers':  PAGE_ISSUERS,
     'nav':      PAGE_NAV,
+    'upcoming': PAGE_UPCOMING,
 }
 
 def get_insights_page(name: str) -> str | None:

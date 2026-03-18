@@ -94,6 +94,11 @@ def run_pcf():
     return count
 
 
+def run_upcoming():
+    from scrapers.upcoming_listings_scraper import scrape_upcoming_listings
+    return scrape_upcoming_listings(DB_PATH)
+
+
 SOURCES = {
     'asx_report': ('ASX Monthly Report', run_asx_report),
     'cboe': ('Cboe Australia', run_cboe),
@@ -103,6 +108,7 @@ SOURCES = {
     'nav': ('NAV & Premium/Discount', run_nav),
     'documents': ('Document Ingestion & AI Summaries', run_documents),
     'pcf': ('PCF / Holdings Refresh', run_pcf),
+    'upcoming': ('Upcoming ETF Listings', run_upcoming),
 }
 
 
@@ -183,6 +189,7 @@ Sources:
   master      Rebuild FUM rankings and issuer stats
   documents   Discover PDS/TMD/factsheet URLs and generate AI summaries (slow, costs money)
   pcf         Download PCF/holdings files from issuers + rebuild FUM ranks (twice-daily)
+  upcoming    Scrape ASIC Offer Notice Board for upcoming ETF listings
   all         Run all of the above except 'documents' (default)
         """
     )
@@ -216,12 +223,12 @@ Sources:
 
     if args.source == 'all':
         # documents excluded from default daily run (slow + API costs)
-        sources = ['asx_report', 'cboe', 'issuers', 'asx_api', 'master', 'nav']
+        sources = ['asx_report', 'cboe', 'issuers', 'asx_api', 'master', 'nav', 'upcoming']
     else:
         sources = [args.source]
         # Always run master list after individual scrapers, except for
         # standalone sources
-        if args.source not in ('master', 'documents', 'nav') and 'master' not in sources:
+        if args.source not in ('master', 'documents', 'nav', 'upcoming') and 'master' not in sources:
             sources.append('master')
 
     run_pipeline(sources)
