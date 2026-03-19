@@ -95,17 +95,17 @@ ARTICLES = [
         "subtitle": "Two Japan ETFs, the same underlying market, a 39-percentage-point performance gap. The difference was whether you hedged the yen.",
         "date": "2026-03-19",
         "category": "Performance",
-        "summary": "HJPN, VanEck's currency-hedged Japan ETF, returned 74% from January 2024 to March 2026. IJP, the iShares unhedged equivalent, returned 40% over the same period. Both hold the same Japanese equities. The gap — 34 percentage points — reflects the cost of holding unhedged yen exposure as Japan's currency weakened against the Australian dollar.",
+        "summary": "HJPN, BetaShares' currency-hedged Japan ETF, returned 74% from January 2024 to March 2026. IJP, the iShares unhedged equivalent, returned 40% over the same period. Both hold the same Japanese equities. The gap — 34 percentage points over two years, 39 percentage points over one year — reflects the cost of holding unhedged yen exposure as Japan's currency weakened against the Australian dollar.",
         "body": """
 <p>Japan's equity market has been one of the world's better-performing major markets over the past two years. The Nikkei 225 broke above 40,000 for the first time in March 2024, a milestone that resonated globally as Japanese equities shook off three decades of stagnation. Corporate governance reforms, the end of negative interest rates, and the return of domestic inflation all contributed to a genuine re-rating of Japanese stocks.</p>
 
-<p>Yet two Australia-listed Japan ETFs that both hold Japanese equities produced very different outcomes for investors. VanEck's HJPN (Japan ETF — Currency Hedged) returned <strong>+55.5%</strong> over the past twelve months. The iShares IJP (MSCI Japan ETF, unhedged) returned <strong>+15.7%</strong> over the same period. Both track Japanese equities. The difference is almost entirely currency.</p>
+<p>Yet two Australia-listed Japan ETFs that both hold Japanese equities produced very different outcomes for investors. BetaShares' HJPN (Japan ETF — Currency Hedged) returned <strong>+55.5%</strong> over the past twelve months. The iShares IJP (MSCI Japan ETF, unhedged) returned <strong>+15.7%</strong> over the same period. Both track Japanese equities. The difference is almost entirely currency.</p>
 
 <h2>Performance comparison</h2>
 <table>
   <thead><tr><th>ETF</th><th>Currency Hedging</th><th>1Y Return</th><th>3Y Return</th><th>FUM</th><th>Fee</th></tr></thead>
   <tbody>
-    <tr><td>HJPN</td><td>AUD hedged (removes JPY risk)</td><td class="pos">+55.5%</td><td class="pos">+33.2%</td><td>$247M</td><td>0.56%</td></tr>
+    <tr><td>HJPN</td><td>AUD hedged (removes JPY risk)</td><td class="pos">+55.5%</td><td class="pos">+33.2%</td><td>$244M</td><td>0.56%</td></tr>
     <tr><td>IJP</td><td>Unhedged (full JPY exposure)</td><td class="pos">+15.7%</td><td class="pos">+59.2%</td><td>$1,229M</td><td>0.50%</td></tr>
   </tbody>
 </table>
