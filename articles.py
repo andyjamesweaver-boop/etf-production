@@ -56,7 +56,7 @@ ARTICLES = [
       plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
       scales: {
         x: { ticks: { font: { size: 10 } }, grid: { display: false } },
-        y: { ticks: { font: { size: 10 }, callback: v => v + '' }, grid: { color: '#f1f5f9' }, title: { display: true, text: 'Indexed (Jan 2024 = 100)', font: { size: 10 } } }
+        y: { ticks: { font: { size: 10 }, callback: v => v + '' }, grid: { color: '#1e3860' }, title: { display: true, text: 'Indexed (Jan 2024 = 100)', font: { size: 10 } } }
       }
     }
   });
@@ -136,7 +136,7 @@ ARTICLES = [
       plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
       scales: {
         x: { ticks: { font: { size: 10 } }, grid: { display: false } },
-        y: { ticks: { font: { size: 10 } }, grid: { color: '#f1f5f9' }, title: { display: true, text: 'Indexed (Jan 2024 = 100)', font: { size: 10 } } }
+        y: { ticks: { font: { size: 10 } }, grid: { color: '#1e3860' }, title: { display: true, text: 'Indexed (Jan 2024 = 100)', font: { size: 10 } } }
       }
     }
   });
@@ -219,7 +219,7 @@ ARTICLES = [
       plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
       scales: {
         x:     { ticks: { font: { size: 10 } }, grid: { display: false } },
-        yAUM:  { type: 'linear', position: 'left',  ticks: { font: { size: 10 }, callback: v => '$' + v + 'B' }, grid: { color: '#f1f5f9' } },
+        yAUM:  { type: 'linear', position: 'left',  ticks: { font: { size: 10 }, callback: v => '$' + v + 'B' }, grid: { color: '#1e3860' } },
         yFlow: { type: 'linear', position: 'right', ticks: { font: { size: 10 }, callback: v => '$' + v + 'M' }, grid: { display: false } }
       }
     }
@@ -403,7 +403,7 @@ ARTICLES = [
       plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
       scales: {
         x:     { ticks: { font: { size: 10 } }, grid: { display: false } },
-        yAUM:  { type: 'linear', position: 'left',  ticks: { font: { size: 10 }, callback: v => '$' + v + 'B' }, grid: { color: '#f1f5f9' } },
+        yAUM:  { type: 'linear', position: 'left',  ticks: { font: { size: 10 }, callback: v => '$' + v + 'B' }, grid: { color: '#1e3860' } },
         yFlow: { type: 'linear', position: 'right', ticks: { font: { size: 10 }, callback: v => '$' + v + 'M' }, grid: { display: false } }
       }
     }
@@ -585,7 +585,7 @@ ARTICLES = [
       plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
       scales: {
         x:     { ticks: { font: { size: 10 } }, grid: { display: false } },
-        yAUM:  { type: 'linear', position: 'left',  ticks: { font: { size: 10 }, callback: v => '$' + v + 'B' }, grid: { color: '#f1f5f9' } },
+        yAUM:  { type: 'linear', position: 'left',  ticks: { font: { size: 10 }, callback: v => '$' + v + 'B' }, grid: { color: '#1e3860' } },
         yFlow: { type: 'linear', position: 'right', ticks: { font: { size: 10 }, callback: v => '$' + v + 'M' }, grid: { display: false } }
       }
     }
@@ -766,7 +766,7 @@ ARTICLES = [
       plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
       scales: {
         x:     { ticks: { font: { size: 10 } }, grid: { display: false } },
-        yAUM:  { type: 'linear', position: 'left',  ticks: { font: { size: 10 }, callback: v => '$' + v + 'B' }, grid: { color: '#f1f5f9' } },
+        yAUM:  { type: 'linear', position: 'left',  ticks: { font: { size: 10 }, callback: v => '$' + v + 'B' }, grid: { color: '#1e3860' } },
         yFlow: { type: 'linear', position: 'right', ticks: { font: { size: 10 }, callback: v => '$' + v + 'M' }, grid: { display: false } }
       }
     }
@@ -947,7 +947,7 @@ ARTICLES = [
       plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
       scales: {
         x:     { ticks: { font: { size: 10 } }, grid: { display: false } },
-        yAUM:  { type: 'linear', position: 'left',  ticks: { font: { size: 10 }, callback: v => '$' + v + 'B' }, grid: { color: '#f1f5f9' } },
+        yAUM:  { type: 'linear', position: 'left',  ticks: { font: { size: 10 }, callback: v => '$' + v + 'B' }, grid: { color: '#1e3860' } },
         yFlow: { type: 'linear', position: 'right', ticks: { font: { size: 10 }, callback: v => '$' + v + 'M' }, grid: { display: false } }
       }
     }
@@ -1127,7 +1127,7 @@ ARTICLES = [
       plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
       scales: {
         x:     { ticks: { font: { size: 10 } }, grid: { display: false } },
-        yAUM:  { type: 'linear', position: 'left',  ticks: { font: { size: 10 }, callback: v => '$' + v + 'B' }, grid: { color: '#f1f5f9' } },
+        yAUM:  { type: 'linear', position: 'left',  ticks: { font: { size: 10 }, callback: v => '$' + v + 'B' }, grid: { color: '#1e3860' } },
         yFlow: { type: 'linear', position: 'right', ticks: { font: { size: 10 }, callback: v => '$' + v + 'M' }, grid: { display: false } }
       }
     }

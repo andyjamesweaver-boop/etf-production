@@ -1890,11 +1890,11 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
 
   /* Text */
   .text-gray-900, .text-gray-800, .text-gray-700 { color: #e2e8f0 !important; }
-  .text-gray-600, .text-gray-500                 { color: #7fa3c8 !important; }
-  .text-gray-400, .text-gray-300                 { color: #4a6fa5 !important; }
+  .text-gray-600, .text-gray-500                 { color: #a8c4e0 !important; }
+  .text-gray-400, .text-gray-300                 { color: #7fa3c8 !important; }
   .text-slate-800, .text-slate-700               { color: #e2e8f0 !important; }
-  .text-slate-600, .text-slate-500               { color: #7fa3c8 !important; }
-  .text-slate-400                                { color: #4a6fa5 !important; }
+  .text-slate-600, .text-slate-500               { color: #a8c4e0 !important; }
+  .text-slate-400                                { color: #7fa3c8 !important; }
   .text-blue-900, .text-blue-800                 { color: #93c5fd !important; }
   .text-blue-700, .text-blue-600                 { color: #60a5fa !important; }
   .text-blue-500                                 { color: #3b82f6 !important; }
@@ -1931,7 +1931,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
     border-color: #1e3860 !important;
     color: #e2e8f0 !important;
   }
-  input::placeholder { color: #4a6fa5 !important; }
+  input::placeholder { color: #7fa3c8 !important; }
   select option { background: #0f2040; color: #e2e8f0; }
 
   /* Cards with shadow */
@@ -1967,7 +1967,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
   #etf-table tr.row-selected { background: #1a3a6b !important; }
 
   /* Detail tabs */
-  .dtab { color: #4a6fa5; padding-bottom: 10px; font-weight: 500; transition: color .15s; border-bottom: 2px solid transparent; }
+  .dtab { color: #7fa3c8; padding-bottom: 10px; font-weight: 500; transition: color .15s; border-bottom: 2px solid transparent; }
   .dtab:hover { color: #60a5fa; }
   .tab-active { color: #3b82f6 !important; border-bottom-color: #3b82f6; }
 
@@ -1993,7 +1993,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
   .stat-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,.4); }
 
   /* Main view tabs */
-  .main-tab { color: #4a6fa5; padding: 10px 0; font-weight: 500; transition: color .15s;
+  .main-tab { color: #7fa3c8; padding: 10px 0; font-weight: 500; transition: color .15s;
               border-bottom: 2px solid transparent; white-space: nowrap; }
   .main-tab:hover { color: #60a5fa; }
   .main-tab.active { color: #3b82f6; border-bottom-color: #3b82f6; }
@@ -2004,7 +2004,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
   /* Screener */
   .sc-check-list { max-height: 130px; overflow-y: auto; }
   .sc-check-list label { display: flex; align-items: center; gap: 6px; padding: 3px 0;
-                         cursor: pointer; font-size: .8125rem; color: #7fa3c8; }
+                         cursor: pointer; font-size: .8125rem; color: #a8c4e0; }
   .sc-check-list label:hover { color: #60a5fa; }
 
   /* Compare mini-bars */
@@ -2022,11 +2022,11 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
 
   /* Data freshness tooltip trigger */
   .dated { cursor: help; }
-  .dated:hover { border-bottom: 1px dotted #4a6fa5; }
+  .dated:hover { border-bottom: 1px dotted #7fa3c8; }
 
   /* Article/content pages */
   .prose, .prose p, .prose h2, .prose h3 { color: #e2e8f0 !important; }
-  table th { background: #0d1c35 !important; color: #7fa3c8 !important; border-color: #1e3860 !important; }
+  table th { background: #0d1c35 !important; color: #a8c4e0 !important; border-color: #1e3860 !important; }
   table td { border-color: #1e3860 !important; }
   .chart-box { background: #0f2040; border: 1px solid #1e3860; border-radius: 8px; padding: 16px; margin: 16px 0; }
 
@@ -3258,7 +3258,7 @@ function renderOverviewTab(d) {
   const docLinks = [['PDS',d.pds_url],['TMD',d.tmd_url],['Fact Sheet',d.factsheet_url]].filter(([,u])=>u);
   const docHtml = docLinks.length ? `<div class="flex flex-wrap gap-2 mb-3">
     ${docLinks.map(([lbl,url])=>`<a href="${url}" target="_blank" rel="noopener"
-       class="inline-flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-200 rounded-full text-xs font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors">&#128196; ${lbl}</a>`).join('')}
+       class="inline-flex items-center gap-1 px-3 py-1.5 bg-[#0f2040] border border-[#1e3860] rounded-full text-xs font-medium text-slate-300 hover:border-blue-400 hover:text-blue-400 transition-colors">&#128196; ${lbl}</a>`).join('')}
   </div>` : '';
 
   // Benchmark
@@ -3663,14 +3663,14 @@ async function renderPerformanceTab(code) {
           data: { labels: dates, datasets: [{ data: aums, borderColor: '#3b82f6', backgroundColor: '#3b82f620', fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2 }] },
           options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
             scales:{ x:{ticks:{maxTicksLimit:8,font:{size:9}},grid:{display:false}},
-                     y:{ticks:{font:{size:9},callback:v=>'$'+v.toFixed(0)+'M'},grid:{color:'#f1f5f9'}} } }
+                     y:{ticks:{font:{size:9},callback:v=>'$'+v.toFixed(0)+'M'},grid:{color:'#1e3860'}} } }
         });
         histCharts['perf-flow-hist'] = new Chart(document.getElementById('perf-flow-hist'), {
           type: 'bar',
           data: { labels: dates, datasets: [{ data: flows, backgroundColor: flows.map(v=>v>=0?'#3b82f680':'#ef444480'), borderRadius: 1 }] },
           options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
             scales:{ x:{ticks:{maxTicksLimit:8,font:{size:9}},grid:{display:false}},
-                     y:{ticks:{font:{size:9},callback:v=>'$'+v.toFixed(0)+'M'},grid:{color:'#f1f5f9'}} } }
+                     y:{ticks:{font:{size:9},callback:v=>'$'+v.toFixed(0)+'M'},grid:{color:'#1e3860'}} } }
         });
       }, 50);
     }
@@ -3712,7 +3712,7 @@ async function loadPerfData(code, period) {
       const col = BENCHMARK_COLORS[b] || '#6b7280';
       return `<button data-bmark="${b}"
         class="perf-bmark px-2.5 py-1 text-xs rounded-lg border font-medium transition-colors
-               ${active ? 'text-white' : 'text-gray-500 bg-white border-gray-200 hover:border-gray-400'}"
+               ${active ? 'text-white' : 'text-slate-300 bg-[#0f2040] border-[#1e3860] hover:border-blue-500'}"
         style="${active ? `background:${col};border-color:${col}` : ''}">
         ${BENCHMARK_LABELS[b] || b}
       </button>`;
@@ -3728,10 +3728,10 @@ async function loadPerfData(code, period) {
         const col = BENCHMARK_COLORS[b] || '#6b7280';
         if (activeBmarks.has(b)) {
           btn.style.background = col; btn.style.borderColor = col; btn.classList.add('text-white');
-          btn.classList.remove('text-gray-500', 'bg-white', 'border-gray-200', 'hover:border-gray-400');
+          btn.classList.remove('text-slate-300', 'bg-[#0f2040]', 'border-[#1e3860]', 'hover:border-blue-500');
         } else {
           btn.style.background = ''; btn.style.borderColor = ''; btn.classList.remove('text-white');
-          btn.classList.add('text-gray-500', 'bg-white', 'border-gray-200', 'hover:border-gray-400');
+          btn.classList.add('text-slate-300', 'bg-[#0f2040]', 'border-[#1e3860]', 'hover:border-blue-500');
         }
       });
     });
@@ -3827,7 +3827,7 @@ function drawPerfChart(d, code) {
             callback: v => v.toFixed(0),
           },
           grid: { color: 'rgba(0,0,0,0.04)' },
-          title: { display: true, text: 'Rebased to 100', font: { size: 10 }, color: '#9ca3af' },
+          title: { display: true, text: 'Rebased to 100', font: { size: 10 }, color: '#a8c4e0' },
         },
       },
     },
@@ -4009,7 +4009,7 @@ async function loadAnalytics() {
       const cx = left + width / 2, cy = top + height / 2;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.font = 'bold 13px Inter,sans-serif';
-      ctx.fillStyle = '#1e293b';
+      ctx.fillStyle = '#e2e8f0';
       ctx.fillText(fmtFum(totalAum), cx, cy - 7);
       ctx.font = '10px Inter,sans-serif';
       ctx.fillStyle = '#94a3b8';
@@ -4218,7 +4218,7 @@ async function loadAnalytics() {
         },
         scales: {
           y: {
-            grid: { color: '#f1f5f9' },
+            grid: { color: '#1e3860' },
             ticks: { font: { size: 10 }, callback: v => fmtFum(v) },
           },
           x: {
@@ -5042,7 +5042,7 @@ function makeStackedArea(canvasId, dates, series, colors) {
       scales: {
         x: { ticks: { maxTicksLimit: 12, font: { size: 10 } }, grid: { display: false } },
         y: { stacked: true, ticks: { font: { size: 10 },
-             callback: v => '$' + v.toFixed(0) + 'B' }, grid: { color: '#f1f5f9' } }
+             callback: v => '$' + v.toFixed(0) + 'B' }, grid: { color: '#1e3860' } }
       }
     }
   });
@@ -5063,7 +5063,7 @@ function makeLineChart(canvasId, labels, datasets, yLabel, inlinePlugins) {
       plugins: { legend: { display: datasets.length > 1, position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
       scales: {
         x: { ticks: { maxTicksLimit: 12, font: { size: 10 } }, grid: { display: false } },
-        y: { ticks: { font: { size: 10 } }, grid: { color: '#f1f5f9' } }
+        y: { ticks: { font: { size: 10 } }, grid: { color: '#1e3860' } }
       }
     },
     plugins: inlinePlugins || []
@@ -5084,7 +5084,7 @@ function makeBarChart(canvasId, labels, datasets) {
       plugins: { legend: { display: datasets.length > 1, position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
       scales: {
         x: { ticks: { font: { size: 10 } }, grid: { display: false } },
-        y: { ticks: { font: { size: 10 } }, grid: { color: '#f1f5f9' } }
+        y: { ticks: { font: { size: 10 } }, grid: { color: '#1e3860' } }
       }
     }
   });
@@ -5174,11 +5174,11 @@ async function loadHistIndustry() {
         const pad = 6, bh = 15, bw = tw + pad * 2;
         const bx = Math.min(Math.max(x - bw / 2, 2), chart.width - bw - 2);
         const by = y - lineH - bh - 2;
-        ctx.fillStyle = '#334155';
+        ctx.fillStyle = '#1e3860';
         ctx.beginPath();
         ctx.roundRect(bx, by, bw, bh, 4);
         ctx.fill();
-        ctx.fillStyle = '#f1f5f9';
+        ctx.fillStyle = '#e2e8f0';
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
         ctx.fillText(label, bx + pad, by + bh / 2);
@@ -5211,7 +5211,7 @@ async function loadHistIndustry() {
   if (c) {
     c.options.scales = {
       x: { ticks: { maxTicksLimit: 12, font: { size: 10 } }, grid: { display: false } },
-      yCount: { type: 'linear', position: 'left',  ticks: { font: { size: 10 } }, grid: { color: '#f1f5f9' } },
+      yCount: { type: 'linear', position: 'left',  ticks: { font: { size: 10 } }, grid: { color: '#1e3860' } },
       yFlow:  { type: 'linear', position: 'right', ticks: { font: { size: 10 } }, grid: { display: false } }
     };
     c.update();
@@ -5615,10 +5615,10 @@ def _articles_head(title):
 <style>
   body {{ font-family: Inter, system-ui, -apple-system, sans-serif; background: #0a1628; color: #e2e8f0; }}
   article h2 {{ font-size: 1.15rem; font-weight: 700; margin: 1.5rem 0 .6rem; color: #e2e8f0; }}
-  article p  {{ margin-bottom: 1rem; line-height: 1.7; font-size: .9rem; color: #7fa3c8; }}
+  article p  {{ margin-bottom: 1rem; line-height: 1.7; font-size: .9rem; color: #c8ddf0; }}
   article table {{ width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: .82rem; }}
   article th {{ text-align: left; padding: .4rem .7rem; background: #0d1c35; border-bottom: 1px solid #1e3860;
-                font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #7fa3c8; }}
+                font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #a8c4e0; }}
   article td {{ padding: .4rem .7rem; border-bottom: 1px solid #1e3860; vertical-align: middle; color: #e2e8f0; }}
   article tr:last-child td {{ border-bottom: none; }}
   article tr:hover td {{ background: #142850; }}
