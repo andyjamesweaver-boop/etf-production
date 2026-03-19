@@ -13,18 +13,20 @@ ARTICLES = [
         "subtitle": "Physical gold ETFs returned 137% over the past two years. Gold miners returned more than twice that. Here's why the gap exists — and why it can reverse.",
         "date": "2026-03-19",
         "category": "Performance",
-        "summary": "Physical gold ETFs returned 137% from January 2024 to March 2026. Over the same period, VanEck's Gold Miners ETF (MNRS) returned 363%. The gap is not a mistake — it is operating leverage. But the same mechanism that amplifies gains also amplifies losses, and investors who chased MNRS in early 2024 endured two months of underperformance before the trade delivered.",
+        "summary": "Physical gold ETFs returned 137% from January 2024 to March 2026. Over the same period, BetaShares' Gold Miners Currency Hedged ETF (MNRS) returned 263%. The gap is not a mistake — it is operating leverage. But the same mechanism that amplifies gains also amplifies losses, and investors who chased MNRS in early 2024 endured two months of underperformance before the trade delivered.",
         "body": """
-<p>When gold goes up, gold miners tend to go up more. And when gold falls, they tend to fall harder. This relationship — operating leverage — has been on vivid display over the past two years on the ASX, as VanEck's Gold Miners ETF (MNRS) delivered returns that dwarfed those of the physical gold ETFs it nominally tracks alongside.</p>
+<p>When gold goes up, gold miners tend to go up more. And when gold falls, they tend to fall harder. This relationship — operating leverage — has been on vivid display over the past two years on the ASX, as BetaShares' Global Gold Miners ETF (MNRS) delivered returns that dwarfed those of the physical gold ETFs it nominally tracks alongside.</p>
 
 <p>From January 2024 to March 2026, MNRS rose from $5.01 to $18.21 — a gain of <strong>263%</strong>. Over the same period, the VanEck Gold Bullion ETF (NUGG) rose from $30.45 to $72.28 — a gain of <strong>137%</strong>. Both products benefited from the same underlying commodity. One returned nearly twice the other.</p>
+
+<p>One important structural note: MNRS is currency hedged, meaning it removes the AUD/USD exchange rate from its returns. Investors receive the equity performance of global gold miners in AUD terms, without the overlay of currency movements. This makes the comparison with NUGG (which holds physical gold priced in USD and is unhedged) a cleaner test of the operating leverage thesis — the MNRS outperformance reflects equity amplification of gold's move, not a currency tailwind.</p>
 
 <h2>Performance at a glance</h2>
 <table>
   <thead><tr><th>ETF</th><th>Type</th><th>1Y Return</th><th>2Y Return (est.)</th><th>FUM</th><th>Fee</th></tr></thead>
   <tbody>
-    <tr><td>MNRS</td><td>Gold miners equity</td><td class="pos">+190%</td><td class="pos">+263%</td><td>$289M</td><td>0.57%</td></tr>
-    <tr><td>GDX</td><td>Gold miners equity (large-cap)</td><td class="pos">+138%</td><td>—</td><td>$1,580M</td><td>0.53%</td></tr>
+    <tr><td>MNRS</td><td>Gold miners equity (AUD hedged)</td><td class="pos">+190%</td><td class="pos">+263%</td><td>$285M</td><td>0.57%</td></tr>
+    <tr><td>GDX</td><td>Gold miners equity (large-cap)</td><td class="pos">+138%</td><td>—</td><td>$1,575M</td><td>0.53%</td></tr>
     <tr><td>NUGG</td><td>Physical gold bullion</td><td class="pos">+65%</td><td class="pos">+137%</td><td>$259M</td><td>0.25%</td></tr>
     <tr><td>GLDN</td><td>Physical gold bullion</td><td class="pos">+65%</td><td>—</td><td>$394M</td><td>0.18%</td></tr>
   </tbody>
@@ -81,7 +83,7 @@ ARTICLES = [
 
 <h2>What investors should understand</h2>
 
-<p>MNRS and GDX are equity products, not commodity products. They are affected by company-specific risks, management quality, hedging policies, and equity market valuations, in addition to the gold price. Investors who want pure commodity exposure with lower volatility are better served by NUGG or GLDN (iShares Physical Gold ETF, $394M, fee 0.18%), both of which hold physical gold directly.</p>
+<p>MNRS (BetaShares) and GDX (VanEck) are equity products, not commodity products. They are affected by company-specific risks, management quality, hedging policies, and equity market valuations, in addition to the gold price. Investors who want pure commodity exposure with lower volatility are better served by NUGG or GLDN (iShares Physical Gold ETF, $394M, fee 0.18%), both of which hold physical gold directly.</p>
 
 <p>The fee difference is also meaningful over time. NUGG charges 0.25% and GLDN 0.18%, while MNRS charges 0.57%. In a flat gold environment, that spread compounds unfavourably for miners holders. The case for MNRS rests entirely on the gold price rising — and rising enough to justify the additional volatility, equity risk, and fee cost.</p>
 
