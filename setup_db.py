@@ -292,7 +292,99 @@ def create_tables(conn):
         )
     ''')
 
-    # 10. scrape_log
+    # 10. etp_list — ETP metadata from ASX ETPReportData (includes historical/delisted)
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS etp_list (
+            ticker              TEXT PRIMARY KEY,
+            type                TEXT,
+            name                TEXT,
+            segment             TEXT,
+            sub_segment         TEXT,
+            investment_style    TEXT,
+            smart_beta          TEXT,
+            leveraged_inverse   TEXT,
+            replication_method  TEXT,
+            esg                 TEXT,
+            reference_benchmark TEXT,
+            issuer              TEXT,
+            trim_issuer         TEXT,
+            full_issuer_name    TEXT,
+            investment_manager  TEXT,
+            disclosure          TEXT,
+            admission_date      TEXT,
+            last_list_date      TEXT,
+            is_listed           INTEGER,
+            iress_code          TEXT,
+            bloomberg           TEXT,
+            asset_class         TEXT,
+            strategy            TEXT,
+            country             TEXT,
+            feeder_fund         TEXT,
+            fixed_income        INTEGER,
+            structure           TEXT,
+            master_fund_ticker  TEXT,
+            registry            TEXT,
+            lead_market_maker   TEXT,
+            income_investing    INTEGER,
+            website             TEXT,
+            notes               TEXT,
+            last_updated        TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    # 11. etp_monthly — monthly ETP time-series data from ASX ETPReportData
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS etp_monthly (
+            id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+            date                TEXT NOT NULL,
+            code                TEXT NOT NULL,
+            mer                 REAL,
+            transacted_value    REAL,
+            transacted_volume   REAL,
+            num_trades          INTEGER,
+            monthly_liquidity_pct REAL,
+            spread_pct          REAL,
+            bid_depth           REAL,
+            ask_depth           REAL,
+            last_price          REAL,
+            year_high           REAL,
+            year_low            REAL,
+            distribution_yield  REAL,
+            return_1m           REAL,
+            return_1y           REAL,
+            return_3y           REAL,
+            return_5y           REAL,
+            market_cap          REAL,
+            market_cap_change   REAL,
+            funds_flow          REAL,
+            spread_quartile     TEXT,
+            total_units         REAL,
+            mer_fee             REAL,
+            mer_quartile        TEXT,
+            is_cdi              INTEGER,
+            usd_mc              REAL,
+            chess_units         REAL,
+            chess_holders       INTEGER,
+            avg_chess_units     REAL,
+            avg_chess_holding   REAL,
+            chess_mc            REAL,
+            mc_difference       REAL,
+            chess_funds_flow    REAL,
+            chess_mc_change     REAL,
+            mc_diff_pct         REAL,
+            mc_change_pct       REAL,
+            chess_mc_change_pct REAL,
+            ff_change_pct       REAL,
+            ff_chess_change_pct REAL,
+            market_cap_band     TEXT,
+            funds_flow_band     TEXT,
+            admission_month     INTEGER,
+            high_low            REAL,
+            UNIQUE(date, code)
+        )
+    ''')
+
+    # 12. scrape_log
     conn.execute('''
         CREATE TABLE IF NOT EXISTS scrape_log (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -325,6 +417,12 @@ def create_indexes(conn):
         'CREATE INDEX IF NOT EXISTS idx_scrape_log_source ON scrape_log(source)',
         'CREATE INDEX IF NOT EXISTS idx_scrape_log_finished ON scrape_log(finished_at DESC)',
         'CREATE INDEX IF NOT EXISTS idx_nav_history_etf_date ON nav_history(etf_code, date DESC)',
+        'CREATE INDEX IF NOT EXISTS idx_etp_monthly_date ON etp_monthly(date DESC)',
+        'CREATE INDEX IF NOT EXISTS idx_etp_monthly_code ON etp_monthly(code)',
+        'CREATE INDEX IF NOT EXISTS idx_etp_monthly_code_date ON etp_monthly(code, date DESC)',
+        'CREATE INDEX IF NOT EXISTS idx_etp_list_issuer ON etp_list(issuer)',
+        'CREATE INDEX IF NOT EXISTS idx_etp_list_asset_class ON etp_list(asset_class)',
+        'CREATE INDEX IF NOT EXISTS idx_etp_list_is_listed ON etp_list(is_listed)',
     ]
     for sql in indexes:
         conn.execute(sql)

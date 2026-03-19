@@ -137,6 +137,25 @@ def upsert_prices_batch(conn, etf_code: str, prices: list[dict], *, commit: bool
         conn.commit()
 
 
+# --------------------------------------------------------- units history
+def upsert_units_history(conn, etf_code: str, units_on_issue: int | None,
+                          net_assets_aud: float | None, record_date: str,
+                          *, commit: bool = True):
+    """Insert or update a units_history row for the given date."""
+    if not etf_code or (units_on_issue is None and net_assets_aud is None):
+        return
+    conn.execute(
+        "INSERT INTO units_history (etf_code, date, units_on_issue, net_assets_aud) "
+        "VALUES (?, ?, ?, ?) "
+        "ON CONFLICT(etf_code, date) DO UPDATE SET "
+        "units_on_issue = COALESCE(excluded.units_on_issue, units_on_issue), "
+        "net_assets_aud = COALESCE(excluded.net_assets_aud, net_assets_aud)",
+        (etf_code, record_date, units_on_issue, net_assets_aud)
+    )
+    if commit:
+        conn.commit()
+
+
 # --------------------------------------------------------------- issuers
 def update_issuer_stats(conn, *, commit: bool = True):
     """Recalculate issuer etf_count and total_fum from the etfs table."""

@@ -16,7 +16,7 @@ from scrapers.config import ISSUER_URLS, ISHARES_AU_PRODUCTS, SPDR_AU_FUNDS, VAN
 from scrapers.base_scraper import fetch, fetch_json
 from scrapers.db_writer import (
     get_connection, upsert_etf, upsert_holdings, upsert_sectors,
-    log_scrape, update_issuer_stats,
+    upsert_units_history, log_scrape, update_issuer_stats,
 )
 
 logger = logging.getLogger(__name__)
@@ -32,6 +32,22 @@ def _safe_float(val) -> float | None:
         return float(s)
     except (ValueError, TypeError):
         return None
+
+
+def _parse_fum_str(s) -> float | None:
+    """Parse abbreviated FUM strings like '$7.76B', '$123.4M', '$1.5K' into raw float."""
+    if not s:
+        return None
+    s = str(s).strip().replace(',', '').replace('$', '').replace(' ', '')
+    mult = 1
+    if s and s[-1] in ('B', 'b'):
+        mult, s = 1_000_000_000, s[:-1]
+    elif s and s[-1] in ('M', 'm'):
+        mult, s = 1_000_000, s[:-1]
+    elif s and s[-1] in ('K', 'k'):
+        mult, s = 1_000, s[:-1]
+    val = _safe_float(s)
+    return val * mult if val is not None else None
 
 
 def _find_json_in_script(soup, key_hints: list[str]) -> dict | list | None:
@@ -199,7 +215,7 @@ def _scrape_betashares_holdings_csv(conn, code: str) -> int:
     return len(holdings)
 
 
-def _scrape_betashares_fund_page(conn, slug: str, soup) -> str | None:
+def _scrape_betashares_fund_page(conn, slug: str, soup, raw_html: str = '') -> str | None:
     """
     Parse a BetaShares individual fund page.
     Returns the ASX code, or None if not found.
@@ -269,6 +285,83 @@ def _scrape_betashares_fund_page(conn, slug: str, soup) -> str | None:
                         holdings.append({'name': h_name, 'weight_pct': weight})
             break
 
+    # ── Returns, NAV, FUM, units on issue, distribution yield ──────────────────
+    returns: dict = {}
+    nav_per_unit = None
+    fum_aud = None
+    units_on_issue = None
+    distribution_yield = None
+
+    # Returns from the fund-performance table
+    # Rows look like: <tr><th>1 month</th><td>-3.96%</td><td>-3.94%</td></tr>
+    # Label is in <th>, fund return is first <td>, index return is second <td>
+    _RETURN_LABEL_MAP = {
+        '1 month':      'return_1m',
+        '3 months':     'return_3m',
+        '6 months':     'return_6m',
+        '1 year':       'return_1y',
+        '3 year':       'return_3y',
+        '3 years':      'return_3y',
+        '5 year':       'return_5y',
+        '5 years':      'return_5y',
+    }
+    for row in soup.find_all('tr'):
+        th_els = row.find_all('th')
+        td_els = row.find_all('td')
+        if not th_els or not td_els:
+            continue
+        label = th_els[0].get_text(strip=True).lower()
+        val = _safe_float(td_els[0].get_text(strip=True))
+        if val is None:
+            continue
+        # strip trailing p.a. / (p.a.) for matching
+        base_label = re.sub(r'\s*\(?\s*p\.?a\.?\s*\)?$', '', label).strip()
+        field = _RETURN_LABEL_MAP.get(base_label)
+        if field:
+            returns[field] = val
+        elif 'since inception' in base_label:
+            returns['return_since_inception'] = val
+
+    # Distribution yield from th/td table row: <th>12 mth distribution yield*</th><td>0.9%</td>
+    for th in soup.find_all('th'):
+        if '12 mth distribution yield' in th.get_text(strip=True).lower():
+            td = th.find_next_sibling('td')
+            if td:
+                yld = _safe_float(td.get_text(strip=True))
+                if yld and 0 < yld < 50:
+                    distribution_yield = yld
+            break
+
+    if raw_html:
+        # NAV per unit: "NAV/unit </span>...<div class="v2-fund-value ...">$51.45</div>"
+        nav_m = re.search(
+            r'NAV/unit\s*</span>[\s\S]{0,400}?\$([0-9,\.]+)',
+            raw_html
+        )
+        if nav_m:
+            nav = _safe_float(nav_m.group(1))
+            if nav and nav > 0:
+                nav_per_unit = nav
+
+        # Net assets (FUM): look for "$7,185,630,356" following "Net assets" label
+        na_m = re.search(
+            r"Net assets\*?</div>.*?<div[^>]*>\$?([\d,]+)</div>",
+            raw_html, re.DOTALL | re.IGNORECASE
+        )
+        if na_m:
+            fum_raw = _safe_float(na_m.group(1).replace(',', ''))
+            if fum_raw and fum_raw > 1_000:  # sanity: > $1000 AUD
+                fum_aud = fum_raw
+
+        # Units on issue: Units outstanding* (#)</th>\n<td>139,671,576</td>
+        units_m = re.search(
+            r'Units outstanding\*?\s*\(#\)</th>\s*<td>([\d,]+)</td>',
+            raw_html, re.IGNORECASE
+        )
+        if units_m:
+            units_str = units_m.group(1).replace(',', '')
+            units_on_issue = int(units_str) if units_str else None
+
     etf = {
         'code': code,
         'name': name,
@@ -278,9 +371,19 @@ def _scrape_betashares_fund_page(conn, slug: str, soup) -> str | None:
         'benchmark': benchmark,
         'data_source': 'betashares',
         'issuer_url': f"https://www.betashares.com.au/fund/{slug}/",
+        'nav_per_unit': nav_per_unit,
+        'fund_size_aud_millions': round(fum_aud / 1_000_000, 1) if fum_aud else None,
+        'net_assets_aud': fum_aud,
+        'net_assets_date': date.today().isoformat() if fum_aud else None,
+        'units_on_issue': units_on_issue,
+        'units_on_issue_date': date.today().isoformat() if units_on_issue else None,
+        'distribution_yield': distribution_yield,
+        **returns,
     }
     etf = {k: v for k, v in etf.items() if v is not None}
     upsert_etf(conn, etf)
+    upsert_units_history(conn, code, etf.get('units_on_issue'), etf.get('net_assets_aud'),
+                         date.today().isoformat(), commit=False)
 
     # Download the full portfolio holdings CSV (includes ticker, sector, country, all positions)
     csv_count = _scrape_betashares_holdings_csv(conn, code)
@@ -344,7 +447,7 @@ def scrape_betashares(db_path=None) -> int:
                 continue
             page_soup = BeautifulSoup(resp.text, 'html.parser')
             try:
-                code = _scrape_betashares_fund_page(conn, slug, page_soup)
+                code = _scrape_betashares_fund_page(conn, slug, page_soup, resp.text)
             except Exception as e:
                 logger.warning(f"BetaShares: error scraping {slug}: {e}")
                 conn.rollback()
@@ -413,6 +516,19 @@ def _scrape_vaneck_snapshot(conn, code: str, snapshot_url: str) -> None:
                 inc = (data.get('Inception Date') or '').strip()
                 if inc:
                     update['inception_date'] = inc
+                # NAV per unit
+                nav_val = _safe_float(data.get('NAV'))
+                if nav_val and nav_val > 0:
+                    update['nav_per_unit'] = nav_val
+                # FUM (Total Net Assets) — may be abbreviated e.g. "$7.76B"
+                fum = _parse_fum_str(data.get('Total Net Assets'))
+                if fum and fum > 1_000:
+                    update['net_assets_aud'] = fum
+                    update['net_assets_date'] = date.today().isoformat()
+                    update['fund_size_aud_millions'] = round(fum / 1_000_000, 1)
+                    if nav_val and nav_val > 0:
+                        update['units_on_issue'] = int(round(fum / nav_val))
+                        update['units_on_issue_date'] = date.today().isoformat()
                 # Holdings — HoldingsList is a list of date-bucketed snapshots;
                 # use the first (most recent) entry.
                 for entry in data.get('HoldingsList', []):
@@ -535,6 +651,8 @@ def _scrape_vaneck_snapshot(conn, code: str, snapshot_url: str) -> None:
 
     if len(update) > 1:
         upsert_etf(conn, update)
+        upsert_units_history(conn, code, update.get('units_on_issue'), update.get('net_assets_aud'),
+                             date.today().isoformat(), commit=False)
     if holdings:
         # Deduplicate by name (merge weights for same-name duplicates e.g. Alphabet Inc)
         merged: dict[str, dict] = {}
@@ -771,14 +889,69 @@ def scrape_vanguard(db_path=None) -> int:
                                 if val is not None:
                                     etf_base['management_fee'] = val
                                     etf_base['expense_ratio'] = val
-                    # FUM from aumAmountWhole (raw AUD; aumAmount is unreliable for new funds)
-                    aum = _safe_float(ov.get('aumAmountWhole'))
-                    if aum and aum > 0:
-                        etf_base['fund_size_aud_millions'] = round(aum / 1_000_000, 1)
                     # Distribution frequency
                     dist_freq = ov.get('distFrequency')
                     if dist_freq:
                         etf_base['distribution_frequency'] = dist_freq
+                    # NAV per unit from navPrices (most recent entry)
+                    nav_prices = ov.get('navPrices') or []
+                    if nav_prices:
+                        nav_val = _safe_float(nav_prices[0].get('price'))
+                        if nav_val and nav_val > 0:
+                            etf_base['nav_per_unit'] = nav_val
+                    # Distribution yield — sum last 12 months of CASH distributions / current NAV
+                    distributions = ov.get('periodicDistributions') or []
+                    if distributions and nav_prices:
+                        nav_for_yield = _safe_float(nav_prices[0].get('price')) or 0
+                        if nav_for_yield > 0:
+                            from datetime import date as _date
+                            one_year_ago = _date.today().replace(year=_date.today().year - 1).isoformat()
+                            dist_total = 0.0
+                            for dist in distributions:
+                                dist_date = (dist.get('asOfDate') or '')[:10]
+                                if dist_date < one_year_ago:
+                                    break
+                                for td in (dist.get('taxDetails') or []):
+                                    if td.get('distributionType', {}).get('distCode') == 'CASH':
+                                        dist_total += _safe_float(td.get('distributionAmount')) or 0
+                            if dist_total > 0:
+                                etf_base['distribution_yield'] = round(dist_total / nav_for_yield * 100, 2)
+                    # Last distribution date and amount
+                    if distributions:
+                        last_dist = distributions[0]
+                        last_dist_date = (last_dist.get('asOfDate') or '')[:10] or None
+                        if last_dist_date:
+                            etf_base['last_distribution_date'] = last_dist_date
+                        for td in (last_dist.get('taxDetails') or []):
+                            if td.get('distributionType', {}).get('distCode') == 'CASH':
+                                amt = _safe_float(td.get('distributionAmount'))
+                                if amt:
+                                    etf_base['last_distribution_amount'] = amt
+                                break
+            # --- ETF-specific units on issue and FUM (nav × units) ---
+            # The overview API's aumAmountWhole is the total managed fund AUM across
+            # all share classes (ETF + managed fund), so we use the /prices endpoint
+            # which provides OSCLTSHQTY (outstanding share quantity) for this ETF only.
+            prices_url = f'https://www.vanguard.com.au/api/products/personal/fund/{port_id}/prices'
+            prices_resp = fetch_json(prices_url, headers=_VANGUARD_API_HEADERS)
+            if prices_resp:
+                for fund in (prices_resp.get('data') or []):
+                    ui = fund.get('unitsOnIssue', {})
+                    records = (ui.get('OSCLTSHQTY') or [])
+                    if records:
+                        units = records[0].get('outstandingShare')
+                        units_date = (records[0].get('effectiveDate') or '')[:10] or None
+                        if units:
+                            etf_base['units_on_issue'] = int(units)
+                            etf_base['units_on_issue_date'] = units_date or date.today().isoformat()
+                            nav = etf_base.get('nav_per_unit')
+                            if nav:
+                                net_assets = float(nav) * int(units)
+                                etf_base['net_assets_aud'] = net_assets
+                                etf_base['net_assets_date'] = units_date or date.today().isoformat()
+                                etf_base['fund_size_aud_millions'] = round(net_assets / 1_000_000, 1)
+                    break
+
             # Fallback for US-domiciled funds where benchMarkNameFromECS is absent
             if 'benchmark' not in etf_base and port_id in _VANGUARD_BENCHMARK_FALLBACK:
                 etf_base['benchmark'] = _VANGUARD_BENCHMARK_FALLBACK[port_id]
@@ -787,6 +960,9 @@ def scrape_vanguard(db_path=None) -> int:
                 port_id_benchmarks[port_id] = etf_base['benchmark']
 
             upsert_etf(conn, etf_base)
+            upsert_units_history(conn, code, etf_base.get('units_on_issue'),
+                                 etf_base.get('net_assets_aud'),
+                                 date.today().isoformat(), commit=False)
             updated += 1
 
             # --- Holdings: ticker, name, weight, sector, country ---
@@ -861,6 +1037,9 @@ def scrape_vanguard(db_path=None) -> int:
             logger.warning(f"Vanguard: error scraping {code} (portId={port_id}): {e}")
             conn.rollback()
             upsert_etf(conn, etf_base)
+            upsert_units_history(conn, code, etf_base.get('units_on_issue'),
+                                 etf_base.get('net_assets_aud'),
+                                 date.today().isoformat(), commit=False)
             conn.commit()
 
     duration = (datetime.utcnow() - started).total_seconds()
@@ -1456,6 +1635,90 @@ def scrape_spdr(db_path=None) -> int:
             except (ValueError, json.JSONDecodeError, AttributeError):
                 pass
 
+        # ── NEW: FUM, NAV, units, returns, distribution yield ───────────────────
+        # SSGA embeds fund data as decoded JSON embedded in attribute values.
+        # Key: "nav":{"originalValue":"78.1705"}
+        # Key: "aum":{"originalValue":"6299437556.17"}
+        fum_aud = None
+        nav_per_unit = None
+        spdr_returns: dict = {}
+        spdr_yield = None
+
+        aum_m = re.search(r'"aum"\s*:\s*\{[^}]*"originalValue"\s*:\s*"([0-9.]+)"', decoded)
+        if aum_m:
+            fum_raw = _safe_float(aum_m.group(1))
+            if fum_raw and fum_raw > 1_000:
+                fum_aud = fum_raw
+
+        nav_m = re.search(r'"nav"\s*:\s*\{[^}]*"originalValue"\s*:\s*"([0-9.]+)"', decoded)
+        if nav_m:
+            nav = _safe_float(nav_m.group(1))
+            if nav and nav > 0:
+                nav_per_unit = nav
+
+        # Units on issue derived from FUM / NAV (both available above)
+        units_on_issue = None
+        if fum_aud and nav_per_unit and nav_per_unit > 0:
+            units_on_issue = int(round(fum_aud / nav_per_unit))
+
+        # Distribution yield from HTML table
+        spdr_yield_m = re.search(
+            r'[Dd]istribution\s+[Yy]ield[^<>%]*?([0-9]+\.?[0-9]*)\s*%', decoded
+        )
+        if spdr_yield_m:
+            yld = _safe_float(spdr_yield_m.group(1))
+            if yld and 0 < yld < 50:
+                spdr_yield = yld
+
+        # Returns from the performance table: find the "Fund Total Return" row
+        # Table structure: first <th> is "As Of" (row-label column), then data columns.
+        # Data row: td[0]=label, td[1]=date (skipped), td[2+]=values aligned to th[1+].
+        _SPDR_HEADER_MAP = {
+            '1 month':       'return_1m',
+            '3 month':       'return_3m',
+            '1 year':        'return_1y',
+            '3 year (p.a.)': 'return_3y',
+            '3 years (p.a.)': 'return_3y',
+            '5 year (p.a.)': 'return_5y',
+            '5 years (p.a.)': 'return_5y',
+        }
+        for table in soup.find_all('table'):
+            th_texts = [th.get_text(strip=True).lower() for th in table.find_all('th')]
+            if '1 year' not in th_texts:
+                continue
+            # Build col_index → field map.  th[0] is the row-label header ("As Of"),
+            # so th[i] aligns with data_vals[i-1] (offset of 1).
+            col_map: dict[int, str] = {}
+            for col_i, h in enumerate(th_texts):
+                if col_i == 0:
+                    continue  # row-label column has no data counterpart
+                field = _SPDR_HEADER_MAP.get(h)
+                if field:
+                    col_map[col_i] = field
+                elif 'since inception' in h or ('inception' in h and 'date' not in h):
+                    col_map[col_i] = 'return_since_inception'
+            # Find "Fund Total Return" data row
+            for row in table.find_all('tr'):
+                tds = row.find_all('td')
+                if not tds:
+                    continue
+                row_label = tds[0].get_text(strip=True).lower()
+                if 'total return' not in row_label:
+                    continue
+                # data_vals: skip td[0] (label) and td[1] (date), collect remaining % values
+                data_vals = []
+                for td in tds[2:]:
+                    txt = td.get_text(strip=True)
+                    pct = _safe_float(txt)
+                    data_vals.append(pct)  # None if not a number
+                # col_i is th index (1-based); data_vals is 0-based → offset = col_i - 1
+                for col_i, field in col_map.items():
+                    dv_i = col_i - 1
+                    if dv_i < len(data_vals) and data_vals[dv_i] is not None:
+                        spdr_returns[field] = data_vals[dv_i]
+                break
+            break  # only process first matching table
+
         etf = {
             'code': code,
             'name': name,
@@ -1467,9 +1730,19 @@ def scrape_spdr(db_path=None) -> int:
             'exchange': 'ASX',
             'data_source': 'spdr',
             'issuer_url': url,
+            'nav_per_unit': nav_per_unit,
+            'fund_size_aud_millions': round(fum_aud / 1_000_000, 1) if fum_aud else None,
+            'net_assets_aud': fum_aud,
+            'net_assets_date': date.today().isoformat() if fum_aud else None,
+            'units_on_issue': units_on_issue,
+            'units_on_issue_date': date.today().isoformat() if units_on_issue else None,
+            'distribution_yield': spdr_yield,
+            **spdr_returns,
         }
         etf = {k: v for k, v in etf.items() if v is not None}
         upsert_etf(conn, etf)
+        upsert_units_history(conn, code, etf.get('units_on_issue'), etf.get('net_assets_aud'),
+                             date.today().isoformat(), commit=False)
         if sectors:
             upsert_sectors(conn, code, sectors, commit=False)
 
@@ -1698,6 +1971,46 @@ def scrape_globalx(db_path=None) -> int:
         cat_name = ((product.get('category') or {}).get('name') or '').strip().lower()
         asset_class = _GLOBALX_CATEGORY_MAP.get(cat_name) or normalise_asset_class(cat_name) or None
 
+        # NAV, AUM, units from the NAV history Excel embedded in fundOverview.fundNav
+        nav_per_unit = None
+        fum_aud = None
+        units_on_issue = None
+        units_date = None
+        dist_yield = None
+
+        fund_overview = product.get('fundOverview') or {}
+        fund_nav_block = fund_overview.get('fundNav') or {}
+        nav_history_url = (fund_nav_block.get('navHistoryLink') or '').strip()
+        if nav_history_url:
+            nav_xl = fetch(nav_history_url)
+            if nav_xl and nav_xl.status_code == 200:
+                try:
+                    import openpyxl as _openpyxl
+                    wb = _openpyxl.load_workbook(io.BytesIO(nav_xl.content), read_only=True, data_only=True)
+                    ws = wb.active
+                    last_row = None
+                    for row in ws.iter_rows(values_only=True):
+                        # Data rows have a datetime in col index 2 and numeric NAV in col 4
+                        if row[2] and hasattr(row[2], 'year') and row[4] is not None:
+                            last_row = row
+                    if last_row is not None:
+                        nav_per_unit = _safe_float(last_row[4])
+                        fum_aud = _safe_float(last_row[5])
+                        units_raw = last_row[6]
+                        if units_raw is not None:
+                            units_on_issue = int(units_raw)
+                        if hasattr(last_row[2], 'date'):
+                            units_date = last_row[2].date().isoformat()
+                except Exception as _e:
+                    logger.debug(f"Global X {ticker}: NAV Excel parse error: {_e}")
+
+        # Distribution yield from fundDistribution otherInfoList
+        fund_dist = fund_overview.get('fundDistribution') or {}
+        for item in (fund_dist.get('otherInfoList') or []):
+            if '12-month yield' in (item.get('label') or '').lower():
+                dist_yield = _safe_float(item.get('textValue'))
+                break
+
         etf = {
             'code':         ticker,
             'name':         name,
@@ -1709,9 +2022,18 @@ def scrape_globalx(db_path=None) -> int:
             'data_source':  'globalx',
             'issuer_url':   issuer_url,
             'exchange':     'ASX',
+            'nav_per_unit': nav_per_unit,
+            'net_assets_aud': fum_aud,
+            'net_assets_date': units_date if fum_aud else None,
+            'fund_size_aud_millions': round(fum_aud / 1_000_000, 1) if fum_aud else None,
+            'units_on_issue': units_on_issue,
+            'units_on_issue_date': units_date if units_on_issue else None,
+            'distribution_yield': dist_yield,
         }
         etf = {k: v for k, v in etf.items() if v is not None}
         upsert_etf(conn, etf)
+        upsert_units_history(conn, ticker, units_on_issue, fum_aud,
+                             units_date or date.today().isoformat(), commit=False)
 
         # Step 3: Download PCF for holdings
         pcf_url = str(product.get('pcf') or '').strip()
@@ -2363,6 +2685,310 @@ def scrape_macquarie(db_path=None) -> int:
                started_at=started.isoformat())
     conn.close()
     logger.info(f'Macquarie: updated {updated} ETFs')
+    return updated
+
+
+def scrape_macquarie_metadata(db_path=None) -> int:
+    """
+    Scrape benchmark and investment objective (summary) from Macquarie ETF
+    fund pages. The pages use a static <dl>/<dt>/<dd> structure in a
+    "Fund facts" section — no JavaScript rendering required.
+    """
+    started = datetime.utcnow()
+    source = 'macquarie_metadata'
+    updated = 0
+
+    try:
+        from bs4 import BeautifulSoup
+    except ImportError:
+        logger.warning('beautifulsoup4 required for Macquarie metadata scraper')
+        return 0
+
+    conn = get_connection(db_path)
+    rows = conn.execute(
+        "SELECT code, issuer_url FROM etfs WHERE issuer = 'Macquarie' AND issuer_url IS NOT NULL"
+    ).fetchall()
+
+    for row in rows:
+        code = row['code']
+        url = row['issuer_url']
+        try:
+            resp = fetch(url)
+            if not resp or resp.status_code != 200:
+                logger.warning(f'Macquarie metadata: no response for {code} ({url})')
+                continue
+
+            soup = BeautifulSoup(resp.text, 'html.parser')
+
+            # Macquarie fund pages use a <table> with <b>Label</b> in the first
+            # <td> and the value in the second <td> of each row.
+            table_data: dict[str, str] = {}
+            for tr in soup.find_all('tr'):
+                cells = tr.find_all(['td', 'th'])
+                if len(cells) >= 2:
+                    key = cells[0].get_text(separator=' ', strip=True).lower()
+                    val = cells[1].get_text(separator=' ', strip=True)
+                    if key and val:
+                        table_data[key] = val
+
+            benchmark = table_data.get('benchmark') or None
+            objective = table_data.get('investment objective') or None
+
+            if not benchmark and not objective:
+                logger.debug(f'Macquarie metadata: no data found for {code}')
+                continue
+
+            update = {'code': code}
+            if benchmark:
+                update['benchmark'] = benchmark
+            if objective:
+                update['summary'] = objective
+
+            upsert_etf(conn, update)
+            conn.commit()
+            updated += 1
+            logger.info(f'Macquarie metadata: {code} benchmark={benchmark!r}')
+
+        except Exception as e:
+            logger.warning(f'Macquarie metadata: error scraping {code}: {e}')
+
+    duration = (datetime.utcnow() - started).total_seconds()
+    log_scrape(conn, source, 'success' if updated else 'no_data',
+               records_affected=updated, duration_secs=duration,
+               started_at=started.isoformat())
+    conn.close()
+    logger.info(f'Macquarie metadata: updated {updated} ETFs')
+    return updated
+
+
+# ====================================================================
+# Dimensional (DFA) — static metadata
+# ====================================================================
+# Dimensional's fund pages are fully JavaScript-rendered; benchmark and
+# summary are hard-coded from their PDSs and fund factsheets.
+
+_DFA_METADATA = {
+    'DACE': {
+        'benchmark': 'S&P/ASX 300 Accumulation Index',
+        'summary': (
+            'Seeks long-term capital appreciation and income through broadly diversified '
+            'exposure to Australian equities. Uses a systematic, factor-based approach '
+            'targeting the size, relative price, and profitability premiums.'
+        ),
+    },
+    'DAVA': {
+        'benchmark': 'S&P/ASX 200 Index',
+        'summary': (
+            'Seeks long-term capital appreciation by investing in Australian equities with '
+            'a strong value tilt, targeting companies with lower relative prices and higher '
+            'profitability characteristics.'
+        ),
+    },
+    'DFGH': {
+        'benchmark': 'MSCI World ex Australia Index (AUD Hedged)',
+        'summary': (
+            'Provides broadly diversified exposure to developed-market equities excluding '
+            'Australia, with AUD currency hedging. Uses a systematic, factor-based approach '
+            'targeting the size, value, and profitability premiums.'
+        ),
+    },
+    'DGCE': {
+        'benchmark': 'MSCI World ex Australia Index (AUD)',
+        'summary': (
+            'Provides broadly diversified exposure to developed-market equities excluding '
+            'Australia in unhedged AUD terms. Uses a systematic, factor-based approach '
+            'targeting the size, value, and profitability premiums.'
+        ),
+    },
+    'DGSM': {
+        'benchmark': 'MSCI World Small Cap Index (AUD)',
+        'summary': (
+            'Seeks long-term capital appreciation through diversified exposure to small-cap '
+            'equities across global developed markets. Emphasises the small, value, and '
+            'profitability premiums to target higher expected returns.'
+        ),
+    },
+    'DGVA': {
+        'benchmark': 'MSCI World Index (AUD)',
+        'summary': (
+            'Seeks long-term capital appreciation by investing in global developed-market '
+            'equities with a strong value tilt, targeting companies with lower relative '
+            'prices and higher profitability characteristics.'
+        ),
+    },
+}
+
+
+def scrape_dfa_metadata(db_path=None) -> int:
+    """Apply hard-coded benchmark and summary for Dimensional (DFA) ETFs."""
+    started = datetime.utcnow()
+    source = 'dfa_metadata'
+    updated = 0
+    conn = get_connection(db_path)
+
+    for code, meta in _DFA_METADATA.items():
+        try:
+            upsert_etf(conn, {'code': code, **meta})
+            updated += 1
+            logger.info(f'DFA metadata: {code} — benchmark={meta["benchmark"]!r}')
+        except Exception as e:
+            logger.warning(f'DFA metadata: error updating {code}: {e}')
+
+    conn.commit()
+    duration = (datetime.utcnow() - started).total_seconds()
+    log_scrape(conn, source, 'success' if updated else 'no_data',
+               records_affected=updated, duration_secs=duration,
+               started_at=started.isoformat())
+    conn.close()
+    logger.info(f'DFA metadata: updated {updated} ETFs')
+    return updated
+
+
+# ====================================================================
+# JPMorgan — static metadata
+# ====================================================================
+# JPMorgan's fund pages load data via JavaScript; benchmark and summary
+# are hard-coded from their fund factsheets and PDSs.
+
+_JPMORGAN_METADATA = {
+    # ASX-listed (issuer = 'JPMorgan')
+    'JEPI': {
+        'benchmark': 'S&P 500 Index (AUD Unhedged)',
+        'summary': (
+            'Seeks to deliver monthly income and lower volatility than the S&P 500 by '
+            'investing in large-cap US equities and writing out-of-the-money covered call '
+            'options via equity-linked notes.'
+        ),
+    },
+    'JHPI': {
+        'benchmark': 'S&P 500 Index (AUD Hedged)',
+        'summary': (
+            'Seeks to deliver monthly income and lower volatility by investing in large-cap '
+            'US equities and writing covered call options, with AUD currency hedging.'
+        ),
+    },
+    'JPEQ': {
+        'benchmark': 'Nasdaq-100 Index (AUD Unhedged)',
+        'summary': (
+            'Seeks to deliver monthly income with lower volatility than the Nasdaq-100 by '
+            'investing in large-cap US technology-oriented equities and writing covered call '
+            'options via equity-linked notes.'
+        ),
+    },
+    'JPHQ': {
+        'benchmark': 'Nasdaq-100 Index (AUD Hedged)',
+        'summary': (
+            'Seeks to deliver monthly income with lower volatility than the Nasdaq-100 by '
+            'investing in large-cap US technology-oriented equities and writing covered call '
+            'options, with AUD currency hedging.'
+        ),
+    },
+    'JREG': {
+        'benchmark': 'MSCI World Index (AUD Unhedged)',
+        'summary': (
+            'Targets modest outperformance of the MSCI World Index by combining broad '
+            'global equity diversification with systematic, research-driven tilts toward '
+            'securities with the most favourable return prospects.'
+        ),
+    },
+    'JRHG': {
+        'benchmark': 'MSCI World Index (AUD Hedged)',
+        'summary': (
+            'Targets modest outperformance of the MSCI World Index through systematic, '
+            'research-driven security selection across global developed markets, with AUD '
+            'currency hedging.'
+        ),
+    },
+    'JEME': {
+        'benchmark': 'MSCI Emerging Markets Index (AUD Unhedged)',
+        'summary': (
+            'Targets modest outperformance of the MSCI Emerging Markets Index by combining '
+            'broad diversification with systematic, research-driven tilts toward '
+            'higher-quality emerging market equities.'
+        ),
+    },
+    'JGLO': {
+        'benchmark': 'MSCI ACWI (AUD Unhedged)',
+        'summary': (
+            'Concentrated, high-conviction portfolio of 50–90 global equities selected for '
+            'their long-term growth potential through fundamental, bottom-up research across '
+            'developed and emerging markets.'
+        ),
+    },
+    'JHLO': {
+        'benchmark': 'MSCI ACWI (AUD Hedged)',
+        'summary': (
+            'Concentrated, high-conviction portfolio of global equities selected for their '
+            'long-term growth potential through fundamental, bottom-up research, with AUD '
+            'currency hedging.'
+        ),
+    },
+    'T3MP': {
+        'benchmark': 'MSCI ACWI (AUD Unhedged)',
+        'summary': (
+            'Invests in global companies developing solutions to climate change, including '
+            'clean energy, energy efficiency, sustainable transportation, and water '
+            'management. Actively managed with a high-conviction, concentrated approach.'
+        ),
+    },
+    'JPGB': {
+        'benchmark': 'Bloomberg Global Aggregate Index (AUD Hedged)',
+        'summary': (
+            'Actively managed global investment-grade fixed income ETF seeking income and '
+            'capital preservation by investing across government and corporate bonds '
+            'worldwide, hedged to AUD.'
+        ),
+    },
+    'JPIE': {
+        'benchmark': 'Bloomberg Global Aggregate Index (AUD Hedged)',
+        'summary': (
+            'Seeks above-benchmark income by investing across a broad range of fixed income '
+            'sectors including high yield, securitised assets, and emerging market debt, '
+            'hedged to AUD.'
+        ),
+    },
+    # ASX-listed (issuer = 'JPMAM / Perpetual')
+    'JEGA': {
+        'benchmark': 'MSCI World Index (AUD Unhedged)',
+        'summary': (
+            'Complex ETF seeking monthly income through dividends and option premiums with '
+            'lower equity market volatility, by investing in a diversified portfolio of '
+            'global equities and systematically writing covered call options.'
+        ),
+    },
+    'JHGA': {
+        'benchmark': 'MSCI World Index (AUD Hedged)',
+        'summary': (
+            'Complex ETF seeking monthly income through dividends and option premiums with '
+            'lower equity market volatility, investing in global equities and writing covered '
+            'call options with AUD currency hedging.'
+        ),
+    },
+}
+
+
+def scrape_jpmorgan_metadata(db_path=None) -> int:
+    """Apply hard-coded benchmark and summary for JPMorgan ETFs."""
+    started = datetime.utcnow()
+    source = 'jpmorgan_metadata'
+    updated = 0
+    conn = get_connection(db_path)
+
+    for code, meta in _JPMORGAN_METADATA.items():
+        try:
+            upsert_etf(conn, {'code': code, **meta})
+            updated += 1
+            logger.info(f'JPMorgan metadata: {code} — benchmark={meta["benchmark"]!r}')
+        except Exception as e:
+            logger.warning(f'JPMorgan metadata: error updating {code}: {e}')
+
+    conn.commit()
+    duration = (datetime.utcnow() - started).total_seconds()
+    log_scrape(conn, source, 'success' if updated else 'no_data',
+               records_affected=updated, duration_secs=duration,
+               started_at=started.isoformat())
+    conn.close()
+    logger.info(f'JPMorgan metadata: updated {updated} ETFs')
     return updated
 
 
@@ -6923,7 +7549,9 @@ def scrape_all_issuers(db_path=None) -> int:
         ('Global X', scrape_globalx),
         ('CXA Issuers', scrape_cxa_issuers),
         ('Dimensional', scrape_dimensional),
+        ('Dimensional Metadata', scrape_dfa_metadata),
         ('Macquarie', scrape_macquarie),
+        ('Macquarie Metadata', scrape_macquarie_metadata),
         ('Schroders', scrape_schroders),
         ('Russell', scrape_russell),
         ('Magellan', scrape_magellan),
@@ -6948,6 +7576,7 @@ def scrape_all_issuers(db_path=None) -> int:
         ('Plato', scrape_plato),
         ('Janus Henderson', scrape_janus_henderson),
         ('JPMorgan', scrape_jpmam),
+        ('JPMorgan Metadata', scrape_jpmorgan_metadata),
         ('Antipodes', scrape_antipodes),
         ('Lakehouse', scrape_lakehouse),
         ('Alphinity', scrape_alphinity),

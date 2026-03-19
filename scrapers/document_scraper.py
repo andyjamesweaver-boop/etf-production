@@ -162,23 +162,87 @@ def _discover_betashares(code: str, slug: str) -> dict:
     return result
 
 
-def _discover_vaneck(code: str) -> dict:
+def _discover_vaneck(code: str, issuer_url: str | None = None) -> dict:
+    """
+    Discover VanEck documents using Playwright.
+
+    VanEck's documents page is JS-rendered — static HTML only returns 3 links.
+    Playwright reveals the full set including PDS and factsheet.
+
+    URL structure:
+      - documents page: {issuer_url.replace('/snapshot', '/documents')}
+      - PDS href contains: /assets/pds/
+      - TMD href contains: /target-market-determination/
+      - Factsheet: link text is "Factsheet" (preferred) or href contains /library/vaneck-etfs/
+    """
+    import asyncio
+
+    try:
+        from playwright.async_api import async_playwright
+    except ImportError:
+        logger.warning("playwright not installed — falling back to static VanEck scrape")
+        return _discover_vaneck_static(code)
+
+    c = code.lower()
+    if issuer_url:
+        docs_url = issuer_url.replace("/snapshot", "/documents")
+    else:
+        docs_url = f"https://www.vaneck.com.au/etf/equity/{c}/documents"
+
+    async def _run() -> dict:
+        result: dict = {}
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            try:
+                page = await browser.new_page()
+                await page.goto(docs_url, timeout=30000)
+                await page.wait_for_load_state("networkidle", timeout=20000)
+
+                links = await page.eval_on_selector_all(
+                    'a[href*=".pdf"]',
+                    'els => els.map(el => ({href: el.href, text: el.textContent.trim()}))'
+                )
+
+                factsheet_candidates: list[tuple[int, str]] = []
+                for link in links:
+                    href = link.get("href", "")
+                    text = link.get("text", "").lower()
+                    if not href:
+                        continue
+                    if "/assets/pds/" in href or "pds---" in href:
+                        result.setdefault("pds_url", href)
+                    elif "/target-market-determination/" in href or "tmd---" in href:
+                        result.setdefault("tmd_url", href)
+                    elif text == "factsheet" or "/library/vaneck-etfs/" in href:
+                        # Prefer named "Factsheet" link over bare URL duplicates
+                        priority = 0 if text == "factsheet" else 1
+                        factsheet_candidates.append((priority, href))
+
+                if factsheet_candidates and "factsheet_url" not in result:
+                    factsheet_candidates.sort(key=lambda x: x[0])
+                    result["factsheet_url"] = factsheet_candidates[0][1]
+
+            finally:
+                await browser.close()
+        return result
+
+    try:
+        return asyncio.run(_run())
+    except Exception as e:
+        logger.warning(f"Playwright VanEck scrape failed for {code}: {e}")
+        return _discover_vaneck_static(code)
+
+
+def _discover_vaneck_static(code: str) -> dict:
+    """Static fallback: TMD only (PDS/factsheet require JS)."""
     result: dict = {}
     c = code.lower()
-
-    # TMD: predictable template
     tmd_url = (
         f"https://www.vaneck.com.au/globalassets/home.au/media/managedassets/library/"
         f"assets/target-market-determination/tmd---{c}.pdf"
     )
     if _head_ok(tmd_url):
         result["tmd_url"] = tmd_url
-
-    # PDS + factsheet: parse documents page
-    docs_page = f"https://www.vaneck.com.au/etf/equity/{c}/documents/"
-    html_docs = _discover_html_links(docs_page, _LABEL_HINTS)
-    result.update({k: v for k, v in html_docs.items() if k not in result})
-
     return result
 
 
@@ -392,6 +456,242 @@ def _discover_vanguard(code: str) -> dict:
     return result
 
 
+_JPMORGAN_BASE = "https://am.jpmorgan.com/content/dam/jpm-am-aem/asiapacific/au/en"
+_JPMORGAN_PDS  = _JPMORGAN_BASE + "/regulatory/product-disclosure-statement/{slug}.pdf"
+_JPMORGAN_TMD  = _JPMORGAN_BASE + "/regulatory/target-market-determination/{slug}.pdf"
+_JPMORGAN_FS   = _JPMORGAN_BASE + "/literature/fact-sheet/{slug}.pdf"
+
+# Hard-coded document slugs discovered from JPMorgan's fund-explorer pages
+# (those pages load docs via JS so must be hard-coded; verified via WebFetch)
+# Format: code → (pds_slug, tmd_slug, factsheet_slug)
+# None = slug unknown; HEAD probe will attempt variants
+_JPMORGAN_DOC_SLUGS: dict[str, tuple] = {
+    "JEPI": (
+        "product-disclosure-statement-premium-income-jepi",
+        "target-market-determination-JEPI",
+        "factsheet-jpmorgan-equity-premium-income-active-etf",
+    ),
+    "JHPI": (
+        "product-disclosure-statement-jpmorgan-equity-premium-income-hedged-fund",
+        "target-market-determination-jpmorgan-equity-premium-income-hedged-fund",
+        "factsheet-jpmorgan-equity-premium-income-active-etf-hedged",
+    ),
+    "JPEQ": (
+        "product-disclosure-statement-jpmorgan-us-100q-equity-premium-income",
+        "target-market-determination-jpmorgan-us-100q-equity-premium-income",
+        "factsheet-jpmorgan-us-100q-equity-premium-income-active-etf",
+    ),
+    "JPHQ": (
+        "product-disclosure-statement-jpmorgan-us100q-equity-premium-income-hedged-",
+        None,   # TMD not found; HEAD probe will try variants
+        "factsheet-jpmorgan-us-100q-equity-premium-income-active-etf-hedged",
+    ),
+    "JREG": (
+        "product-disclosure-statement-global-research-enhanced-jreg",
+        "target-market-determination-JREG",
+        "factsheet-jpmorgan-global-research-enhanced-index-equity-active-etf",
+    ),
+    "JRHG": (
+        None,   # PDS not publicly available — shared with JREG PDS in practice
+        None,
+        "factsheet-jpmorgan-global-research-enhanced-index-equity-active-etf-hedged",
+    ),
+    "JEME": (
+        "product-disclosure-statement-jeme",
+        "target-market-determination-jeme",
+        "factsheet-jpmorgan-emerging-markets-research-enhanced-index-equity-active-etf",
+    ),
+    "JGLO": (
+        "product-disclosure-statement-jglo-etf",
+        "target-market-determination-jglo",
+        "factsheet-jpmorgan-global-select-equity-active-etf",
+    ),
+    "JHLO": (
+        "product-disclosure-statement-jhlo-etf",
+        None,
+        "factsheet-jpmorgan-global-select-equity-active-etf-hedged",
+    ),
+    "T3MP": (
+        "product-disclosure-statement-jpmorgan-climate-change-solutions-active-etf",
+        "target-market-determination-jpmorgan-climate-change-solutions-active-etf",
+        "factsheet-jpmorgan-climate-change-solutions-active-etf",
+    ),
+    "JPGB": (
+        "product-disclosure-statement-jpmorgan-global-bond-active-etf-managed-fund",
+        "target-market-determination-jpmorgan-global-bond-active-etf-managed-fund",
+        "factsheet-jpmorgan-global-bond-fund-active-etf",
+    ),
+    "JPIE": (
+        "product-disclosure-statement-jpmorgan-active-etf-managed-fund-hedged",
+        "target-market-determination-jpmorgan-income-active-etf-manged-fund-hedged",
+        "factsheet-jpmorgan-income-active-etf",
+    ),
+    "JEGA": (
+        "product-disclosure-statement-jpmorgan-global-equity-premium-income",
+        "target-market-determination-jpmorgan-global-equity-premium-income-complex-etf-jega",
+        "factsheet-jpmorgan-global-equity-premium-income-complex-etf",
+    ),
+    "JHGA": (
+        None,   # PDS not separately published; shares PDS with JEGA
+        "target-market-determination-jpmorgan-global-equity-premium-income-hedged-complex-etf-jhga",
+        "factsheet-jpmorgan-global-equity-premium-income-complex-etf-hedged",
+    ),
+}
+
+# Macquarie fund pages have a "performance report" that serves as their factsheet
+_MACQUARIE_HINTS = {
+    "pds_url":       ["product disclosure", "pds"],
+    "tmd_url":       ["target market", "tmd"],
+    "factsheet_url": ["fact sheet", "factsheet", "fund facts", "performance report"],
+}
+
+
+def _discover_macquarie(code: str, issuer_url: str | None) -> dict:
+    """
+    Discover documents from Macquarie fund pages.
+    Pages use static HTML with <a href="...pdf"> links.
+    PDS and TMD use keyword labels; performance report is used as factsheet.
+    """
+    if not issuer_url:
+        return {}
+    result = _discover_html_links(issuer_url, _MACQUARIE_HINTS)
+    # Ensure absolute URLs (Macquarie pages may return relative paths)
+    base = "https://etf.macquarie.com"
+    for key, url in result.items():
+        if url and url.startswith("/"):
+            result[key] = base + url
+    return result
+
+
+def _discover_jpmorgan(code: str) -> dict:
+    """
+    Discover JPMorgan document URLs using hard-coded slugs (fund-explorer pages
+    require JavaScript to render document links).
+    HEAD-probes each URL to confirm it exists before returning it.
+    For unknown slugs, tries common variants.
+    """
+    entry = _JPMORGAN_DOC_SLUGS.get(code)
+    if not entry:
+        logger.debug(f"[{code}] No JPMorgan doc slug mapping — skipping")
+        return {}
+
+    pds_slug, tmd_slug, fs_slug = entry
+    result: dict = {}
+
+    url_map = [
+        ("pds_url",       pds_slug, _JPMORGAN_PDS),
+        ("tmd_url",       tmd_slug, _JPMORGAN_TMD),
+        ("factsheet_url", fs_slug,  _JPMORGAN_FS),
+    ]
+
+    for key, slug, template in url_map:
+        if slug:
+            url = template.format(slug=slug)
+            if _head_ok(url):
+                result[key] = url
+            else:
+                logger.debug(f"[{code}] {key} not found at {url}")
+        else:
+            # Probe common variants derived from the code
+            code_l = code.lower()
+            variants = [
+                template.format(slug=f"product-disclosure-statement-{code_l}"),
+                template.format(slug=f"target-market-determination-{code_l}"),
+                template.format(slug=f"target-market-determination-{code.upper()}"),
+                template.format(slug=f"factsheet-jpmorgan-{code_l}"),
+            ]
+            for url in variants:
+                if _head_ok(url):
+                    result[key] = url
+                    break
+
+    return result
+
+
+def _discover_dimensional_playwright(issuer_url: str) -> dict:
+    """
+    Use Playwright (headless Chromium) to load a Dimensional fund page and
+    extract chmedia PDF links for PDS, TMD, and factsheet.
+
+    Dimensional's document section is JavaScript-rendered (Coveo search), so
+    static HTTP requests only return the FSG.  Playwright waits for networkidle
+    so all document links are present in the DOM before we scrape them.
+    """
+    import asyncio
+
+    try:
+        from playwright.async_api import async_playwright
+    except ImportError:
+        logger.warning("playwright not installed — cannot scrape Dimensional docs dynamically")
+        return {}
+
+    async def _run() -> dict:
+        result: dict = {}
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            try:
+                page = await browser.new_page()
+                await page.goto(issuer_url, timeout=30000)
+                await page.wait_for_load_state("networkidle", timeout=20000)
+
+                links = await page.eval_on_selector_all(
+                    'a[href*="chmedia"][href*=".pdf"], a[href*=".pdf"]',
+                    'els => els.map(el => ({href: el.href, text: el.textContent.trim()}))'
+                )
+
+                # Prefer "Quarterly Fact Sheet" over other factsheet variants
+                factsheet_priority = ["quarterly fact sheet", "fact sheet", "factsheet", "fund facts"]
+                factsheet_candidates: list[tuple[int, str]] = []
+
+                for link in links:
+                    href = link.get("href", "")
+                    text = link.get("text", "").lower()
+                    if not href or not href.startswith("http"):
+                        continue
+                    if "product disclosure" in text or text == "pds":
+                        result.setdefault("pds_url", href)
+                    elif "target market" in text or text == "tmd":
+                        result.setdefault("tmd_url", href)
+                    else:
+                        for priority, label in enumerate(factsheet_priority):
+                            if label in text:
+                                factsheet_candidates.append((priority, href))
+                                break
+
+                if factsheet_candidates and "factsheet_url" not in result:
+                    factsheet_candidates.sort(key=lambda x: x[0])
+                    result["factsheet_url"] = factsheet_candidates[0][1]
+
+            finally:
+                await browser.close()
+        return result
+
+    try:
+        return asyncio.run(_run())
+    except Exception as e:
+        logger.warning(f"Playwright scrape failed for {issuer_url}: {e}")
+        return {}
+
+
+def _discover_dimensional(code: str, issuer_url: str | None) -> dict:
+    """
+    Discover Dimensional (DFA) documents.
+    Uses Playwright to load the JS-rendered fund page and extract chmedia PDF links.
+    Falls back to the known combined PDS URL if Playwright is unavailable.
+    """
+    if issuer_url:
+        docs = _discover_dimensional_playwright(issuer_url)
+        if docs:
+            return docs
+
+    # Fallback: combined PDS only (no TMD/factsheet without JS rendering)
+    # chmedia/191665 confirmed: 781,618 bytes, 67 pages, covers all 6 DFA ETFs
+    _COMBINED_PDS = "https://www.dimensional.com/chmedia/191665/source/download/pds-australian-core-equity-trust_au.pdf"
+    if code in {"DACE", "DAVA", "DFGH", "DGCE", "DGSM", "DGVA"}:
+        return {"pds_url": _COMBINED_PDS}
+    return {}
+
+
 def discover_documents(code: str, issuer: str | None, row: dict) -> dict:
     """
     Dispatch to per-issuer discovery; returns
@@ -410,7 +710,7 @@ def discover_documents(code: str, issuer: str | None, row: dict) -> dict:
         docs = _discover_betashares(code, slug)
 
     elif issuer == "VanEck":
-        docs = _discover_vaneck(code)
+        docs = _discover_vaneck(code, row.get("issuer_url"))
 
     elif issuer == "iShares":
         docs = _discover_ishares(code)
@@ -420,6 +720,15 @@ def discover_documents(code: str, issuer: str | None, row: dict) -> dict:
 
     elif issuer == "Vanguard":
         docs = _discover_vanguard(code)
+
+    elif issuer == "Macquarie":
+        docs = _discover_macquarie(code, row.get("issuer_url"))
+
+    elif issuer in ("JPMorgan", "JPMAM / Perpetual"):
+        docs = _discover_jpmorgan(code)
+
+    elif issuer == "DFA":
+        docs = _discover_dimensional(code, row.get("issuer_url"))
 
     else:
         issuer_url = row.get("issuer_url")

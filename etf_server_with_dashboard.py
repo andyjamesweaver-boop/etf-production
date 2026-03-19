@@ -27,6 +27,37 @@ def get_db():
     return conn
 
 
+def estimate_asset_class(name, fund_type='', benchmark='', issuer=''):
+    """Keyword-based asset class estimator for ETFs without a stored classification."""
+    text = ' '.join([str(s) for s in [name, fund_type, benchmark, issuer] if s]).upper()
+    clean = (text.replace('(AUD HEDGED)', '').replace('AUD HEDGED', '')
+             .replace('(HEDGED)', '').replace(' HEDGED', ''))
+    if any(k in clean for k in ['BOND', 'FIXED INCOME', 'CREDIT', 'DEBT', 'YIELD', 'TREASURY',
+            'GOVERNMENT', 'CORPORATE', 'INFLATION', 'DURATION', 'INTEREST RATE',
+            'BDC', 'INCOME FUND', 'RMBS', 'MORTGAGE', 'SUBORDINATED',
+            'HIGH YIELD', 'CASH PLUS', ' AAA ', 'SHORT TERM ACTIVE YIELD']):
+        return 'Fixed Income'
+    if any(k in clean for k in ['CASH ETF', 'MONEY MARKET', 'CASH FUND', 'SHORT TERM CASH']):
+        return 'Money Market'
+    if any(k in clean for k in ['GOLD', 'SILVER', 'PLATINUM', 'PALLADIUM', 'COPPER', 'OIL', 'GAS',
+            'COMMODITY', 'COMMODITIES', 'METAL', 'MINER', 'URANIUM', 'AGRICULTURE', 'WHEAT', 'CRUDE']):
+        return 'Commodity'
+    if any(k in clean for k in ['MULTI-ASSET', 'MULTI ASSET', 'DIVERSIFIED', 'BALANCED']):
+        return 'Mixed Allocation'
+    if any(k in clean for k in ['ABSOLUTE RETURN', 'LONG SHORT', 'LONG/SHORT', 'HEDGE FUND',
+            'ALPHA PLUS', 'PRIVATE EQUITY', 'PRIVATE CREDIT', 'MARKET NEUTRAL']):
+        return 'Alternative'
+    if any(k in clean for k in ['SHARE', 'EQUITY', 'STOCK', 'S&P', 'MSCI', 'NASDAQ', 'DOW',
+            'RUSSELL', 'NIKKEI', 'FTSE', 'INDEX FUND', 'INDEX ETF', 'LISTED PROPERTY', 'REIT',
+            'REAL ESTATE', 'TECHNOLOGY', 'HEALTHCARE', 'FINANCIAL', 'CONSUMER',
+            'GROWTH FUND', 'VALUE FUND', 'MOMENTUM', 'SMALL CAP', 'MID CAP', 'SMALL COMPANIES', 'SMID']):
+        aus = any(k in clean for k in ['AUSTRALIA', 'AUSTRALIAN', ' ASX', 'A200'])
+        return 'Australian Equities' if aus else 'International Equities'
+    if 'FIRETRAIL' in clean:
+        return 'Australian Equities'
+    return None
+
+
 class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
 
     # ------------------------------------------------------------------ routing
@@ -54,6 +85,12 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
             '/api/v1/compare':         lambda: self.handle_compare(qs),
             '/api/v1/compare/overlap': lambda: self.handle_compare_overlap(qs),
             '/api/v1/holdings/search': lambda: self.handle_holdings_search(qs),
+            # History API
+            '/api/v1/history/industry':      self.handle_history_industry,
+            '/api/v1/history/issuers':       self.handle_history_issuers,
+            '/api/v1/history/asset-classes': self.handle_history_asset_classes,
+            '/api/v1/history/flows':         lambda: self.handle_history_flows(qs),
+            '/api/v1/history/launches':      self.handle_history_launches,
             # Insights API
             '/api/v1/insights/fum':      self.handle_insights_fum,
             '/api/v1/insights/listings': self.handle_insights_listings,
@@ -86,6 +123,12 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
         m = re.match(r'^/articles/([a-z0-9\-]+)$', path)
         if m:
             self.handle_article_detail(m.group(1))
+            return
+
+        # History ETF detail: /api/v1/history/etf/{code}
+        m2 = re.match(r'^/api/v1/history/etf/([A-Za-z0-9]+)$', path)
+        if m2:
+            self.handle_history_etf(m2.group(1).upper())
             return
 
         # Parameterised routes: /api/v1/etfs/{code}[/sub]
@@ -272,6 +315,24 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
                 d['units_change'] = None
                 d['units_change_date'] = None
                 d['units_change_prev_date'] = None
+            # Latest etp_monthly snapshot for CHESS data + cross-reference AUM
+            m_row = conn.execute(
+                "SELECT chess_mc, chess_units, chess_holders, total_units, market_cap, "
+                "transacted_value, num_trades, spread_pct "
+                "FROM etp_monthly WHERE code=? ORDER BY date DESC LIMIT 1",
+                (code,)
+            ).fetchone()
+            if m_row:
+                mr = dict(m_row)
+                if mr.get('chess_mc'):       d['chess_mc']       = mr['chess_mc']
+                if mr.get('chess_units'):    d['chess_units']     = mr['chess_units']
+                if mr.get('chess_holders'):  d['chess_holders']   = mr['chess_holders']
+                if not d.get('units_on_issue') and mr.get('total_units'):
+                    d['units_on_issue'] = mr['total_units']
+            # Fall back to estimated asset class if none stored
+            if not d.get('asset_class'):
+                d['asset_class'] = estimate_asset_class(
+                    d.get('name', ''), d.get('fund_type', ''), '', d.get('issuer', ''))
             self.send_json(d)
         except Exception as e:
             self.send_json({'error': str(e)}, 500)
@@ -579,6 +640,237 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
                 "ORDER BY return_1y DESC LIMIT ?", (limit,)
             ).fetchall()
             self.send_json({'top_performers': [dict(r) for r in rows]})
+        except Exception as e:
+            self.send_json({'error': str(e)}, 500)
+        finally:
+            conn.close()
+
+    # ----- History: Industry -----
+    def handle_history_industry(self):
+        conn = get_db()
+        try:
+            rows = conn.execute("""
+                SELECT m.date,
+                       COUNT(DISTINCT m.code) AS etf_count,
+                       SUM(m.market_cap)/1e9   AS aum_b,
+                       SUM(CASE WHEN l.admission_date IS NULL
+                                  OR strftime('%Y-%m', m.date) != strftime('%Y-%m', l.admission_date)
+                                THEN m.funds_flow ELSE 0 END)/1e6 AS flows_m,
+                       SUM(m.funds_flow)/1e6 AS raw_flows_m,
+                       SUM(m.transacted_value)/1e6 AS traded_m
+                FROM etp_monthly m LEFT JOIN etp_list l ON l.ticker = m.code
+                WHERE m.market_cap > 0
+                GROUP BY m.date ORDER BY m.date ASC
+            """).fetchall()
+            data = [dict(r) for r in rows]
+            # Build anomalies map: date -> [{code, name, flow_m}] for admission-month spikes >$500M
+            anomaly_months = [r['date'] for r in data
+                              if abs((r['raw_flows_m'] or 0) - (r['flows_m'] or 0)) > 500]
+            anomalies = {}
+            if anomaly_months:
+                ph = ','.join('?' * len(anomaly_months))
+                contribs = conn.execute(f"""
+                    SELECT m.date, m.code, COALESCE(l.name, m.code) AS name,
+                           m.funds_flow/1e6 AS flow_m
+                    FROM etp_monthly m LEFT JOIN etp_list l ON l.ticker = m.code
+                    WHERE m.date IN ({ph})
+                      AND l.admission_date IS NOT NULL
+                      AND strftime('%Y-%m', m.date) = strftime('%Y-%m', l.admission_date)
+                      AND m.funds_flow > 100000000
+                    ORDER BY m.date, m.funds_flow DESC
+                """, anomaly_months).fetchall()
+                for r in contribs:
+                    anomalies.setdefault(r['date'], []).append(
+                        {'code': r['code'], 'name': r['name'], 'flow_m': round(r['flow_m'] or 0, 0)}
+                    )
+            self.send_json({'data': data, 'anomalies': anomalies})
+        except Exception as e:
+            self.send_json({'error': str(e)}, 500)
+        finally:
+            conn.close()
+
+    # ----- History: Issuers -----
+    def handle_history_issuers(self):
+        conn = get_db()
+        try:
+            latest = conn.execute("SELECT MAX(date) FROM etp_monthly").fetchone()[0]
+            top = conn.execute("""
+                SELECT COALESCE(l.trim_issuer, l.issuer, 'Other') AS issuer,
+                       SUM(m.market_cap) AS aum
+                FROM etp_monthly m LEFT JOIN etp_list l ON l.ticker=m.code
+                WHERE m.date=? AND m.market_cap>0
+                GROUP BY issuer ORDER BY aum DESC LIMIT 10
+            """, (latest,)).fetchall()
+            top_names = [r['issuer'] for r in top]
+            all_rows = conn.execute("""
+                SELECT m.date,
+                       COALESCE(l.trim_issuer, l.issuer, 'Other') AS issuer,
+                       SUM(m.market_cap)/1e9 AS aum_b
+                FROM etp_monthly m LEFT JOIN etp_list l ON l.ticker=m.code
+                WHERE m.market_cap>0
+                GROUP BY m.date, issuer ORDER BY m.date ASC
+            """).fetchall()
+            from collections import defaultdict
+            pivot = defaultdict(dict)
+            dates_set = []
+            seen_dates = set()
+            for r in all_rows:
+                nm = r['issuer'] if r['issuer'] in top_names else 'Other'
+                pivot[r['date']][nm] = pivot[r['date']].get(nm, 0) + (r['aum_b'] or 0)
+                if r['date'] not in seen_dates:
+                    seen_dates.add(r['date'])
+                    dates_set.append(r['date'])
+            series = []
+            display_names = top_names + (['Other'] if any(r['issuer'] not in top_names for r in all_rows) else [])
+            seen = set()
+            ordered_names = []
+            for n in display_names:
+                if n not in seen:
+                    seen.add(n)
+                    ordered_names.append(n)
+            for name in ordered_names:
+                series.append({'name': name, 'data': [round(pivot[d].get(name, 0), 2) for d in dates_set]})
+            self.send_json({'dates': dates_set, 'series': series})
+        except Exception as e:
+            self.send_json({'error': str(e)}, 500)
+        finally:
+            conn.close()
+
+    # ----- History: Asset Classes -----
+    def handle_history_asset_classes(self):
+        conn = get_db()
+        try:
+            latest = conn.execute("SELECT MAX(date) FROM etp_monthly").fetchone()[0]
+            top = conn.execute("""
+                SELECT CASE
+                    WHEN l.asset_class = 'Equity' AND l.segment LIKE 'Equity - Australia%' THEN 'Australian Equities'
+                    WHEN l.asset_class = 'Equity' THEN 'International Equities'
+                    ELSE COALESCE(l.asset_class, 'Other')
+                END AS cls, SUM(m.market_cap) AS aum
+                FROM etp_monthly m LEFT JOIN etp_list l ON l.ticker=m.code
+                WHERE m.date=? AND m.market_cap>0
+                GROUP BY cls ORDER BY aum DESC LIMIT 8
+            """, (latest,)).fetchall()
+            top_names = [r['cls'] for r in top]
+            all_rows = conn.execute("""
+                SELECT m.date,
+                       CASE
+                           WHEN l.asset_class = 'Equity' AND l.segment LIKE 'Equity - Australia%' THEN 'Australian Equities'
+                           WHEN l.asset_class = 'Equity' THEN 'International Equities'
+                           ELSE COALESCE(l.asset_class, 'Other')
+                       END AS cls,
+                       SUM(m.market_cap)/1e9 AS aum_b
+                FROM etp_monthly m LEFT JOIN etp_list l ON l.ticker=m.code
+                WHERE m.market_cap>0
+                GROUP BY m.date, cls ORDER BY m.date ASC
+            """).fetchall()
+            from collections import defaultdict
+            pivot = defaultdict(dict)
+            dates_set = []
+            seen_dates = set()
+            for r in all_rows:
+                nm = r['cls'] if r['cls'] in top_names else 'Other'
+                pivot[r['date']][nm] = pivot[r['date']].get(nm, 0) + (r['aum_b'] or 0)
+                if r['date'] not in seen_dates:
+                    seen_dates.add(r['date'])
+                    dates_set.append(r['date'])
+            ordered_names = list(dict.fromkeys(top_names + (['Other'] if any(r['cls'] not in top_names for r in all_rows) else [])))
+            series = [{'name': n, 'data': [round(pivot[d].get(n, 0), 2) for d in dates_set]} for n in ordered_names]
+            self.send_json({'dates': dates_set, 'series': series})
+        except Exception as e:
+            self.send_json({'error': str(e)}, 500)
+        finally:
+            conn.close()
+
+    # ----- History: ETF detail -----
+    def handle_history_etf(self, code):
+        conn = get_db()
+        try:
+            info = conn.execute("SELECT name, issuer, admission_date FROM etp_list WHERE ticker=?", (code,)).fetchone()
+            rows = conn.execute("""
+                SELECT date, last_price, market_cap/1e6 AS aum_m,
+                       funds_flow/1e6 AS flow_m, return_1y, distribution_yield,
+                       total_units/1e6 AS units_m, spread_pct, mer
+                FROM etp_monthly WHERE code=? ORDER BY date ASC
+            """, (code,)).fetchall()
+            adm_ym = (info['admission_date'] or '')[:7] if info else ''
+            data = []
+            for r in rows:
+                row = dict(r)
+                row['is_anomaly'] = bool(adm_ym and row['date'][:7] == adm_ym)
+                data.append(row)
+            self.send_json({
+                'code': code,
+                'name': info['name'] if info else code,
+                'issuer': info['issuer'] if info else None,
+                'data': data,
+            })
+        except Exception as e:
+            self.send_json({'error': str(e)}, 500)
+        finally:
+            conn.close()
+
+    # ----- History: Flows -----
+    def handle_history_flows(self, qs):
+        months = self._int(qs, 'months', 12)
+        limit = self._int(qs, 'limit', 20)
+        conn = get_db()
+        try:
+            latest = conn.execute("SELECT MAX(date) FROM etp_monthly").fetchone()[0]
+            sql = """
+                SELECT m.code,
+                       COALESCE(l.name, m.code) AS name,
+                       COALESCE(l.trim_issuer, l.issuer) AS issuer,
+                       CASE
+                           WHEN l.asset_class = 'Equity' AND l.segment LIKE 'Equity - Australia%' THEN 'Australian Equities'
+                           WHEN l.asset_class = 'Equity' THEN 'International Equities'
+                           ELSE COALESCE(l.asset_class, 'Other')
+                       END AS asset_class,
+                       SUM(m.funds_flow)/1e6 AS flow_m,
+                       MAX(m.market_cap)/1e6  AS latest_aum_m
+                FROM etp_monthly m LEFT JOIN etp_list l ON l.ticker=m.code
+                WHERE m.date <= ? AND m.date > date(?, ? || ' months')
+                  AND (l.admission_date IS NULL
+                       OR strftime('%Y-%m', m.date) != strftime('%Y-%m', l.admission_date))
+                GROUP BY m.code HAVING flow_m IS NOT NULL
+                ORDER BY flow_m {dir} LIMIT ?
+            """
+            inflows  = conn.execute(sql.format(dir='DESC'), (latest, latest, f'-{months}', limit)).fetchall()
+            outflows = conn.execute(sql.format(dir='ASC'),  (latest, latest, f'-{months}', limit)).fetchall()
+            self.send_json({
+                'months': months,
+                'as_of': latest,
+                'inflows':  [dict(r) for r in inflows],
+                'outflows': [dict(r) for r in outflows],
+            })
+        except Exception as e:
+            self.send_json({'error': str(e)}, 500)
+        finally:
+            conn.close()
+
+    # ----- History: Launches -----
+    def handle_history_launches(self):
+        conn = get_db()
+        try:
+            by_year = conn.execute("""
+                SELECT strftime('%Y', admission_date) AS year, COUNT(*) AS count
+                FROM etp_list
+                WHERE admission_date IS NOT NULL AND admission_date != ''
+                  AND strftime('%Y', admission_date) >= '2000'
+                GROUP BY year ORDER BY year ASC
+            """).fetchall()
+            by_issuer = conn.execute("""
+                SELECT COALESCE(trim_issuer, issuer, 'Unknown') AS issuer,
+                       COUNT(*) AS total,
+                       SUM(CASE WHEN is_listed=1 THEN 1 ELSE 0 END) AS active
+                FROM etp_list
+                WHERE admission_date IS NOT NULL AND strftime('%Y', admission_date) >= '2000'
+                GROUP BY issuer ORDER BY total DESC LIMIT 15
+            """).fetchall()
+            self.send_json({
+                'by_year':   [dict(r) for r in by_year],
+                'by_issuer': [dict(r) for r in by_issuer],
+            })
         except Exception as e:
             self.send_json({'error': str(e)}, 500)
         finally:
@@ -1444,14 +1736,21 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
                     ORDER BY expected_listing_date ASC NULLS LAST
                 """).fetchall()
                 upcoming = [dict(r) for r in rows]
+                for u in upcoming:
+                    if not u.get('asset_class'):
+                        u['asset_class'] = estimate_asset_class(
+                            u.get('name', ''), u.get('fund_type', ''), '', u.get('issuer', ''))
 
             # --- Recently listed: from etfs table by inception_date ---
+            # Guard: only match ISO-format dates (YYYY-MM-DD) to exclude ~51 VanEck ETFs
+            # that have inception_date stored as DD-Mon-YY and sort incorrectly as strings.
             recent = conn.execute("""
                 SELECT code, name, issuer, exchange, asset_class, fund_type,
                        inception_date, management_fee, expense_ratio,
                        fund_size_aud_millions
                 FROM etfs
                 WHERE inception_date >= ?
+                  AND inception_date GLOB '20[0-9][0-9]-[0-1][0-9]-[0-3][0-9]'
                 ORDER BY inception_date DESC
             """, (d90,)).fetchall()
             recent = [dict(r) for r in recent]
@@ -1461,7 +1760,8 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
             listed_last_30 = sum(1 for r in recent if r['inception_date'] and r['inception_date'] >= d30)
             listed_last_90 = len(recent)
             listed_ytd = conn.execute(
-                "SELECT COUNT(*) FROM etfs WHERE inception_date >= ?", (ytd_start,)
+                "SELECT COUNT(*) FROM etfs WHERE inception_date >= ? "
+                "AND inception_date GLOB '20[0-9][0-9]-[0-1][0-9]-[0-3][0-9]'", (ytd_start,)
             ).fetchone()[0]
 
             self.send_json({
@@ -1651,25 +1951,25 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
 <body class="bg-slate-100 min-h-screen text-sm text-gray-800 antialiased">
 
 <!-- ── Header ── -->
-<header class="bg-gradient-to-r from-green-900 to-green-700 shadow-xl">
+<header class="bg-gradient-to-r from-slate-800 to-slate-700 shadow-xl">
   <div class="max-w-[1400px] mx-auto px-5 py-3 flex flex-wrap items-center gap-4">
     <div class="flex-1 min-w-[180px]">
       <h1 class="text-lg font-bold text-white tracking-tight leading-tight">
-        ☘️ Australian ETF Dashboard
+        Australian ETF Dashboard
       </h1>
-      <p id="subtitle" class="text-green-300 text-xs mt-0.5">Loading market data…</p>
+      <p id="subtitle" class="text-slate-300 text-xs mt-0.5">Loading market data…</p>
     </div>
 
     <!-- Search -->
     <div class="relative w-80">
-      <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-green-300 pointer-events-none"
+      <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 pointer-events-none"
            fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
               d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
       </svg>
       <input id="search" type="text" placeholder="Search code or name…"
              autocomplete="off"
-             class="w-full bg-white/10 border border-white/20 text-white placeholder-green-300
+             class="w-full bg-white/10 border border-white/20 text-white placeholder-slate-300
                     rounded-xl pl-9 pr-3 py-2 text-sm outline-none
                     focus:ring-2 focus:ring-white/40 focus:bg-white/20">
       <div id="search-results"
@@ -1677,8 +1977,8 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
     </div>
 
     <!-- Live indicator -->
-    <div class="flex items-center gap-2 text-xs text-green-300">
-      <span class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+    <div class="flex items-center gap-2 text-xs text-slate-300">
+      <span class="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></span>
       <span id="last-refresh">Live</span>
     </div>
   </div>
@@ -1691,42 +1991,42 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
     <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer" onclick="goCard('fum')" title="CHESS FUM = units on issue × last price. View FUM breakdown by asset class.">
       <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">CHESS FUM</p>
       <p id="c-fum" class="text-2xl font-bold text-gray-900 mt-1 leading-tight">—</p>
-      <p class="text-gray-400 text-xs mt-0.5 flex items-center justify-between">Total <span id="c-fum-total" class="tabular-nums">—</span> <span class="text-green-300">›</span></p>
+      <p class="text-gray-400 text-xs mt-0.5 flex items-center justify-between">Total <span id="c-fum-total" class="tabular-nums">—</span> <span class="text-slate-300">›</span></p>
     </div>
     <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer" onclick="goCard('count')" title="Browse all ETFs sorted by size">
       <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">ETFs Listed</p>
       <p id="c-count" class="text-2xl font-bold text-gray-900 mt-1 leading-tight">—</p>
-      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">all exchanges <span class="text-green-300">›</span></p>
+      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">all exchanges <span class="text-slate-300">›</span></p>
     </div>
     <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer" onclick="goCard('return')" title="See top performing ETFs">
       <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Avg 1Y Return</p>
       <p id="c-ret" class="text-2xl font-bold mt-1 leading-tight">—</p>
-      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">market average <span class="text-green-300">›</span></p>
+      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">market average <span class="text-slate-300">›</span></p>
     </div>
     <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer" onclick="goCard('expense')" title="See lowest cost ETFs">
       <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Avg Expense</p>
       <p id="c-exp" class="text-2xl font-bold text-gray-900 mt-1 leading-tight">—</p>
-      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">management fee <span class="text-green-300">›</span></p>
+      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">management fee <span class="text-slate-300">›</span></p>
     </div>
     <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer" onclick="goCard('top')" title="Open top performer detail">
       <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Top Performer</p>
-      <p id="c-top" class="text-2xl font-bold text-green-600 mt-1 leading-tight">—</p>
-      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">best 1Y return <span class="text-green-300">›</span></p>
+      <p id="c-top" class="text-2xl font-bold text-blue-600 mt-1 leading-tight">—</p>
+      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">best 1Y return <span class="text-slate-300">›</span></p>
     </div>
     <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer" onclick="goCard('issuers')" title="View issuer market share">
       <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Issuers</p>
       <p id="c-issuers" class="text-2xl font-bold text-gray-900 mt-1 leading-tight">—</p>
-      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">fund managers <span class="text-green-300">›</span></p>
+      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">fund managers <span class="text-slate-300">›</span></p>
     </div>
     <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer" onclick="goCard('nav')" title="Premium / Discount to NAV analysis">
       <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Prem / Disc</p>
       <p id="c-nav" class="text-2xl font-bold text-gray-900 mt-1 leading-tight">—</p>
-      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">vs NAV <span class="text-green-300">›</span></p>
+      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">vs NAV <span class="text-slate-300">›</span></p>
     </div>
     <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer" onclick="goCard('upcoming')" title="Upcoming & recently listed ETFs">
       <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Coming Soon</p>
       <p id="c-upcoming" class="text-2xl font-bold text-indigo-600 mt-1 leading-tight">—</p>
-      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">new listings <span class="text-green-300">›</span></p>
+      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">new listings <span class="text-slate-300">›</span></p>
     </div>
   </div>
 
@@ -1734,7 +2034,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
   <div class="mb-5">
     <div class="flex items-center justify-between mb-2 px-0.5">
       <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Latest Articles</span>
-      <a href="/articles" class="text-xs text-green-500 hover:text-green-700 font-medium">View all →</a>
+      <a href="/articles" class="text-xs text-blue-500 hover:text-blue-700 font-medium">View all →</a>
     </div>
     <div class="relative">
       <div id="article-carousel" class="flex gap-3 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-1"
@@ -1744,13 +2044,13 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
       <button onclick="carouselScroll(-1)"
               class="hidden lg:flex absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4
                      w-8 h-8 items-center justify-center rounded-full bg-white shadow border
-                     border-gray-200 text-gray-500 hover:text-green-600 z-10">
+                     border-gray-200 text-gray-500 hover:text-blue-600 z-10">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
       <button onclick="carouselScroll(1)"
               class="hidden lg:flex absolute right-0 top-1/2 -translate-y-1/2 translate-x-4
                      w-8 h-8 items-center justify-center rounded-full bg-white shadow border
-                     border-gray-200 text-gray-500 hover:text-green-600 z-10">
+                     border-gray-200 text-gray-500 hover:text-blue-600 z-10">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
       </button>
     </div>
@@ -1764,6 +2064,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
       <button class="main-tab" data-view="compare">Compare</button>
       <button class="main-tab" data-view="holdings">Holdings Search</button>
       <button class="main-tab" data-view="analytics">Analytics</button>
+      <button class="main-tab" data-view="history">History</button>
       <a href="/articles" class="main-tab flex items-center gap-1" style="text-decoration:none">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
         Articles
@@ -1794,7 +2095,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             <label class="block text-xs text-gray-500 mb-1">Exchange</label>
             <select id="f-exchange"
                     class="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm bg-gray-50
-                           focus:ring-2 focus:ring-green-200 focus:border-green-400 outline-none">
+                           focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
               <option value="">All Exchanges</option>
             </select>
           </div>
@@ -1802,7 +2103,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             <label class="block text-xs text-gray-500 mb-1">Issuer</label>
             <select id="f-issuer"
                     class="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm bg-gray-50
-                           focus:ring-2 focus:ring-green-200 focus:border-green-400 outline-none">
+                           focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
               <option value="">All Issuers</option>
             </select>
           </div>
@@ -1810,7 +2111,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             <label class="block text-xs text-gray-500 mb-1">Asset Class</label>
             <select id="f-asset"
                     class="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm bg-gray-50
-                           focus:ring-2 focus:ring-green-200 focus:border-green-400 outline-none">
+                           focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
               <option value="">All Asset Classes</option>
             </select>
           </div>
@@ -1818,7 +2119,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             <label class="block text-xs text-gray-500 mb-1">Management Style</label>
             <select id="f-type"
                     class="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm bg-gray-50
-                           focus:ring-2 focus:ring-green-200 focus:border-green-400 outline-none">
+                           focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
               <option value="">All Types</option>
               <option value="ETF">Passive / Index</option>
               <option value="Active">Active</option>
@@ -1831,13 +2132,13 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             <label class="block text-xs text-gray-500 mb-1">Benchmark / Index</label>
             <input id="f-benchmark" type="text" placeholder="e.g. MSCI, S&amp;P/ASX…"
                    class="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm bg-gray-50
-                          focus:ring-2 focus:ring-green-200 focus:border-green-400 outline-none"/>
+                          focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none"/>
           </div>
           <div>
             <label class="block text-xs text-gray-500 mb-1">Sort By</label>
             <select id="f-sort"
                     class="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm bg-gray-50
-                           focus:ring-2 focus:ring-green-200 focus:border-green-400 outline-none">
+                           focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
               <option value="rank">Rank by FUM</option>
               <option value="fum">FUM (largest)</option>
               <option value="return_1y">1Y Return</option>
@@ -1851,11 +2152,11 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             <label class="block text-xs text-gray-500 mb-1">Extra Columns</label>
             <div class="space-y-1">
               <label class="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
-                <input id="col-3y" type="checkbox" class="accent-green-600">
+                <input id="col-3y" type="checkbox" class="accent-blue-600">
                 3Y Return
               </label>
               <label class="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
-                <input id="col-5y" type="checkbox" class="accent-green-600">
+                <input id="col-5y" type="checkbox" class="accent-blue-600">
                 5Y Return
               </label>
             </div>
@@ -1910,7 +2211,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
     <div class="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-4">
       <div>
         <div class="flex items-center gap-2 flex-wrap">
-          <span id="d-code" class="text-2xl font-bold text-green-700"></span>
+          <span id="d-code" class="text-2xl font-bold text-blue-700"></span>
           <span id="d-badge" class="text-xs px-2 py-0.5 rounded-full font-medium"></span>
         </div>
         <p id="d-name" class="text-gray-500 text-sm mt-0.5"></p>
@@ -1973,7 +2274,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
           <div class="flex items-center justify-between">
             <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Screener Filters</h3>
             <button id="sc-clear"
-                    class="text-xs text-green-600 hover:underline">Clear All</button>
+                    class="text-xs text-blue-600 hover:underline">Clear All</button>
           </div>
 
           <!-- Exchange toggles -->
@@ -1981,11 +2282,11 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             <p class="text-xs text-gray-500 mb-1.5">Exchange</p>
             <div class="flex gap-1.5">
               <button class="sc-exch active flex-1 py-1 rounded-lg border text-xs font-medium
-                             bg-green-600 text-white border-green-600" data-exch="">All</button>
+                             bg-blue-600 text-white border-blue-600" data-exch="">All</button>
               <button class="sc-exch flex-1 py-1 rounded-lg border text-xs font-medium
-                             text-gray-600 border-gray-200 hover:border-green-400" data-exch="ASX">ASX</button>
+                             text-gray-600 border-gray-200 hover:border-blue-400" data-exch="ASX">ASX</button>
               <button class="sc-exch flex-1 py-1 rounded-lg border text-xs font-medium
-                             text-gray-600 border-gray-200 hover:border-green-400" data-exch="CXA">CXA</button>
+                             text-gray-600 border-gray-200 hover:border-blue-400" data-exch="CXA">CXA</button>
             </div>
           </div>
 
@@ -2005,7 +2306,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
           <div>
             <p class="text-xs text-gray-500 mb-1.5">Max Management Fee: <span id="sc-fee-val" class="font-semibold text-gray-700">2.00%</span></p>
             <input id="sc-fee" type="range" min="0" max="2" step="0.05" value="2"
-                   class="w-full accent-green-600">
+                   class="w-full accent-blue-600">
           </div>
 
           <!-- Min FUM -->
@@ -2013,7 +2314,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             <p class="text-xs text-gray-500 mb-1">Min Fund Size (AUD M)</p>
             <input id="sc-fum" type="number" min="0" placeholder="e.g. 100"
                    class="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm bg-gray-50
-                          focus:ring-2 focus:ring-green-200 focus:border-green-400 outline-none">
+                          focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
           </div>
 
           <!-- 1Y Return range -->
@@ -2022,10 +2323,10 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             <div class="flex gap-2">
               <input id="sc-ret-min" type="number" placeholder="Min"
                      class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-gray-50
-                            focus:ring-2 focus:ring-green-200 focus:border-green-400 outline-none">
+                            focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
               <input id="sc-ret-max" type="number" placeholder="Max"
                      class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-gray-50
-                            focus:ring-2 focus:ring-green-200 focus:border-green-400 outline-none">
+                            focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
             </div>
           </div>
 
@@ -2034,12 +2335,12 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             <p class="text-xs text-gray-500 mb-1">Min Distribution Yield (%)</p>
             <input id="sc-yield" type="number" min="0" placeholder="e.g. 3"
                    class="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm bg-gray-50
-                          focus:ring-2 focus:ring-green-200 focus:border-green-400 outline-none">
+                          focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
           </div>
 
           <!-- FX hedged -->
           <label class="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
-            <input id="sc-hedged" type="checkbox" class="accent-green-600">
+            <input id="sc-hedged" type="checkbox" class="accent-blue-600">
             FX Hedged only
           </label>
 
@@ -2056,7 +2357,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
               <span id="sc-result-count" class="text-xs text-gray-400"></span>
               <button id="sc-export"
                       class="flex items-center gap-1 px-3 py-1.5 border border-gray-200 rounded-lg
-                             text-xs text-gray-600 hover:border-green-400 hover:text-green-600 transition-colors">
+                             text-xs text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors">
                 &#8595; CSV
               </button>
             </div>
@@ -2099,7 +2400,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
           <input id="cmp-search" type="text" placeholder="Search ETF code or name…"
                  autocomplete="off"
                  class="w-full border border-gray-200 rounded-xl pl-9 pr-3 py-2 text-sm bg-gray-50
-                        focus:ring-2 focus:ring-green-200 focus:border-green-400 outline-none">
+                        focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
           <div id="cmp-dropdown"
                class="hidden absolute z-50 top-full mt-1 left-0 right-0 bg-white border border-gray-200
                       rounded-xl shadow-2xl max-h-60 overflow-y-auto"></div>
@@ -2156,19 +2457,19 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
           </svg>
           <input id="hs-input" type="text" placeholder="e.g. Apple, BHP, AAPL, NVDA…"
                  class="w-full border border-gray-200 rounded-xl pl-9 pr-3 py-2.5 text-sm bg-gray-50
-                        focus:ring-2 focus:ring-green-200 focus:border-green-400 outline-none">
+                        focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
         </div>
         <div class="flex items-center gap-2 text-sm text-gray-500">
           <label class="text-xs">Min Weight %</label>
           <input id="hs-min-weight" type="number" min="0" step="0.1" value="0" placeholder="0"
                  class="w-20 border border-gray-200 rounded-lg px-2 py-2 text-sm bg-gray-50
-                        focus:ring-2 focus:ring-green-200 focus:border-green-400 outline-none">
+                        focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
         </div>
       </div>
     </div>
 
     <!-- Summary + results -->
-    <div id="hs-summary" class="hidden bg-green-50 border border-green-100 rounded-xl px-5 py-3 mb-4 text-sm text-green-800"></div>
+    <div id="hs-summary" class="hidden bg-blue-50 border border-blue-100 rounded-xl px-5 py-3 mb-4 text-sm text-blue-800"></div>
 
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
       <div id="hs-empty" class="py-16 text-center text-gray-400 text-sm">
@@ -2240,7 +2541,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
       <h3 class="font-semibold text-gray-700 text-sm mb-4">Fund Flows — Monthly (1M)</h3>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <p class="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-2">Top Inflows</p>
+          <p class="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-2">Top Inflows</p>
           <div id="an-inflows" class="space-y-2">
             <div class="flex justify-center py-4"><div class="spinner"></div></div>
           </div>
@@ -2255,6 +2556,134 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
     </div>
 
   </div><!-- /view-analytics -->
+
+  <!-- ══════════════════════════════ VIEW: History ══════════════════════════════ -->
+  <div id="view-history" class="hidden">
+
+    <!-- Sub-nav -->
+    <div class="flex gap-2 mb-5 flex-wrap" id="hist-subnav">
+      <button class="hist-sub-btn px-3 py-1.5 text-xs rounded-lg border font-medium bg-blue-600 text-white border-blue-600" data-hsub="industry">Industry Growth</button>
+      <button class="hist-sub-btn px-3 py-1.5 text-xs rounded-lg border font-medium border-gray-200 text-gray-600 hover:border-blue-400" data-hsub="issuers">Issuer Market Share</button>
+      <button class="hist-sub-btn px-3 py-1.5 text-xs rounded-lg border font-medium border-gray-200 text-gray-600 hover:border-blue-400" data-hsub="assetclass">Asset Classes</button>
+      <button class="hist-sub-btn px-3 py-1.5 text-xs rounded-lg border font-medium border-gray-200 text-gray-600 hover:border-blue-400" data-hsub="fund">Fund Lookup</button>
+      <button class="hist-sub-btn px-3 py-1.5 text-xs rounded-lg border font-medium border-gray-200 text-gray-600 hover:border-blue-400" data-hsub="flows">Flows</button>
+      <button class="hist-sub-btn px-3 py-1.5 text-xs rounded-lg border font-medium border-gray-200 text-gray-600 hover:border-blue-400" data-hsub="launches">Launches</button>
+    </div>
+
+    <!-- ── Industry Growth ── -->
+    <div id="hsub-industry">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+          <h3 class="font-semibold text-gray-700 text-sm mb-1">Industry AUM ($B)</h3>
+          <p class="text-xs text-gray-400 mb-3">Total market cap of all Australian ETFs</p>
+          <div style="height:260px"><canvas id="hist-industry-aum"></canvas></div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+          <h3 class="font-semibold text-gray-700 text-sm mb-1">ETF Count &amp; Monthly Flows</h3>
+          <p class="text-xs text-gray-400 mb-3">Number of listed ETFs and net fund flows</p>
+          <div style="height:260px"><canvas id="hist-industry-count"></canvas></div>
+        </div>
+      </div>
+      <!-- Anomaly explainer -->
+      <div class="flex items-start gap-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 mb-4">
+        <div class="mt-0.5 shrink-0">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" class="text-slate-400">
+            <line x1="2" y1="8" x2="14" y2="8" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="3 2"/>
+            <circle cx="8" cy="8" r="2.5" fill="#94a3b8"/>
+          </svg>
+        </div>
+        <div>
+          <p class="text-xs font-semibold text-slate-600 mb-0.5">About the grey dashed line</p>
+          <p class="text-xs text-slate-500 leading-relaxed">
+            Several funds listed on the ASX as <strong>quoted managed funds</strong> (e.g. MGOC, DACE, DGCE) transferred existing investor assets onto the exchange at admission rather than raising new capital.
+            This causes their admission-month funds flow to equal their entire starting AUM — a one-off structural event, not genuine investor inflows.
+            The <span class="font-medium text-slate-600">orange line</span> excludes these admission-month figures so ordinary flow trends are clearly visible.
+            The <span class="font-medium text-slate-600">grey dashed line</span> shows the raw figure including admission AUM — hover over a grey data point to see which fund caused the spike.
+          </p>
+        </div>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+        <h3 class="font-semibold text-gray-700 text-sm mb-1">Annual Net Flows &amp; Traded Value</h3>
+        <p class="text-xs text-gray-400 mb-3">Calendar-year aggregates</p>
+        <div style="height:220px"><canvas id="hist-industry-flows"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ── Issuer Market Share ── -->
+    <div id="hsub-issuers" class="hidden">
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-4">
+        <h3 class="font-semibold text-gray-700 text-sm mb-1">Issuer AUM Over Time ($B)</h3>
+        <p class="text-xs text-gray-400 mb-3">Stacked by top 10 issuers · monthly data since Jul 2013</p>
+        <div style="height:320px"><canvas id="hist-issuer-stacked"></canvas></div>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+        <h3 class="font-semibold text-gray-700 text-sm mb-1">Current Issuer Rankings</h3>
+        <div id="hist-issuer-table" class="overflow-x-auto"></div>
+      </div>
+    </div>
+
+    <!-- ── Asset Classes ── -->
+    <div id="hsub-assetclass" class="hidden">
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-4">
+        <h3 class="font-semibold text-gray-700 text-sm mb-1">Asset Class AUM Over Time ($B)</h3>
+        <p class="text-xs text-gray-400 mb-3">Stacked by asset class · monthly data since Jul 2013</p>
+        <div style="height:320px"><canvas id="hist-assetclass-stacked"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ── Fund Lookup ── -->
+    <div id="hsub-fund" class="hidden">
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-4">
+        <div class="flex gap-3 items-center mb-4">
+          <input id="hist-fund-input" type="text" placeholder="Enter ASX code e.g. VAS, NDQ, IVV&hellip;"
+            class="border border-gray-200 rounded-lg px-3 py-2 text-sm flex-1 max-w-xs focus:outline-none focus:ring-2 focus:ring-blue-200">
+          <button id="hist-fund-btn"
+            class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 font-medium">
+            Load
+          </button>
+        </div>
+        <div id="hist-fund-result"></div>
+      </div>
+    </div>
+
+    <!-- ── Flows ── -->
+    <div id="hsub-flows" class="hidden">
+      <div class="flex gap-2 mb-4 flex-wrap items-center">
+        <span class="text-xs text-gray-500 font-medium">Period:</span>
+        <button class="hist-flow-period px-3 py-1 text-xs rounded-lg border font-medium border-gray-200 text-gray-600 hover:border-blue-400" data-months="3">3 months</button>
+        <button class="hist-flow-period px-3 py-1 text-xs rounded-lg border font-medium border-gray-200 text-gray-600 hover:border-blue-400" data-months="6">6 months</button>
+        <button class="hist-flow-period px-3 py-1 text-xs rounded-lg border font-medium bg-blue-600 text-white border-blue-600" data-months="12">12 months</button>
+        <button class="hist-flow-period px-3 py-1 text-xs rounded-lg border font-medium border-gray-200 text-gray-600 hover:border-blue-400" data-months="24">24 months</button>
+        <button class="hist-flow-period px-3 py-1 text-xs rounded-lg border font-medium border-gray-200 text-gray-600 hover:border-blue-400" data-months="36">36 months</button>
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+          <h3 class="font-semibold text-gray-700 text-sm mb-3">Top Inflows</h3>
+          <div id="hist-flows-in"></div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+          <h3 class="font-semibold text-gray-700 text-sm mb-3">Top Outflows</h3>
+          <div id="hist-flows-out"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Launches ── -->
+    <div id="hsub-launches" class="hidden">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+          <h3 class="font-semibold text-gray-700 text-sm mb-1">ETF Launches by Year</h3>
+          <p class="text-xs text-gray-400 mb-3">New ETFs admitted to ASX per calendar year</p>
+          <div style="height:280px"><canvas id="hist-launches-bar"></canvas></div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+          <h3 class="font-semibold text-gray-700 text-sm mb-3">All-Time Launches by Issuer</h3>
+          <div id="hist-launches-issuer"></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /view-history -->
 
 </main>
 
@@ -2330,7 +2759,7 @@ function issuerLogo(name) {
 /* Asset class colours — consistent across charts */
 const ASSET_CLASS_COLORS = {
   'Australian Equities':    '#3b82f6',
-  'International Equities': '#10b981',
+  'International Equities': '#6366f1',
   'Fixed Income':           '#f59e0b',
   'Diversified':            '#8b5cf6',
   'Property':               '#ec4899',
@@ -2542,7 +2971,7 @@ function renderSortHeaders() {
     const arrow = isActive ? (tableSortDir === 'asc' ? ' ▲' : ' ▼') : ' ⇅';
     // Strip any existing indicator and re-add
     th.textContent = th.textContent.replace(/\s[▲▼⇅]$/, '') + arrow;
-    th.classList.toggle('text-green-600', isActive);
+    th.classList.toggle('text-blue-600', isActive);
     th.classList.toggle('text-gray-500', !isActive);
   });
 }
@@ -2697,91 +3126,137 @@ async function showDetail(code) {
 function renderOverviewTab(d) {
   const _ao = 'ASX Monthly Report · ' + fmtTs(tsFor('asx_report'));
   const _po = 'ASX live data · ' + fmtTs(d.last_updated);
-  const cards = [
-    ['1M Return',   pct(d.return_1m),  d.return_1m, _ao],
-    ['3M Return',   pct(d.return_3m),  d.return_3m, _ao],
-    ['1Y Return',   pct(d.return_1y),  d.return_1y, _ao],
-    ['3Y Return',   pct(d.return_3y),  d.return_3y, _ao],
-    ['52W High',    money(d.year_high), null,         _po],
-    ['52W Low',     money(d.year_low),  null,         _po],
-    ['Bid/Ask',     d.bid_ask_spread_pct != null ? d.bid_ask_spread_pct + '%' : '—', null, _po],
-    ['Inception',   d.inception_date || '—'],
-    ['Asset Class', d.asset_class || '—'],
-    ['Exchange',    d.exchange || '—'],
-    ['Currency',    'AUD'],
-  ];
+  const _is = 'Issuer website';
 
-  // ── AI Summary card ──────────────────────────────────────────────────────
-  let aiSummaryHtml = '';
+  function card(label, val, numOrNull, tip) {
+    const cls = numOrNull != null ? pctCls(numOrNull) : 'text-gray-800';
+    return `<div class="bg-slate-50 rounded-lg p-3 border border-gray-100" ${tip ? `title="${tip}"` : ''}>
+      <p class="text-gray-400 text-xs">${label}</p>
+      <p class="font-semibold text-sm mt-0.5 ${cls}">${val}</p>
+    </div>`;
+  }
+
+  function section(title, cardsHtml) {
+    return `<div class="mb-4">
+      <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">${title}</p>
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">${cardsHtml}</div>
+    </div>`;
+  }
+
+  // AI Summary
+  let aiHtml = '';
   if (d.summary) {
     let s = null;
     try { s = typeof d.summary === 'string' ? JSON.parse(d.summary) : d.summary; } catch(e) {}
     if (s) {
       const risksHtml = Array.isArray(s.key_risks) && s.key_risks.length
-        ? `<details class="mt-2">
-             <summary class="text-xs text-green-600 cursor-pointer hover:underline select-none">
-               Key risks (${s.key_risks.length})
-             </summary>
-             <ul class="mt-1.5 space-y-1 list-disc list-inside">
-               ${s.key_risks.map(r => `<li class="text-xs text-gray-600">${r}</li>`).join('')}
-             </ul>
-           </details>`
-        : '';
-      aiSummaryHtml = `
-        <div class="bg-green-50 border border-green-100 rounded-lg px-4 py-3 mb-3">
-          <p class="text-green-500 text-xs font-medium uppercase tracking-wide mb-1.5">AI Summary</p>
-          ${s.summary ? `<p class="text-sm text-gray-700 leading-relaxed">${s.summary}</p>` : ''}
-          ${s.objective ? `<p class="mt-2 text-xs text-gray-500"><span class="font-medium text-gray-600">Objective:</span> ${s.objective}</p>` : ''}
-          ${s.suitable_for ? `<p class="mt-1 text-xs text-gray-500"><span class="font-medium text-gray-600">Suitable for:</span> ${s.suitable_for}</p>` : ''}
-          ${risksHtml}
-          <p class="mt-2 text-xs text-gray-400 italic">Generated by AI from PDS — not financial advice.</p>
-        </div>`;
+        ? `<details class="mt-2"><summary class="text-xs text-blue-600 cursor-pointer hover:underline select-none">Key risks (${s.key_risks.length})</summary>
+             <ul class="mt-1.5 space-y-1 list-disc list-inside">${s.key_risks.map(r=>`<li class="text-xs text-gray-600">${r}</li>`).join('')}</ul></details>` : '';
+      aiHtml = `<div class="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 mb-3">
+        <p class="text-blue-500 text-xs font-medium uppercase tracking-wide mb-1.5">AI Summary</p>
+        ${s.summary ? `<p class="text-sm text-gray-700 leading-relaxed">${s.summary}</p>` : ''}
+        ${s.objective ? `<p class="mt-2 text-xs text-gray-500"><span class="font-medium text-gray-600">Objective:</span> ${s.objective}</p>` : ''}
+        ${s.suitable_for ? `<p class="mt-1 text-xs text-gray-500"><span class="font-medium text-gray-600">Suitable for:</span> ${s.suitable_for}</p>` : ''}
+        ${risksHtml}
+        <p class="mt-2 text-xs text-gray-400 italic">Generated by AI from PDS — not financial advice.</p>
+      </div>`;
     }
   }
 
-  // ── Document links row ────────────────────────────────────────────────────
-  const docLinks = [
-    ['PDS',        d.pds_url],
-    ['TMD',        d.tmd_url],
-    ['Fact Sheet', d.factsheet_url],
-  ].filter(([, url]) => url);
-  const docLinksHtml = docLinks.length ? `
-    <div class="flex flex-wrap gap-2 mb-3">
-      ${docLinks.map(([label, url]) => `
-        <a href="${url}" target="_blank" rel="noopener"
-           class="inline-flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-200
-                  rounded-full text-xs font-medium text-gray-600 hover:border-green-400
-                  hover:text-green-600 transition-colors">
-          &#128196; ${label}
-        </a>`).join('')}
-    </div>` : '';
+  // Doc links
+  const docLinks = [['PDS',d.pds_url],['TMD',d.tmd_url],['Fact Sheet',d.factsheet_url]].filter(([,u])=>u);
+  const docHtml = docLinks.length ? `<div class="flex flex-wrap gap-2 mb-3">
+    ${docLinks.map(([lbl,url])=>`<a href="${url}" target="_blank" rel="noopener"
+       class="inline-flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-200 rounded-full text-xs font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors">&#128196; ${lbl}</a>`).join('')}
+  </div>` : '';
 
-  // ── Benchmark banner ──────────────────────────────────────────────────────
-  const benchmarkRow = d.benchmark ? `
-    <div class="bg-indigo-50 border border-indigo-100 rounded-lg px-4 py-3 mb-3 flex items-center gap-2">
-      <span class="text-indigo-300 text-lg">&#8594;</span>
-      <div>
-        <p class="text-indigo-400 text-xs font-medium uppercase tracking-wide">Tracked Index</p>
-        <p class="font-semibold text-indigo-900 text-sm">${d.benchmark}</p>
-      </div>
-    </div>` : '';
+  // Benchmark
+  const bmHtml = d.benchmark ? `<div class="bg-indigo-50 border border-indigo-100 rounded-lg px-4 py-3 mb-3 flex items-center gap-2">
+    <span class="text-indigo-300 text-lg">&#8594;</span>
+    <div><p class="text-indigo-400 text-xs font-medium uppercase tracking-wide">Tracked Index</p>
+    <p class="font-semibold text-indigo-900 text-sm">${d.benchmark}</p></div>
+  </div>` : '';
+
+  // Section: Price & Market
+  const priceCards = [
+    card('Price', money(d.current_price), null, _po),
+    card('Day Change', pct(d.day_change_pct), d.day_change_pct, _po),
+    card('NAV / Unit', d.nav_per_unit != null ? '$' + d.nav_per_unit.toFixed(4) : '—', null, _is),
+    card('Prem / Disc', d.premium_discount_pct != null ? d.premium_discount_pct.toFixed(2) + '%' : '—', d.premium_discount_pct, _po),
+    card('52W High', money(d.year_high), null, _po),
+    card('52W Low', money(d.year_low), null, _po),
+    card('Volume', d.volume != null ? d.volume.toLocaleString() : '—', null, _po),
+  ].join('');
+
+  // Section: Fund Size
+  const fumFormatted = d.fund_size_aud_millions != null
+    ? (d.fund_size_aud_millions >= 1000 ? '$' + (d.fund_size_aud_millions/1000).toFixed(2) + 'B' : '$' + d.fund_size_aud_millions.toFixed(0) + 'M')
+    : '—';
+  const netAssetsFormatted = d.net_assets_aud != null
+    ? (d.net_assets_aud >= 1e9 ? '$' + (d.net_assets_aud/1e9).toFixed(2) + 'B' : '$' + (d.net_assets_aud/1e6).toFixed(0) + 'M')
+    : '—';
+  const chessMcFormatted = d.chess_mc != null
+    ? (d.chess_mc >= 1e9 ? '$' + (d.chess_mc/1e9).toFixed(2) + 'B' : '$' + (d.chess_mc/1e6).toFixed(0) + 'M')
+    : '—';
+  const unitsChange = d.units_change != null
+    ? (d.units_change > 0 ? '+' : '') + d.units_change.toLocaleString()
+    : null;
+  const sizeCards = [
+    card('Total FUM', fumFormatted, null, 'Fund size from issuer or ASX report'),
+    card('Net Assets', netAssetsFormatted, null, 'Net assets from issuer website'),
+    card('CHESS Mkt Cap', chessMcFormatted, null, 'CHESS-settled market cap · ASX monthly data'),
+    card('Units on Issue', d.units_on_issue != null ? d.units_on_issue.toLocaleString() : '—', null, _is),
+    card('Units Change', unitsChange ? unitsChange : '—', null, d.units_change_date && d.units_change_prev_date ? `Change from ${d.units_change_prev_date} to ${d.units_change_date}` : 'Requires 2+ unit history records'),
+    card('CHESS Holders', d.chess_holders != null ? d.chess_holders.toLocaleString() : '—', null, 'CHESS registered holders · ASX monthly data'),
+  ].join('');
+
+  // Section: Costs & Trading
+  const costsCards = [
+    card('MER', d.expense_ratio != null ? d.expense_ratio.toFixed(2) + '% p.a.' : '—', null, 'Management expense ratio'),
+    card('Bid/Ask Spread', d.bid_ask_spread_pct != null ? d.bid_ask_spread_pct + '%' : '—', null, _po),
+    card('Buy Spread', d.buy_spread != null ? d.buy_spread.toFixed(3) + '%' : '—', null, 'Issuer buy spread'),
+    card('Sell Spread', d.sell_spread != null ? d.sell_spread.toFixed(3) + '%' : '—', null, 'Issuer sell spread'),
+  ].join('');
+
+  // Section: Returns
+  const retCards = [
+    card('1M Return',  pct(d.return_1m), d.return_1m, _ao),
+    card('3M Return',  pct(d.return_3m), d.return_3m, _ao),
+    card('6M Return',  pct(d.return_6m), d.return_6m, _ao),
+    card('1Y Return',  pct(d.return_1y), d.return_1y, _ao),
+    card('3Y Return',  pct(d.return_3y), d.return_3y, _ao),
+    card('5Y Return',  pct(d.return_5y), d.return_5y, _ao),
+    d.return_since_inception != null ? card('Since Inception', pct(d.return_since_inception), d.return_since_inception, _ao) : '',
+  ].join('');
+
+  // Section: Distributions
+  const distCards = [
+    card('Dist. Yield', d.distribution_yield != null ? d.distribution_yield.toFixed(2) + '%' : '—', null, _is),
+    card('Frequency', d.distribution_frequency || '—', null),
+    card('Last Dist.', d.last_distribution_amount != null ? '$' + d.last_distribution_amount.toFixed(4) : '—', null, d.last_distribution_date || ''),
+    card('Franking', d.franking_pct != null ? d.franking_pct.toFixed(0) + '%' : '—', null),
+  ].join('');
+
+  // Section: Fund Info
+  const infoCards = [
+    card('Inception', d.inception_date || '—'),
+    card('Asset Class', d.asset_class || '—'),
+    card('Exchange', d.exchange || '—'),
+    card('Replication', d.replication_method || '—'),
+    card('FX Hedged', d.fx_hedged ? 'Yes' : 'No'),
+  ].join('');
 
   document.getElementById('tab-content').innerHTML = `
-    ${aiSummaryHtml}
-    ${docLinksHtml}
-    ${benchmarkRow}
-    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-      ${cards.map(([label, val, num, tip]) => `
-        <div class="bg-slate-50 rounded-lg p-3 border border-gray-100${tip ? ' dated' : ''}"
-             ${tip ? `title="${tip}"` : ''}>
-          <p class="text-gray-400 text-xs">${label}</p>
-          <p class="font-semibold text-sm mt-0.5 ${num != null ? pctCls(num) : 'text-gray-800'}">${val}</p>
-        </div>`).join('')}
-    </div>
+    ${aiHtml}${docHtml}${bmHtml}
+    ${section('Price & Market', priceCards)}
+    ${section('Fund Size', sizeCards)}
+    ${section('Costs & Trading', costsCards)}
+    ${section('Returns', retCards)}
+    ${section('Distributions', distCards)}
+    ${section('Fund Info', infoCards)}
     ${d.description ? `<p class="mt-4 text-sm text-gray-600 leading-relaxed border-t pt-4">${d.description}</p>` : ''}
     ${d.issuer_url ? `<a href="${d.issuer_url}" target="_blank" rel="noopener"
-       class="mt-3 inline-flex items-center gap-1 text-green-600 hover:underline text-sm">
-       View on issuer site &#8594;</a>` : ''}`;
+       class="mt-3 inline-flex items-center gap-1 text-blue-600 hover:underline text-sm">View on issuer site &#8594;</a>` : ''}`;
 }
 
 async function showTab(tab) {
@@ -2816,7 +3291,7 @@ async function showTab(tab) {
 
     el.innerHTML = `
       <div class="flex flex-wrap items-center gap-2 mb-3">
-        <span class="bg-green-50 text-green-700 px-2.5 py-1 rounded-full text-xs font-semibold">${all.length} holdings</span>
+        <span class="bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full text-xs font-semibold">${all.length} holdings</span>
         <span class="text-xs text-gray-500">Top 10 concentration:
           <strong class="text-gray-700">${top10Wt.toFixed(1)}%</strong></span>
         ${topCountries.length > 1 ? `<span class="text-xs text-gray-400">·</span>
@@ -2825,7 +3300,7 @@ async function showTab(tab) {
         ${holdingsTs ? `<span class="ml-auto text-xs text-gray-400" title="Holdings last updated by issuer scraper">As of ${fmtTs(holdingsTs)}</span>` : ''}
       </div>
       <input id="holding-filter" type="text" placeholder="Filter by name or ticker…"
-        class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-green-200">
+        class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-200">
       <div class="text-xs text-gray-400 grid gap-x-3 mb-1 pr-1"
            style="grid-template-columns:3.5rem 1fr 7rem 5rem">
         <span class="text-right">Ticker</span><span>Name</span><span>Sector</span><span class="hidden sm:block">Country</span>
@@ -2839,10 +3314,10 @@ async function showTab(tab) {
             <div class="flex-1 min-w-0">
               <div class="flex items-center justify-between mb-0.5">
                 <span class="text-xs font-medium text-gray-700 truncate">${r.name || ''}</span>
-                <span class="text-xs font-bold text-green-700 ml-2 shrink-0">${r.weight_pct != null ? r.weight_pct.toFixed(2) + '%' : '—'}</span>
+                <span class="text-xs font-bold text-blue-700 ml-2 shrink-0">${r.weight_pct != null ? r.weight_pct.toFixed(2) + '%' : '—'}</span>
               </div>
               <div class="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                <div class="h-full bg-green-400 rounded-full pbar"
+                <div class="h-full bg-blue-400 rounded-full pbar"
                      style="width:${maxW > 0 ? ((r.weight_pct || 0) / maxW * 100).toFixed(1) : 0}%"></div>
               </div>
             </div>
@@ -2852,7 +3327,7 @@ async function showTab(tab) {
       </div>
       ${all.length > 50 ? `
         <button id="show-all-holdings"
-          class="mt-2 w-full text-xs text-green-600 hover:text-green-800 hover:underline py-1.5 border-t border-gray-100">
+          class="mt-2 w-full text-xs text-blue-600 hover:text-blue-800 hover:underline py-1.5 border-t border-gray-100">
           Show all ${all.length} holdings ↓
         </button>` : ''}`;
 
@@ -2940,9 +3415,9 @@ async function showTab(tab) {
 
     const yieldBar = (yieldPct != null) ? `
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
-        <div class="bg-green-50 rounded-lg p-3 border border-green-100">
+        <div class="bg-blue-50 rounded-lg p-3 border border-blue-100">
           <p class="text-xs text-green-600 font-medium">Distribution Yield</p>
-          <p class="text-xl font-bold text-green-700 mt-0.5">${yieldPct.toFixed(2)}%</p>
+          <p class="text-xl font-bold text-blue-700 mt-0.5">${yieldPct.toFixed(2)}%</p>
         </div>
         ${price != null ? `<div class="bg-slate-50 rounded-lg p-3 border border-gray-100">
           <p class="text-xs text-gray-400 font-medium">Unit Price</p>
@@ -2952,9 +3427,9 @@ async function showTab(tab) {
           <p class="text-xs text-gray-400 font-medium">Income / Unit</p>
           <p class="text-xl font-bold text-gray-800 mt-0.5">${money(incomePerUnit)}</p>
         </div>` : ''}
-        ${incomePerTenK != null ? `<div class="bg-green-50 rounded-lg p-3 border border-green-100">
+        ${incomePerTenK != null ? `<div class="bg-blue-50 rounded-lg p-3 border border-blue-100">
           <p class="text-xs text-green-600 font-medium">Est. Income / $10K</p>
-          <p class="text-xl font-bold text-green-700 mt-0.5">${money(incomePerTenK)}<span class="text-xs font-normal text-green-400">/yr</span></p>
+          <p class="text-xl font-bold text-blue-700 mt-0.5">${money(incomePerTenK)}<span class="text-xs font-normal text-blue-400">/yr</span></p>
         </div>` : ''}
       </div>` : '';
 
@@ -3058,7 +3533,7 @@ async function renderPerformanceTab(code) {
         ${periods.map(p => `
           <button data-period="${p}"
                   class="perf-period px-3 py-1 text-xs rounded-lg border font-medium transition-colors
-                         ${p === '1y' ? 'bg-green-600 text-white border-green-600' : 'border-gray-200 text-gray-500 hover:border-green-400 hover:text-green-600'}">
+                         ${p === '1y' ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-200 text-gray-500 hover:border-blue-400 hover:text-blue-600'}">
             ${labels[p]}
           </button>`).join('')}
       </div>
@@ -3072,6 +3547,44 @@ async function renderPerformanceTab(code) {
     <div id="perf-table-wrap" class="overflow-x-auto mb-2"></div>
     <p class="text-xs text-gray-400">Prices from Yahoo Finance · rebased to 100 at period start · weekly data</p>`;
 
+  // Load AUM history from etp_monthly (append after chart)
+  try {
+    const histD = await api('/api/v1/history/etf/' + code);
+    if (histD.data && histD.data.length > 1) {
+      const rows = histD.data;
+      const dates = rows.map(r => r.date);
+      const aums  = rows.map(r => r.aum_m || 0);
+      const flows = rows.map(r => r.flow_m || 0);
+      const aumSection = document.createElement('div');
+      aumSection.className = 'mt-5 pt-4 border-t border-gray-100';
+      aumSection.innerHTML = `
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Historical AUM &amp; Flows <span class="font-normal normal-case">(ASX monthly data)</span></p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div style="height:160px"><canvas id="perf-aum-hist"></canvas></div>
+          <div style="height:160px"><canvas id="perf-flow-hist"></canvas></div>
+        </div>`;
+      document.getElementById('tab-content').appendChild(aumSection);
+      setTimeout(() => {
+        if (histCharts['perf-aum-hist']) { histCharts['perf-aum-hist'].destroy(); }
+        if (histCharts['perf-flow-hist']){ histCharts['perf-flow-hist'].destroy(); }
+        histCharts['perf-aum-hist'] = new Chart(document.getElementById('perf-aum-hist'), {
+          type: 'line',
+          data: { labels: dates, datasets: [{ data: aums, borderColor: '#3b82f6', backgroundColor: '#3b82f620', fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2 }] },
+          options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+            scales:{ x:{ticks:{maxTicksLimit:8,font:{size:9}},grid:{display:false}},
+                     y:{ticks:{font:{size:9},callback:v=>'$'+v.toFixed(0)+'M'},grid:{color:'#f1f5f9'}} } }
+        });
+        histCharts['perf-flow-hist'] = new Chart(document.getElementById('perf-flow-hist'), {
+          type: 'bar',
+          data: { labels: dates, datasets: [{ data: flows, backgroundColor: flows.map(v=>v>=0?'#3b82f680':'#ef444480'), borderRadius: 1 }] },
+          options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+            scales:{ x:{ticks:{maxTicksLimit:8,font:{size:9}},grid:{display:false}},
+                     y:{ticks:{font:{size:9},callback:v=>'$'+v.toFixed(0)+'M'},grid:{color:'#f1f5f9'}} } }
+        });
+      }, 50);
+    }
+  } catch(e) { /* etp_monthly data not available for this fund */ }
+
   await loadPerfData(code, '1y');
 
   // Period button clicks
@@ -3079,11 +3592,11 @@ async function renderPerformanceTab(code) {
     const btn = e.target.closest('[data-period]');
     if (!btn) return;
     document.querySelectorAll('.perf-period').forEach(b => {
-      b.className = b.className.replace('bg-green-600 text-white border-green-600',
-                                        'border-gray-200 text-gray-500 hover:border-green-400 hover:text-green-600');
+      b.className = b.className.replace('bg-blue-600 text-white border-blue-600',
+                                        'border-gray-200 text-gray-500 hover:border-blue-400 hover:text-blue-600');
     });
-    btn.className = btn.className.replace('border-gray-200 text-gray-500 hover:border-green-400 hover:text-green-600',
-                                          'bg-green-600 text-white border-green-600');
+    btn.className = btn.className.replace('border-gray-200 text-gray-500 hover:border-blue-400 hover:text-blue-600',
+                                          'bg-blue-600 text-white border-blue-600');
     await loadPerfData(code, btn.dataset.period);
   });
 }
@@ -3293,7 +3806,7 @@ function renderPerfTable(d, code, prices) {
       <thead>
         <tr class="border-b border-gray-200">
           <th class="pb-2 pr-3 text-left text-xs text-gray-400 font-semibold uppercase">Period</th>
-          <th class="pb-2 px-3 text-right text-xs text-green-600 font-semibold uppercase">${code} Return</th>
+          <th class="pb-2 px-3 text-right text-xs text-blue-600 font-semibold uppercase">${code} Return</th>
           ${headerCols}
         </tr>
       </thead>
@@ -3325,7 +3838,7 @@ document.getElementById('search').addEventListener('input', function () {
       return;
     }
     el.innerHTML = d.results.slice(0, 10).map(r => `
-      <div class="px-3 py-2.5 hover:bg-green-50 cursor-pointer flex justify-between items-center border-b last:border-b-0"
+      <div class="px-3 py-2.5 hover:bg-blue-50 cursor-pointer flex justify-between items-center border-b last:border-b-0"
            data-code="${r.code}">
         <div>
           <span class="font-bold text-gray-900">${r.code}</span>
@@ -3710,7 +4223,7 @@ setInterval(() => {
 }, 120000);
 
 /* ======================================================= main view tabs */
-const VIEWS = ['list', 'screener', 'compare', 'holdings', 'analytics'];
+const VIEWS = ['list', 'screener', 'compare', 'holdings', 'analytics', 'history'];
 document.querySelectorAll('.main-tab').forEach(btn => {
   btn.addEventListener('click', () => {
     const v = btn.dataset.view;
@@ -3721,6 +4234,7 @@ document.querySelectorAll('.main-tab').forEach(btn => {
     if (v === 'screener'  && !screenerLoaded)  initScreener();
     if (v === 'compare'   && !compareLoaded)   initCompare();
     if (v === 'analytics' && !analyticsLoaded) initAnalytics();
+    if (v === 'history'   && !historyLoaded)   initHistory();
   });
 });
 
@@ -3745,7 +4259,7 @@ async function initScreener() {
   (cats.categories || []).forEach(c => {
     const id = 'sca-' + c.asset_class.replace(/\W/g, '_');
     const label = document.createElement('label');
-    label.innerHTML = `<input type="checkbox" id="${id}" value="${c.asset_class}" class="sc-ac accent-green-600">
+    label.innerHTML = `<input type="checkbox" id="${id}" value="${c.asset_class}" class="sc-ac accent-blue-600">
       <span class="truncate">${c.asset_class} <span class="text-gray-400">(${c.etf_count})</span></span>`;
     label.querySelector('input').addEventListener('change', e => {
       if (e.target.checked) scFilters.assetClasses.add(e.target.value);
@@ -3759,7 +4273,7 @@ async function initScreener() {
   (issuers.issuers || []).forEach(i => {
     const id = 'sci-' + i.name.replace(/\W/g, '_');
     const label = document.createElement('label');
-    label.innerHTML = `<input type="checkbox" id="${id}" value="${i.name}" class="sc-is accent-green-600">
+    label.innerHTML = `<input type="checkbox" id="${id}" value="${i.name}" class="sc-is accent-blue-600">
       <span class="truncate">${i.name} <span class="text-gray-400">(${i.etf_count})</span></span>`;
     label.querySelector('input').addEventListener('change', e => {
       if (e.target.checked) scFilters.issuers.add(e.target.value);
@@ -3773,10 +4287,10 @@ async function initScreener() {
   document.querySelectorAll('.sc-exch').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.sc-exch').forEach(b => {
-        b.classList.remove('active', 'bg-green-600', 'text-white', 'border-green-600');
+        b.classList.remove('active', 'bg-blue-600', 'text-white', 'border-blue-600');
         b.classList.add('text-gray-600', 'border-gray-200');
       });
-      btn.classList.add('active', 'bg-green-600', 'text-white', 'border-green-600');
+      btn.classList.add('active', 'bg-blue-600', 'text-white', 'border-blue-600');
       btn.classList.remove('text-gray-600', 'border-gray-200');
       scFilters.exchange = btn.dataset.exch;
       scDebounceFetch();
@@ -3824,11 +4338,11 @@ async function initScreener() {
     document.querySelectorAll('#sc-asset-list input, #sc-issuer-list input').forEach(cb =>
       cb.checked = false);
     document.querySelectorAll('.sc-exch').forEach(b => {
-      b.classList.remove('active','bg-green-600','text-white','border-green-600');
+      b.classList.remove('active','bg-blue-600','text-white','border-blue-600');
       b.classList.add('text-gray-600','border-gray-200');
     });
     document.querySelector('.sc-exch[data-exch=""]').classList.add(
-      'active','bg-green-600','text-white','border-green-600');
+      'active','bg-blue-600','text-white','border-blue-600');
     scFetch();
   });
 
@@ -3903,6 +4417,9 @@ async function scFetch() {
 /* ============================================================ COMPARE */
 let compareLoaded = false;
 let analyticsLoaded = false;
+let historyLoaded = false;
+let histCharts = {};
+let histSubActive = 'industry';
 const cmpSet = new Set();
 let cmpTimer;
 
@@ -3923,8 +4440,8 @@ function initCompare() {
         return;
       }
       dd.innerHTML = d.results.slice(0, 8).map(r => `
-        <div class="px-3 py-2 hover:bg-green-50 cursor-pointer flex justify-between items-center
-                    border-b last:border-b-0 ${cmpSet.has(r.code) ? 'bg-green-50' : ''}"
+        <div class="px-3 py-2 hover:bg-blue-50 cursor-pointer flex justify-between items-center
+                    border-b last:border-b-0 ${cmpSet.has(r.code) ? 'bg-blue-50' : ''}"
              data-code="${r.code}" data-name="${r.name || ''}">
           <div>
             <span class="font-bold text-gray-900">${r.code}</span>
@@ -3961,11 +4478,11 @@ function initCompare() {
 function renderCmpChips() {
   const el = document.getElementById('cmp-chips');
   el.innerHTML = [...cmpSet].map(code => `
-    <span class="inline-flex items-center gap-1 bg-green-100 text-green-800 text-xs font-semibold
+    <span class="inline-flex items-center gap-1 bg-blue-100 text-blue-800 text-xs font-semibold
                  px-2.5 py-1 rounded-full">
       ${code}
       <button onclick="cmpRemove('${code}')"
-              class="ml-0.5 text-green-500 hover:text-green-800 font-bold text-sm leading-none">×</button>
+              class="ml-0.5 text-blue-500 hover:text-blue-800 font-bold text-sm leading-none">×</button>
     </span>`).join('');
 }
 
@@ -4029,7 +4546,7 @@ async function cmpFetchOverlap() {
   // Coverage pills: "VAS — 94.2% covered by shared holdings"
   coverageEl.innerHTML = codes.map(code => {
     const pct = coverage[code] != null ? coverage[code].toFixed(1) + '%' : '—';
-    const col = coverage[code] >= 50 ? 'bg-green-50 text-green-700 border-green-200'
+    const col = coverage[code] >= 50 ? 'bg-blue-50 text-blue-700 border-blue-200'
               : coverage[code] >= 20 ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
               : 'bg-gray-50 text-gray-600 border-gray-200';
     return `<div class="border rounded-lg px-3 py-1.5 text-xs ${col}">
@@ -4045,7 +4562,7 @@ async function cmpFetchOverlap() {
   });
 
   const thCols = codes.map(c =>
-    `<th class="px-3 py-2 text-right text-xs font-semibold text-green-700 uppercase tracking-wide whitespace-nowrap">${c}</th>`
+    `<th class="px-3 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wide whitespace-nowrap">${c}</th>`
   ).join('');
 
   const rows = overlap.map((item, i) => {
@@ -4053,7 +4570,7 @@ async function cmpFetchOverlap() {
     // Badge if it's in all selected ETFs
     const inAll = item.etf_count === codes.length;
     const countBadge = inAll
-      ? '<span class="ml-1.5 text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">all</span>'
+      ? '<span class="ml-1.5 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-medium">all</span>'
       : (codes.length > 2
           ? `<span class="ml-1.5 text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">${item.etf_count}/${codes.length}</span>`
           : '');
@@ -4064,13 +4581,13 @@ async function cmpFetchOverlap() {
       const barPct = maxWeightPerCode[c] > 0 ? Math.round(w / maxWeightPerCode[c] * 64) : 0;
       return `<td class="px-3 py-2 text-right text-xs">
         <div class="flex items-center justify-end gap-1.5">
-          <div class="h-1.5 rounded-full bg-green-200" style="width:${barPct}px;min-width:2px"></div>
+          <div class="h-1.5 rounded-full bg-blue-200" style="width:${barPct}px;min-width:2px"></div>
           <span class="font-medium text-gray-700 tabular-nums">${w.toFixed(2)}%</span>
         </div>
       </td>`;
     }).join('');
 
-    return `<tr class="${bg} hover:bg-green-50 transition-colors">
+    return `<tr class="${bg} hover:bg-blue-50 transition-colors">
       <td class="px-3 py-2 text-xs text-gray-800 font-medium max-w-xs truncate">
         ${item.name}${countBadge}
       </td>
@@ -4135,13 +4652,13 @@ async function cmpFetchSimilar() {
   }
 
   function similarCard(s, dimmed) {
-    const overlapColor = s.overlap_pct >= 50 ? 'bg-green-100 text-green-700'
+    const overlapColor = s.overlap_pct >= 50 ? 'bg-blue-100 text-blue-700'
                        : s.overlap_pct >= 20 ? 'bg-yellow-100 text-yellow-700'
                        : 'bg-gray-100 text-gray-500';
     return `
-      <div class="bg-white border ${dimmed ? 'border-dashed border-gray-200 opacity-80' : 'border-gray-200'} rounded-xl p-4 hover:shadow-md hover:border-green-200 transition-all">
+      <div class="bg-white border ${dimmed ? 'border-dashed border-gray-200 opacity-80' : 'border-gray-200'} rounded-xl p-4 hover:shadow-md hover:border-blue-200 transition-all">
         <div class="flex justify-between items-start mb-1">
-          <span class="font-bold text-green-700 text-base">${s.code}</span>
+          <span class="font-bold text-blue-700 text-base">${s.code}</span>
           <span class="text-xs ${overlapColor} font-semibold px-2 py-0.5 rounded-full">${s.overlap_pct.toFixed(0)}% overlap</span>
         </div>
         <p class="text-xs text-gray-500 mb-1 leading-snug">${(s.name || '').slice(0, 50)}</p>
@@ -4153,7 +4670,7 @@ async function cmpFetchSimilar() {
           ${s.return_1y != null ? `<span class="${pctCls(s.return_1y)}">${pct(s.return_1y)} 1Y</span>` : ''}
         </div>
         <button onclick="cmpAdd('${s.code}')"
-                class="mt-3 text-xs text-green-600 hover:text-green-800 font-medium border border-green-200 hover:border-green-400 rounded-lg px-3 py-1 transition-colors">
+                class="mt-3 text-xs text-blue-600 hover:text-blue-800 font-medium border border-blue-200 hover:border-blue-400 rounded-lg px-3 py-1 transition-colors">
           + Add to Compare
         </button>
       </div>`;
@@ -4241,7 +4758,7 @@ function renderCmpTable(etfs) {
 
   const thCols = etfs.map(e => `
     <th class="px-4 py-3 text-center min-w-[140px]">
-      <div class="font-bold text-green-700 text-base">${e.code}</div>
+      <div class="font-bold text-blue-700 text-base">${e.code}</div>
       <button onclick="cmpRemove('${e.code}')"
               class="text-xs text-gray-400 hover:text-red-500 mt-0.5">Remove</button>
     </th>`).join('');
@@ -4313,17 +4830,17 @@ async function hsFetch() {
   const maxW = Math.max(...d.results.map(r => r.weight_pct || 0));
   document.getElementById('holdings-table').innerHTML = d.results.map(r => `
     <tr class="cursor-pointer" onclick="showDetail('${r.etf_code}');document.querySelector('.main-tab[data-view=list]').click()">
-      <td class="px-3 py-2.5 font-bold text-green-700">${r.etf_code}</td>
+      <td class="px-3 py-2.5 font-bold text-blue-700">${r.etf_code}</td>
       <td class="px-3 py-2.5 text-gray-600 max-w-[160px] truncate text-xs">${r.etf_name || ''}</td>
       <td class="px-3 py-2.5 font-medium text-gray-800 max-w-[180px] truncate">${r.holding_name || ''}</td>
       <td class="px-3 py-2.5 font-mono text-xs text-gray-500">${r.ticker || '—'}</td>
       <td class="px-3 py-2.5 text-right">
         <div class="flex items-center justify-end gap-2">
           <div class="w-16 bg-gray-100 rounded-full h-1.5 overflow-hidden">
-            <div class="h-full bg-green-400 rounded-full"
+            <div class="h-full bg-blue-400 rounded-full"
                  style="width:${maxW > 0 ? (r.weight_pct / maxW * 100).toFixed(1) : 0}%"></div>
           </div>
-          <span class="font-bold text-green-700 text-xs w-12 text-right">
+          <span class="font-bold text-blue-700 text-xs w-12 text-right">
             ${r.weight_pct != null ? r.weight_pct.toFixed(2) + '%' : '—'}
           </span>
         </div>
@@ -4401,6 +4918,541 @@ async function initAnalytics() {
     (flows.top_outflows || []).slice(0, 8).map(r => flowRow(r, 'out')).join('');
 }
 
+/* ============================================================ HISTORY TAB */
+const HIST_PALETTE = [
+  '#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6',
+  '#ec4899','#06b6d4','#84cc16','#f97316','#6366f1',
+  '#14b8a6','#a855f7'
+];
+
+function makeStackedArea(canvasId, dates, series, colors) {
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return null;
+  if (histCharts[canvasId]) { histCharts[canvasId].destroy(); delete histCharts[canvasId]; }
+  const c = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: dates,
+      datasets: series.map((s, i) => ({
+        label: s.name,
+        data: s.data,
+        backgroundColor: (colors?.[i] ?? HIST_PALETTE[i % HIST_PALETTE.length]) + '99',
+        borderColor:     colors?.[i] ?? HIST_PALETTE[i % HIST_PALETTE.length],
+        borderWidth: 1.5,
+        fill: 'stack',
+        tension: 0.3,
+        pointRadius: 0,
+      }))
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+      scales: {
+        x: { ticks: { maxTicksLimit: 12, font: { size: 10 } }, grid: { display: false } },
+        y: { stacked: true, ticks: { font: { size: 10 },
+             callback: v => '$' + v.toFixed(0) + 'B' }, grid: { color: '#f1f5f9' } }
+      }
+    }
+  });
+  histCharts[canvasId] = c;
+  return c;
+}
+
+function makeLineChart(canvasId, labels, datasets, yLabel, inlinePlugins) {
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return null;
+  if (histCharts[canvasId]) { histCharts[canvasId].destroy(); delete histCharts[canvasId]; }
+  const c = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { display: datasets.length > 1, position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+      scales: {
+        x: { ticks: { maxTicksLimit: 12, font: { size: 10 } }, grid: { display: false } },
+        y: { ticks: { font: { size: 10 } }, grid: { color: '#f1f5f9' } }
+      }
+    },
+    plugins: inlinePlugins || []
+  });
+  histCharts[canvasId] = c;
+  return c;
+}
+
+function makeBarChart(canvasId, labels, datasets) {
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return null;
+  if (histCharts[canvasId]) { histCharts[canvasId].destroy(); delete histCharts[canvasId]; }
+  const c = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: datasets.length > 1, position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+      scales: {
+        x: { ticks: { font: { size: 10 } }, grid: { display: false } },
+        y: { ticks: { font: { size: 10 } }, grid: { color: '#f1f5f9' } }
+      }
+    }
+  });
+  histCharts[canvasId] = c;
+  return c;
+}
+
+async function loadHistIndustry() {
+  const d = await api('/api/v1/history/industry');
+  if (!d.data) return;
+  const rows = d.data;
+  const anomalies = d.anomalies || {};
+  const dates  = rows.map(r => r.date);
+  const aums   = rows.map(r => r.aum_b      ? +r.aum_b.toFixed(1)      : 0);
+  const counts = rows.map(r => r.etf_count  || 0);
+  const flows     = rows.map(r => r.flows_m     ? +r.flows_m.toFixed(0)     : 0);
+  const rawFlows  = rows.map(r => r.raw_flows_m ? +r.raw_flows_m.toFixed(0) : 0);
+  const THRESH = 500;
+
+  // Grey line traces orange exactly, diverges only at anomaly spikes — visually connected
+  const greyLine  = rawFlows.map((v, i) => Math.abs(v - flows[i]) > THRESH ? v : flows[i]);
+  const isAnomaly = greyLine.map((v, i) => Math.abs(v - flows[i]) > THRESH);
+
+  // Y-axis cap: max of clean (non-anomaly) flows + 10% headroom — shows all ordinary data in full
+  const cleanMax = Math.max(...flows.filter((_, i) => !isAnomaly[i])) * 1.1;
+
+  // Inline plugin: dynamic Y-axis + hover callout
+  function makeCalloutPlugin(anomalyMap, datesList, dsIndex) {
+    let _updating = false;
+    return {
+      id: 'anomalyCallout_' + dsIndex,
+      // On first render, clamp the Y-axis to clean data range
+      afterRender(chart) {
+        const yScale = chart.options.scales.yFlow;
+        if (yScale && yScale.max === undefined) {
+          yScale.max = cleanMax;
+          if (!_updating) { _updating = true; chart.update('none'); _updating = false; }
+        }
+      },
+      // Expand/collapse Y-axis on hover
+      afterEvent(chart, args) {
+        if (_updating) return;
+        const e = args.event;
+        if (e.type !== 'mousemove' && e.type !== 'mouseleave') return;
+        const yScale = chart.options.scales.yFlow;
+        if (!yScale) return;
+        let onAnomaly = false;
+        if (e.type === 'mousemove') {
+          const active = chart.tooltip._active || [];
+          if (active.length && anomalyMap[datesList[active[0].index]]) onAnomaly = true;
+        }
+        const target = onAnomaly ? undefined : cleanMax;
+        if (yScale.max !== target) {
+          yScale.max = target;
+          _updating = true;
+          chart.update();
+          _updating = false;
+        }
+      },
+      // Draw callout only while hovering over an anomaly point
+      afterDatasetsDraw(chart) {
+        const active = chart.tooltip._active;
+        if (!active || !active.length) return;
+        const activeIdx = active[0].index;
+        const date = datesList[activeIdx];
+        if (!anomalyMap[date]) return;
+        const meta = chart.getDatasetMeta(dsIndex);
+        if (!meta || !meta.data) return;
+        const pt = meta.data[activeIdx];
+        if (!pt) return;
+        const ctx = chart.ctx;
+        const x = pt.x, y = pt.y;
+        const etfs = anomalyMap[date];
+        const label = etfs.map(e => `${e.code}  +$${(e.flow_m / 1000).toFixed(1)}B`).join('   ');
+        const lineH = 30;
+        ctx.save();
+        ctx.beginPath();
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 3]);
+        ctx.moveTo(x, y - 5);
+        ctx.lineTo(x, y - lineH);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.font = 'bold 9px ui-sans-serif, sans-serif';
+        const tw = ctx.measureText(label).width;
+        const pad = 6, bh = 15, bw = tw + pad * 2;
+        const bx = Math.min(Math.max(x - bw / 2, 2), chart.width - bw - 2);
+        const by = y - lineH - bh - 2;
+        ctx.fillStyle = '#334155';
+        ctx.beginPath();
+        ctx.roundRect(bx, by, bw, bh, 4);
+        ctx.fill();
+        ctx.fillStyle = '#f1f5f9';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, bx + pad, by + bh / 2);
+        ctx.restore();
+      }
+    };
+  }
+
+  makeLineChart('hist-industry-aum', dates, [{
+    label: 'Industry AUM ($B)',
+    data: aums,
+    borderColor: '#3b82f6', backgroundColor: '#3b82f620',
+    fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2
+  }]);
+
+  makeLineChart('hist-industry-count', dates, [
+    { label: 'ETF Count', data: counts, borderColor: '#3b82f6', backgroundColor: 'transparent',
+      tension: 0.3, pointRadius: 0, borderWidth: 2, yAxisID: 'yCount' },
+    { label: 'Net Flows ($M)', data: flows, borderColor: '#f59e0b', backgroundColor: '#f59e0b20',
+      fill: true, tension: 0.3, pointRadius: 0, borderWidth: 1.5, yAxisID: 'yFlow' },
+    { label: 'Flows incl. new admissions ($M)', data: greyLine,
+      borderColor: '#94a3b8', backgroundColor: 'transparent',
+      borderDash: [4, 4], tension: 0.3,
+      pointRadius: isAnomaly.map(a => a ? 4 : 0),
+      pointBackgroundColor: '#94a3b8', borderWidth: 1.5, yAxisID: 'yFlow' }
+  ], undefined, [makeCalloutPlugin(anomalies, dates, 2)]);
+
+  // Patch dual-axis scales after creation
+  const c = histCharts['hist-industry-count'];
+  if (c) {
+    c.options.scales = {
+      x: { ticks: { maxTicksLimit: 12, font: { size: 10 } }, grid: { display: false } },
+      yCount: { type: 'linear', position: 'left',  ticks: { font: { size: 10 } }, grid: { color: '#f1f5f9' } },
+      yFlow:  { type: 'linear', position: 'right', ticks: { font: { size: 10 } }, grid: { display: false } }
+    };
+    c.update();
+  }
+
+  // Annual bar chart
+  const annual = {};
+  rows.forEach(r => {
+    const yr = r.date.slice(0, 4);
+    if (!annual[yr]) annual[yr] = { flows: 0, rawFlows: 0, traded: 0, anomalyDates: [] };
+    annual[yr].flows    += (r.flows_m     || 0);
+    annual[yr].rawFlows += (r.raw_flows_m || 0);
+    annual[yr].traded   += (r.traded_m    || 0);
+    if (anomalies[r.date]) annual[yr].anomalyDates.push(r.date);
+  });
+  const yrs = Object.keys(annual).sort();
+
+  // Merge admission ETFs per year for callout
+  const annualAnomalyMap = {};
+  yrs.forEach(yr => {
+    const merged = [];
+    (annual[yr].anomalyDates || []).forEach(dt => (anomalies[dt] || []).forEach(e => merged.push(e)));
+    if (merged.length) annualAnomalyMap[yr] = merged;
+  });
+
+  // Grey line: traces clean bars, diverges at anomaly years
+  const annualRaw      = yrs.map(y => Math.abs(annual[y].rawFlows - annual[y].flows) > 1000
+    ? +annual[y].rawFlows.toFixed(0) : +annual[y].flows.toFixed(0));
+  const annualIsAnom   = yrs.map(y => Math.abs(annual[y].rawFlows - annual[y].flows) > 1000);
+
+  const annualCleanMax = Math.max(...yrs
+    .filter(y => !annualIsAnom[yrs.indexOf(y)])
+    .map(y => annual[y].flows)) * 1.1;
+  let _barUpdating = false;
+  const barCalloutPlugin = {
+    id: 'annualAnomalyCallout',
+    afterRender(chart) {
+      const yScale = chart.options.scales.y;
+      if (yScale && yScale.max === undefined) {
+        yScale.max = annualCleanMax;
+        if (!_barUpdating) { _barUpdating = true; chart.update('none'); _barUpdating = false; }
+      }
+    },
+    afterEvent(chart, args) {
+      if (_barUpdating) return;
+      const e = args.event;
+      if (e.type !== 'mousemove' && e.type !== 'mouseleave') return;
+      const yScale = chart.options.scales.y;
+      if (!yScale) return;
+      let onAnomaly = false;
+      if (e.type === 'mousemove') {
+        const active = chart.tooltip._active || [];
+        if (active.length && annualAnomalyMap[yrs[active[0].index]]) onAnomaly = true;
+      }
+      const target = onAnomaly ? undefined : annualCleanMax;
+      if (yScale.max !== target) {
+        yScale.max = target;
+        _barUpdating = true;
+        chart.update();
+        _barUpdating = false;
+      }
+    },
+    afterDatasetsDraw(chart) {
+      const active = chart.tooltip._active;
+      if (!active || !active.length) return;
+      const i = active[0].index;
+      const yr = yrs[i];
+      if (!annualAnomalyMap[yr]) return;
+      const meta = chart.getDatasetMeta(2);
+      if (!meta || !meta.data) return;
+      const pt = meta.data[i];
+      if (!pt) return;
+      const ctx = chart.ctx;
+      const x = pt.x, y = pt.y;
+      const label = annualAnomalyMap[yr].map(e => `${e.code}  +$${(e.flow_m / 1000).toFixed(1)}B`).join('   ');
+      const lineH = 28;
+      ctx.save();
+      ctx.beginPath();
+      ctx.strokeStyle = '#94a3b8';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.moveTo(x, y - 5);
+      ctx.lineTo(x, y - lineH);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.font = 'bold 9px ui-sans-serif, sans-serif';
+      const tw = ctx.measureText(label).width;
+      const pad = 6, bh = 15, bw = tw + pad * 2;
+      const bx = Math.min(Math.max(x - bw / 2, 2), chart.width - bw - 2);
+      const by = y - lineH - bh - 2;
+      ctx.fillStyle = '#334155';
+      ctx.beginPath();
+      ctx.roundRect(bx, by, bw, bh, 4);
+      ctx.fill();
+      ctx.fillStyle = '#f1f5f9';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, bx + pad, by + bh / 2);
+      ctx.restore();
+    }
+  };
+
+  makeBarChart('hist-industry-flows', yrs, [
+    { label: 'Net Flows ($M)',    data: yrs.map(y => +annual[y].flows.toFixed(0)),  backgroundColor: '#3b82f680' },
+    { label: 'Traded Value ($M)', data: yrs.map(y => +annual[y].traded.toFixed(0)), type: 'line',
+      borderColor: '#3b82f6', fill: false, pointRadius: 2, borderWidth: 2, tension: 0.3 },
+    { label: 'Flows incl. new admissions ($M)', data: annualRaw, type: 'line',
+      borderColor: '#94a3b8', borderDash: [4, 4], fill: false,
+      pointRadius: annualIsAnom.map(a => a ? 5 : 0),
+      pointBackgroundColor: '#94a3b8', borderWidth: 1.5, tension: 0.3 }
+  ]);
+  const bc = histCharts['hist-industry-flows'];
+  if (bc) { bc.config.plugins = [barCalloutPlugin]; bc.update(); }
+}
+
+async function loadHistIssuers() {
+  const ISSUER_BRAND = {
+    'Vanguard':    '#7b1c2e',   // maroon
+    'Betashares':  '#ea580c',   // orange
+    'iShares':     '#16a34a',   // green
+    'VanEck':      '#1e3a8a',   // navy blue
+    'Global X':    '#0e7490',   // teal-blue
+  };
+  const d = await api('/api/v1/history/issuers');
+  if (!d.dates) return;
+  const brandColors = d.series.map((s, i) => ISSUER_BRAND[s.name] ?? HIST_PALETTE[i % HIST_PALETTE.length]);
+  makeStackedArea('hist-issuer-stacked', d.dates, d.series, brandColors);
+
+  // Latest ranking table
+  const latest = d.dates[d.dates.length - 1];
+  const lastIdx = d.dates.length - 1;
+  const ranked = d.series.map(s => ({ name: s.name, aum: s.data[lastIdx] || 0 }))
+    .sort((a, b) => b.aum - a.aum);
+  const totalAum = ranked.reduce((s, r) => s + r.aum, 0);
+  document.getElementById('hist-issuer-table').innerHTML = `
+    <table class="w-full text-sm">
+      <thead><tr class="text-xs text-gray-400 border-b border-gray-100">
+        <th class="pb-2 text-left font-medium">Issuer</th>
+        <th class="pb-2 text-right font-medium">AUM ($B)</th>
+        <th class="pb-2 text-right font-medium">Share</th>
+      </tr></thead>
+      <tbody class="divide-y divide-gray-50">
+        ${ranked.map((r, i) => `
+          <tr>
+            <td class="py-1.5 flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-sm inline-block" style="background:${ISSUER_BRAND[r.name] ?? HIST_PALETTE[d.series.findIndex(s=>s.name===r.name)%HIST_PALETTE.length]}"></span>
+              ${r.name}
+            </td>
+            <td class="py-1.5 text-right font-semibold">${r.aum.toFixed(1)}</td>
+            <td class="py-1.5 text-right text-gray-500">${totalAum > 0 ? (r.aum/totalAum*100).toFixed(1)+'%' : '—'}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+async function loadHistAssetClass() {
+  const d = await api('/api/v1/history/asset-classes');
+  if (!d.dates) return;
+  makeStackedArea('hist-assetclass-stacked', d.dates, d.series);
+}
+
+async function loadHistFlows(months) {
+  document.getElementById('hist-flows-in').innerHTML  = '<div class="flex justify-center py-6"><div class="spinner"></div></div>';
+  document.getElementById('hist-flows-out').innerHTML = '<div class="flex justify-center py-6"><div class="spinner"></div></div>';
+  const d = await api('/api/v1/history/flows?months=' + months + '&limit=15');
+  function flowRows(arr, dir) {
+    if (!arr || !arr.length) return '<p class="text-xs text-gray-400 py-4 text-center">No data</p>';
+    const maxF = Math.max(...arr.map(r => Math.abs(r.flow_m || 0)), 1);
+    return arr.map((r, i) => {
+      const col = dir === 'in' ? '#3b82f6' : '#ef4444';
+      const w = (Math.abs(r.flow_m||0) / maxF * 100).toFixed(1);
+      return `<div class="flex items-center gap-2 py-1.5 hover:bg-slate-50 rounded cursor-pointer px-1"
+           onclick="showDetail('${r.code}');document.querySelector('.main-tab[data-view=list]').click()">
+        <div class="w-16 shrink-0">
+          <div class="font-bold text-xs text-gray-900">${r.code}</div>
+          <div class="text-[10px] text-gray-400 truncate">${r.issuer||''}</div>
+        </div>
+        <div class="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+          <div class="h-full rounded-full" style="background:${col};width:${w}%"></div>
+        </div>
+        <span class="text-xs font-semibold w-20 text-right shrink-0" style="color:${col}">
+          ${dir==='in'?'+':''}${r.flow_m!=null?(r.flow_m/1000).toFixed(2)+'B':'—'}
+        </span>
+      </div>`;
+    }).join('');
+  }
+  document.getElementById('hist-flows-in').innerHTML  = flowRows(d.inflows,  'in');
+  document.getElementById('hist-flows-out').innerHTML = flowRows(d.outflows, 'out');
+}
+
+async function loadHistLaunches() {
+  const d = await api('/api/v1/history/launches');
+  if (!d.by_year) return;
+  const years  = d.by_year.map(r => r.year);
+  const counts = d.by_year.map(r => r.count);
+  makeBarChart('hist-launches-bar', years, [{
+    label: 'New ETF Listings',
+    data: counts,
+    backgroundColor: years.map((_, i) => HIST_PALETTE[i % HIST_PALETTE.length] + 'cc'),
+    borderRadius: 4,
+  }]);
+
+  const maxTotal = Math.max(...d.by_issuer.map(r => r.total), 1);
+  document.getElementById('hist-launches-issuer').innerHTML = (d.by_issuer || []).map((r, i) => `
+    <div class="flex items-center gap-3 py-1.5 border-b border-gray-50 last:border-0">
+      <div class="w-28 text-xs text-gray-700 font-medium truncate shrink-0">${r.issuer}</div>
+      <div class="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+        <div class="h-full rounded-full" style="background:${HIST_PALETTE[i%HIST_PALETTE.length]};width:${(r.total/maxTotal*100).toFixed(0)}%"></div>
+      </div>
+      <span class="text-xs font-semibold text-gray-700 w-8 text-right shrink-0">${r.total}</span>
+      <span class="text-xs text-gray-400 w-16 text-right shrink-0">${r.active} active</span>
+    </div>`).join('');
+}
+
+async function loadHistFund(code) {
+  const el = document.getElementById('hist-fund-result');
+  el.innerHTML = '<div class="flex justify-center py-8"><div class="spinner"></div></div>';
+  const d = await api('/api/v1/history/etf/' + code.toUpperCase());
+  if (d.error || !d.data || !d.data.length) {
+    el.innerHTML = `<p class="text-gray-400 text-sm py-4">No historical data found for ${code.toUpperCase()}.</p>`;
+    return;
+  }
+  const rows  = d.data;
+  const dates = rows.map(r => r.date);
+  const aums  = rows.map(r => r.aum_m || 0);
+  const flows = rows.map(r => r.flow_m || 0);
+  const rets  = rows.map(r => r.return_1y != null ? +(r.return_1y * 100).toFixed(2) : null);
+
+  el.innerHTML = `
+    <h3 class="font-semibold text-gray-800 mb-1">${d.code} — ${d.name || ''}</h3>
+    <p class="text-xs text-gray-400 mb-4">${d.issuer || ''} · ${rows.length} months of data</p>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div>
+        <p class="text-xs font-medium text-gray-600 mb-1">AUM ($M)</p>
+        <div style="height:200px"><canvas id="hist-fund-aum"></canvas></div>
+      </div>
+      <div>
+        <p class="text-xs font-medium text-gray-600 mb-1">Net Monthly Flows ($M)</p>
+        <div style="height:200px"><canvas id="hist-fund-flows"></canvas></div>
+      </div>
+      <div>
+        <p class="text-xs font-medium text-gray-600 mb-1">1Y Total Return (%)</p>
+        <div style="height:200px"><canvas id="hist-fund-ret"></canvas></div>
+      </div>
+      <div>
+        <p class="text-xs font-medium text-gray-600 mb-1">Distribution Yield (%)</p>
+        <div style="height:200px"><canvas id="hist-fund-yield"></canvas></div>
+      </div>
+    </div>`;
+
+  // Draw after DOM is updated
+  setTimeout(() => {
+    makeLineChart('hist-fund-aum', dates, [{
+      data: aums, borderColor: '#3b82f6', backgroundColor: '#3b82f620', fill: true,
+      tension: 0.3, pointRadius: 0, borderWidth: 2
+    }]);
+    const anomalyFlags = rows.map(r => r.is_anomaly);
+    makeBarChart('hist-fund-flows', dates, [{
+      data: flows,
+      backgroundColor: flows.map((v, i) =>
+        anomalyFlags[i] ? '#94a3b880' : (v >= 0 ? '#3b82f680' : '#ef444480')
+      ),
+      borderColor: flows.map((v, i) =>
+        anomalyFlags[i] ? '#94a3b8' : (v >= 0 ? '#3b82f6' : '#ef4444')
+      ),
+      borderWidth: anomalyFlags.map(a => a ? 1 : 0),
+      borderRadius: 2,
+    }]);
+    makeLineChart('hist-fund-ret', dates, [{
+      data: rets, borderColor: '#3b82f6', backgroundColor: '#3b82f620', fill: true,
+      tension: 0.3, pointRadius: 0, borderWidth: 2
+    }]);
+    makeLineChart('hist-fund-yield', dates, [{
+      data: rows.map(r => r.distribution_yield != null ? +(r.distribution_yield*100).toFixed(2) : null),
+      borderColor: '#f59e0b', backgroundColor: '#f59e0b20', fill: true,
+      tension: 0.3, pointRadius: 0, borderWidth: 2
+    }]);
+  }, 50);
+}
+
+async function initHistory() {
+  historyLoaded = true;
+
+  // Sub-nav switching
+  document.getElementById('hist-subnav').addEventListener('click', async e => {
+    const btn = e.target.closest('[data-hsub]');
+    if (!btn) return;
+    const sub = btn.dataset.hsub;
+    document.querySelectorAll('.hist-sub-btn').forEach(b => {
+      const active = b.dataset.hsub === sub;
+      b.className = b.className
+        .replace('bg-blue-600 text-white border-blue-600', 'border-gray-200 text-gray-600 hover:border-blue-400')
+        .replace('border-gray-200 text-gray-600 hover:border-blue-400', 'border-gray-200 text-gray-600 hover:border-blue-400');
+      if (active) {
+        b.className = b.className.replace('border-gray-200 text-gray-600 hover:border-blue-400', 'bg-blue-600 text-white border-blue-600');
+      }
+    });
+    ['industry','issuers','assetclass','fund','flows','launches'].forEach(id => {
+      document.getElementById('hsub-'+id).classList.toggle('hidden', id !== sub);
+    });
+    histSubActive = sub;
+    // Load data for sub-view on first show
+    if (sub === 'issuers'    && !histCharts['hist-issuer-stacked'])   await loadHistIssuers();
+    if (sub === 'assetclass' && !histCharts['hist-assetclass-stacked']) await loadHistAssetClass();
+    if (sub === 'flows'      && !document.getElementById('hist-flows-in').children.length) await loadHistFlows(12);
+    if (sub === 'launches'   && !histCharts['hist-launches-bar'])     await loadHistLaunches();
+  });
+
+  // Fund lookup
+  document.getElementById('hist-fund-btn').addEventListener('click', () => {
+    const code = document.getElementById('hist-fund-input').value.trim();
+    if (code) loadHistFund(code);
+  });
+  document.getElementById('hist-fund-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('hist-fund-btn').click();
+  });
+
+  // Flow period buttons
+  document.querySelectorAll('.hist-flow-period').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.hist-flow-period').forEach(b => {
+        b.className = b.className.replace('bg-blue-600 text-white border-blue-600','border-gray-200 text-gray-600 hover:border-blue-400');
+      });
+      btn.className = btn.className.replace('border-gray-200 text-gray-600 hover:border-blue-400','bg-blue-600 text-white border-blue-600');
+      loadHistFlows(btn.dataset.months);
+    });
+  });
+
+  // Load the default sub-view (industry)
+  await loadHistIndustry();
+}
+
 /* ============================================================ CSV EXPORT */
 function scExportCSV() {
   if (!scLastData.length) return;
@@ -4468,6 +5520,7 @@ def _articles_head(title):
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{title} — Australian ETF Market</title>
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
   body {{ font-family: Inter, system-ui, -apple-system, sans-serif; background: #f8fafc; color: #1e293b; }}
   article h2 {{ font-size: 1.15rem; font-weight: 700; margin: 1.5rem 0 .6rem; color: #1e293b; }}
@@ -4480,13 +5533,17 @@ def _articles_head(title):
   article tr:hover td {{ background: #f8fafc; }}
   .pos {{ color: #16a34a; font-weight: 600; }}
   .neg {{ color: #dc2626; font-weight: 600; }}
+  .chart-box {{ background: #fff; border: 1px solid #e2e8f0; border-radius: .75rem; padding: 1.25rem; margin: 1.5rem 0; }}
+  .chart-box h3 {{ font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #64748b; margin-bottom: .75rem; }}
+  .chart-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1.5rem 0; }}
+  @media (max-width: 640px) {{ .chart-grid {{ grid-template-columns: 1fr; }} }}
 </style>
 </head>"""
 
 
 def _articles_nav(active_slug=None):
     return """
-<header class="bg-gradient-to-r from-green-900 to-green-700 shadow-xl">
+<header class="bg-gradient-to-r from-slate-800 to-slate-700 shadow-xl">
   <div class="max-w-4xl mx-auto px-5 py-3 flex items-center gap-4">
     <a href="/dashboard" class="text-white/70 hover:text-white text-sm flex items-center gap-1.5">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
@@ -4509,6 +5566,7 @@ def _handle_articles_list(self):
         'Research':       ('bg-amber-100',  'text-amber-800'),
         'Education':      ('bg-teal-100',   'text-teal-800'),
         'Issuer Profile': ('bg-orange-100', 'text-orange-800'),
+        'Annual Report':  ('bg-amber-100',  'text-amber-800'),
     }
 
     NEWS_CATS    = {'Performance', 'Market Trends', 'Thematic', 'Research'}
@@ -4522,11 +5580,18 @@ def _handle_articles_list(self):
     ]
 
     news_arts   = [a for a in articles if a['category'] in NEWS_CATS]
+    annual_latest = next((a for a in articles if a['slug'] == 'etf-year-review-2025'), None)
+    if annual_latest and annual_latest not in news_arts:
+        news_arts = [annual_latest] + news_arts
     basics_arts = sorted(
         [a for a in articles if a['category'] in BASICS_CATS],
         key=lambda a: BASICS_ORDER.index(a['slug']) if a['slug'] in BASICS_ORDER else 99
     )
     issuer_arts = [a for a in articles if a['category'] in ISSUER_CATS]
+    annual_arts = sorted(
+        [a for a in articles if a['category'] == 'Annual Report' and a['slug'] != 'etf-year-review-2025'],
+        key=lambda a: a['date'], reverse=True
+    )
 
     def card(a, wide=False):
         bg, fg = CAT_COLORS.get(a['category'], ('bg-gray-100', 'text-gray-800'))
@@ -4555,6 +5620,8 @@ def _handle_articles_list(self):
 
     news_html   = section('Latest Analysis', 'Market data, performance and thematic coverage.',
                            news_arts, cols=2, wide_first=True)
+    annual_html = section('Annual Reports', 'Year-in-review analysis of the Australian ETF market since 2020.',
+                           annual_arts, cols=2, wide_first=False)
     basics_html = section('Learn the Basics', 'Everything you need to know about how ETFs work.',
                            basics_arts, cols=3)
     issuer_html = section('Issuer Profiles', 'Background, size and product range for each major ETF provider.',
@@ -4566,6 +5633,7 @@ def _handle_articles_list(self):
   <h1 class="text-2xl font-bold text-gray-900 mb-1">Articles</h1>
   <p class="text-sm text-gray-500 mb-8">Analysis, education and issuer profiles for the Australian ETF market.</p>
   {news_html}
+  {annual_html}
   {basics_html}
   {issuer_html}
 </main>
@@ -4604,7 +5672,7 @@ def _handle_article_detail(self, slug):
     </article>
   </div>
   <div class="mt-5">
-    <a href="/articles" class="text-sm text-green-600 hover:text-green-800 flex items-center gap-1">
+    <a href="/articles" class="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
       Back to all articles
     </a>

@@ -5,6 +5,1095 @@ Each article is a dict with: slug, title, subtitle, date, category, summary, bod
 
 ARTICLES = [
 
+    # ── Annual Year-in-Review Reports ─────────────────────────────────────────
+
+    {
+        "slug": "etf-year-review-2025",
+        "title": "Australian ETF Year in Review: 2025",
+        "subtitle": "2025 was the year the Australian ETF industry crossed $300 billion in assets under management, closing at a record $320.7 billion.",
+        "date": "2025-12-31",
+        "category": "Annual Report",
+        "summary": "2025 was the year the Australian ETF industry crossed $300 billion in assets under management, closing at a record $320.7 billion. It was also a year that defied easy characterisation: global equity returns were positive but more modest than the prior two years, yet ETF flows reached an unprecedented $51.5 billion — nearly 50% above 2024's record level.",
+        "body": """
+<h2>The $300 Billion Milestone — and a Year of Gold and Flows</h2>
+<p>2025 was the year the Australian ETF industry crossed $300 billion in assets under management, closing at a record $320.7 billion. It was also a year that defied easy characterisation: global equity returns were positive but more modest than the prior two years, yet ETF flows reached an unprecedented $51.5 billion — nearly 50% above 2024's record level. Gold delivered extraordinary gains, crypto held a significant place in the product shelf, and the industry's product count surpassed 400 for the first time. Beneath the headline numbers, a story of Vanguard's continued dominance and BetaShares' rapid ascent continued to reshape the competitive landscape.</p>
+
+<hr class="my-6 border-gray-200">
+
+<div class="chart-box">
+  <h3>Monthly AUM &amp; Net Flows &#8212; 2025</h3>
+  <div style="position:relative;height:260px"><canvas id="chart-monthly-2025"></canvas></div>
+</div>
+<script>
+(function() {
+  const labels = ["2025-01", "2025-02", "2025-03", "2025-04", "2025-05", "2025-06", "2025-07", "2025-08", "2025-09", "2025-10", "2025-11", "2025-12"];
+  const aums   = [250.48, 247.74, 242.52, 250.89, 265.23, 272.18, 280.66, 290.35, 300.03, 312.24, 315.24, 320.73];
+  const flows  = [4631.0, 3103.0, 3381.0, 4518.0, 3136.0, 2128.0, 5552.0, 4883.0, 5250.0, 5672.0, 4074.0, 5127.0];
+  new Chart(document.getElementById('chart-monthly-2025'), {
+    data: {
+      labels,
+      datasets: [
+        { type: 'line',  label: 'AUM ($B)',         data: aums,  borderColor: '#3b82f6', backgroundColor: '#3b82f620', fill: true,  tension: 0.3, pointRadius: 2, borderWidth: 2, yAxisID: 'yAUM' },
+        { type: 'bar',   label: 'Net Flows ($M)',    data: flows, backgroundColor: flows.map(v => v >= 0 ? '#10b98180' : '#ef444480'), borderRadius: 2, yAxisID: 'yFlow' }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+      scales: {
+        x:     { ticks: { font: { size: 10 } }, grid: { display: false } },
+        yAUM:  { type: 'linear', position: 'left',  ticks: { font: { size: 10 }, callback: v => '$' + v + 'B' }, grid: { color: '#f1f5f9' } },
+        yFlow: { type: 'linear', position: 'right', ticks: { font: { size: 10 }, callback: v => '$' + v + 'M' }, grid: { display: false } }
+      }
+    }
+  });
+})();
+</script>
+
+
+<h2>Industry AUM: $81.6 Billion in a Single Year</h2>
+<p>The industry grew from $239.1 billion to $320.7 billion — an increase of $81.6 billion, the largest dollar gain in history by a substantial margin. Net flows of $51.5 billion drove the bulk of that growth, with market appreciation contributing approximately $30 billion. The dominance of flows over price appreciation was notable: in prior bull years (2021, 2023, 2024), price gains had contributed at least as much as flows. In 2025, investors were adding money faster than markets were rising — a powerful statement about structural demand. Total traded value reached $196.6 billion, up 39% from 2024's $141.2 billion, as larger AUM and higher market turnover drove exceptional exchange activity.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Net Flows: $51.5 Billion — More Than Double 2023's Record</h2>
+<p>The $51.5 billion in net flows (excluding admission months) was the most remarkable single statistic of the year. It exceeded the prior record of $34.0 billion by more than 50%, and it exceeded the cumulative total flows from any two-year period before 2024. The flows were spread broadly across equity, fixed income, and other asset classes.</p>
+<p>In equities, VAS attracted $3.1 billion — its largest ever annual inflow — followed by VGS at $2.6 billion and A200 at $2.1 billion. VHY (Vanguard Australian Shares High Yield) drew $1.6 billion, reflecting ongoing demand for income as yields remained attractive. VGAD (Vanguard International Shares - AUD Hedged) attracted $1.4 billion and BGBL (BetaShares Global Shares) drew $1.4 billion, reinforcing the shift toward diversified international equity across multiple products.</p>
+<p>In fixed income, VBND attracted $1.6 billion and SUBD drew $1.2 billion — a continuation of the category's structural growth. IVV brought in $1.2 billion and IOZ $1.1 billion, completing a top-ten that was strikingly broad by asset class and geography.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Top Performing ETFs: Gold's Extraordinary Year</h2>
+<p>2025 was the year of precious metals. Among all products with at least $500 million in AUM, GDX (VanEck Gold Miners) returned an extraordinary 143.8% — reflecting not just gold's price appreciation but the operational leverage that mining equities provide to the underlying metal. ETPMAG (Australian bullion ETF for silver) returned 132.8%. QAU (BetaShares Gold Bullion Currency Hedged) returned 64.4%. Gold ETFs broadly had their best year in at least a decade, as geopolitical uncertainty, dollar weakness, and central bank buying drove the metal to successive record highs.</p>
+<p>Other strong performers included WIRE (81.0%), reflecting infrastructure themes linked to electrification and the energy transition, and ACDC (59.6%, BetaShares Electric Vehicles and Future Mobility), which benefited from accelerating EV adoption globally.</p>
+<p>By contrast, the worst performers among sizable products were concentrated in interest-rate-sensitive or slow-growth categories. IJR (iShares US Small Cap) returned -0.8%, while several newer products showed flat returns reflecting their early-stage nature. The broad equity products — VAS, VGS, A200, IVV — delivered solid but unspectacular 9–13% returns, suggesting that global markets were consolidating after three years of strong gains.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Fund Flows Leaders: Magellan's Long Goodbye</h2>
+<p>The top inflow story was the continued, broad-based dominance of Vanguard and BetaShares core products, with no single ETF capturing an outsized share of the market's new money. VAS's $3.1 billion led all products, but the top-ten collectively spread flows across eight distinct products and multiple issuers — a healthy competitive outcome.</p>
+<p>The largest outflow was MGOC (Magellan Global Open Class) at -$1.3 billion, continuing the multi-year redemption cycle that had seen the product shrink from over $14 billion at peak to $6.4 billion at year-end 2025. XALG (Alphinity Global Equity Fund) shed $236 million and FRGG lost $203 million, reflecting continued rationalisation of higher-fee active products as investors compared costs.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Asset Class Trends: Commodities and "Other" Surge</h2>
+<p>The most dramatic structural shift in 2025 was the surge in commodity and "Other" category AUM. Commodities reached $12.4 billion (up from $6.3 billion at the end of 2024), largely driven by gold's exceptional performance. The "Other" category — encompassing crypto ETFs, listed private credit, and innovative active products — grew to $20.1 billion from $5.4 billion the prior year, as bitcoin and other crypto ETFs attracted significant assets and the broader alternative investment category expanded.</p>
+<p>Equity remained dominant at $245.4 billion (76.5% of total AUM), while fixed income reached $40.0 billion — crossing the $40 billion threshold for the first time. Money market products grew to $2.1 billion.</p>
+
+<hr class="my-6 border-gray-200">
+
+
+<div class="chart-grid">
+  <div class="chart-box" style="margin:0">
+    <h3>Asset Class Breakdown</h3>
+    <div style="position:relative;height:220px"><canvas id="chart-ac-2025"></canvas></div>
+  </div>
+  <div class="chart-box" style="margin:0">
+    <h3>Issuer Market Share</h3>
+    <table>
+      <thead><tr><th>Issuer</th><th>AUM</th><th>ETFs</th><th>Share</th></tr></thead>
+      <tbody>
+        <tr><td>Vanguard</td><td>$89.7B</td><td>31</td><td>30.9%</td></tr>
+        <tr><td>Betashares</td><td>$61.9B</td><td>100</td><td>21.3%</td></tr>
+        <tr><td>iShares</td><td>$54.9B</td><td>51</td><td>18.9%</td></tr>
+        <tr><td>VanEck</td><td>$31.5B</td><td>48</td><td>10.9%</td></tr>
+        <tr><td>Other</td><td>$18.2B</td><td>6</td><td>6.3%</td></tr>
+        <tr><td>Global X</td><td>$15.2B</td><td>44</td><td>5.2%</td></tr>
+        <tr><td>StateStreet</td><td>$11.4B</td><td>17</td><td>3.9%</td></tr>
+        <tr><td>Magellan</td><td>$7.4B</td><td>4</td><td>2.5%</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+<script>
+(function() {
+  const acLabels = ["International Equities", "Australian Equities", "Fixed Income", "Other", "Commodity", "Money Market", "Alternative", "Mixed Allocation", "Specialty"];
+  const acData   = [168.1, 77.3, 40.0, 20.1, 12.4, 2.1, 0.6, 0.1, 0.1];
+  const PALETTE  = ['#3b82f6','#f59e0b','#10b981','#ef4444','#8b5cf6','#ec4899','#06b6d4','#f97316','#84cc16','#6366f1'];
+  new Chart(document.getElementById('chart-ac-2025'), {
+    type: 'doughnut',
+    data: { labels: acLabels, datasets: [{ data: acData, backgroundColor: PALETTE, borderWidth: 2, borderColor: '#fff' }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } } }
+    }
+  });
+})();
+</script>
+
+<div class="chart-box">
+  <h3>Top 10 ETFs by AUM &#8212; 2025-12-31</h3>
+  <table>
+    <thead><tr><th>#</th><th>Code</th><th>Name</th><th>Issuer</th><th>AUM ($M)</th><th>1Y Return</th><th>Year Flows ($M)</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td><strong>VAS</strong></td><td>Vanguard Australian Shares Index ETF</td><td>Vanguard</td><td>$22,585M</td><td><span class="pos">+11.9%</span></td><td><span class="pos">+$3,078M</span></td></tr>
+      <tr><td>2</td><td><strong>VGS</strong></td><td>Vanguard MSCI Index International Shares ETF</td><td>Vanguard</td><td>$14,192M</td><td><span class="pos">+12.9%</span></td><td><span class="pos">+$2,619M</span></td></tr>
+      <tr><td>3</td><td><strong>IVV</strong></td><td>iShares S&P 500 ETF</td><td>iShares</td><td>$13,110M</td><td><span class="pos">+9.4%</span></td><td><span class="pos">+$1,167M</span></td></tr>
+      <tr><td>4</td><td><strong>A200</strong></td><td>BetaShares Australia 200 ETF</td><td>Betashares</td><td>$8,880M</td><td><span class="pos">+11.5%</span></td><td><span class="pos">+$2,122M</span></td></tr>
+      <tr><td>5</td><td><strong>QUAL</strong></td><td>VanEck MSCI International Quality ETF</td><td>VanEck</td><td>$8,070M</td><td><span class="pos">+8.1%</span></td><td><span class="pos">+$474M</span></td></tr>
+      <tr><td>6</td><td><strong>IOZ</strong></td><td>iShares Core S&P/ASX 200 ETF</td><td>iShares</td><td>$7,798M</td><td><span class="pos">+11.4%</span></td><td><span class="pos">+$1,113M</span></td></tr>
+      <tr><td>7</td><td><strong>NDQ</strong></td><td>BetaShares NASDAQ 100 ETF</td><td>Betashares</td><td>$7,690M</td><td><span class="pos">+11.4%</span></td><td><span class="pos">+$927M</span></td></tr>
+      <tr><td>8</td><td><strong>DACE</strong></td><td>Dimensional Australian Core Equity Trust</td><td>Other</td><td>$6,434M</td><td><span class="pos">+17.5%</span></td><td><span class="pos">+$293M</span></td></tr>
+      <tr><td>9</td><td><strong>MGOC</strong></td><td>Magellan Global Fund - Open Class Units</td><td>Magellan</td><td>$6,372M</td><td><span class="pos">+3.4%</span></td><td><span class="neg">$-1,301M</span></td></tr>
+      <tr><td>10</td><td><strong>VTS</strong></td><td>Vanguard US Total Market Shares Index ETF</td><td>Vanguard</td><td>$6,361M</td><td><span class="pos">+9.0%</span></td><td><span class="pos">+$377M</span></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="chart-grid">
+  <div class="chart-box" style="margin:0">
+    <h3>Top 5 Performers (min $500M AUM)</h3>
+    <table>
+      <thead><tr><th>Code</th><th>Name</th><th>Asset Class</th><th>1Y Return</th></tr></thead>
+      <tbody>
+      <tr><td><strong>GDX</strong></td><td>VanEck Gold Miners ETF</td><td>Equity</td><td><span class="pos">+143.8%</span></td></tr>
+      <tr><td><strong>ETPMAG</strong></td><td>Global X Physical Silver</td><td>Commodity</td><td><span class="pos">+132.8%</span></td></tr>
+      <tr><td><strong>WIRE</strong></td><td>Global X Copper Miners ETF</td><td>Equity</td><td><span class="pos">+81.0%</span></td></tr>
+      <tr><td><strong>QAU</strong></td><td>BetaShares Gold Bullion ETF (Currency Hedged)</td><td>Commodity</td><td><span class="pos">+64.4%</span></td></tr>
+      <tr><td><strong>ACDC</strong></td><td>Global X Battery Tech & Lithium ETF</td><td>Equity</td><td><span class="pos">+59.6%</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="chart-box" style="margin:0">
+    <h3>Worst 5 Performers (min $500M AUM)</h3>
+    <table>
+      <thead><tr><th>Code</th><th>Name</th><th>Asset Class</th><th>1Y Return</th></tr></thead>
+      <tbody>
+      <tr><td><strong>IJR</strong></td><td>iShares S&P Small-Cap ETF</td><td>Equity</td><td><span class="neg">-0.8%</span></td></tr>
+      <tr><td><strong>DIVI</strong></td><td>Ausbil Active Dividend Income Fund</td><td>—</td><td>0.0%</td></tr>
+      <tr><td><strong>CIIH</strong></td><td>Clearbridge Global Infrastructure Income (Hedged)</td><td>—</td><td>0.0%</td></tr>
+      <tr><td><strong>CUIV</strong></td><td>Clearbridge Global Infrastructure Value Active ETF</td><td>—</td><td>0.0%</td></tr>
+      <tr><td><strong>CIVH</strong></td><td>Clearbridge Global Infrastructure Value (Hedged)</td><td>—</td><td>0.0%</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<h2>New Launches: 62 Products — Another Record</h2>
+<p>Sixty-two new ETPs launched in 2025, extending the industry's consecutive record-breaking year of product development. Notable arrivals included QBTC (BetaShares Bitcoin ETF) and QETH (BetaShares Ether ETF), deepening the crypto product shelf. Vanguard launched VDIF (Diversified Income ETF) and VDAL (Diversified All Growth ETF), extending its multi-asset product range. Macquarie entered the active ETF space with MQSD and MQYM, adding a major institutional name to the issuer roster. VanEck's ALFA (Australian Long Short) brought complex alternatives strategies to the ETF format.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Issuer Landscape: Vanguard and BetaShares Dominate</h2>
+<p>Vanguard grew to $89.7 billion — more than a quarter of total industry AUM — confirming its structural dominance built on low-cost, high-quality index products. BetaShares grew to $61.9 billion, closing in on iShares ($54.9 billion) and cementing its position as the most dynamic domestic issuer. VanEck reached $31.5 billion, driven by QUAL, QSML, and a growing fixed income franchise. Global X grew to $15.2 billion as its commodity and thematic products benefited from the gold rally and broader investor interest.</p>
+<p>Magellan fell to $7.4 billion, now comfortably below State Street ($11.4 billion). The month of December's flows told the competitive story with precision: Vanguard attracted $1.4 billion, BetaShares $1.7 billion, and iShares $715 million — the three leading issuers collectively capturing the majority of the industry's monthly incremental flows.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Fee Trends: The Cheapest Market in History</h2>
+<p>The AUM-weighted MER fell to 0.327% — the lowest on record — as the industry's largest products remained among its cheapest. The simple average MER was 0.528%, reflecting the growing population of specialist, active, and thematic products that command higher fees. The 0.201 percentage point gap between the weighted and simple average MER was the widest ever recorded, illustrating the bifurcation of the market: a high-volume, low-fee core, and a growing long tail of specialist products where issuers can still charge meaningful fees for differentiated exposures.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Looking Back</h2>
+<p>2025 cemented the Australian ETF market's position as one of the fastest-growing and most innovative in the Asia-Pacific region. The combination of record flows, a $320 billion milestone, 434 products, and the integration of crypto and alternative assets into the mainstream ETF wrapper marked the industry's coming-of-age. Gold's extraordinary performance rewarded the investors who had maintained commodity exposure through quieter years, while the resilience of core equity flows through a more muted return environment confirmed that Australian ETF investors had adopted a genuinely long-term, systematic investment approach.</p>
+""",
+    },
+
+    {
+        "slug": "etf-year-review-2024",
+        "title": "Australian ETF Year in Review: 2024",
+        "subtitle": "2024 was the Australian ETF industry's most remarkable year to date, with total assets crossing $200 billion to close at $239.1 billion.",
+        "date": "2024-12-31",
+        "category": "Annual Report",
+        "summary": "2024 was the Australian ETF industry's most remarkable year to date. Equity markets delivered strong returns for the second consecutive year, investor flows hit record levels, and the industry's total assets under management crossed $200 billion to close at $239.1 billion.",
+        "body": """
+<h2>The Industry's Breakout Year</h2>
+<p>2024 was the Australian ETF industry's most remarkable year to date. Equity markets delivered strong returns for the second consecutive year, investor flows hit record levels, and the industry's total assets under management crossed $200 billion to close at $239.1 billion. The breadth of demand was striking: strong inflows came from international equities, domestic equities, and fixed income simultaneously — a sign of a maturing investor base rather than a momentum-driven crowd. Meanwhile, 54 new products launched, including Australia's first Bitcoin ETFs.</p>
+
+<hr class="my-6 border-gray-200">
+
+<div class="chart-box">
+  <h3>Monthly AUM &amp; Net Flows &#8212; 2024</h3>
+  <div style="position:relative;height:260px"><canvas id="chart-monthly-2024"></canvas></div>
+</div>
+<script>
+(function() {
+  const labels = ["2024-01", "2024-02", "2024-03", "2024-04", "2024-05", "2024-06", "2024-07", "2024-08", "2024-09", "2024-10", "2024-11", "2024-12"];
+  const aums   = [178.51, 184.48, 191.87, 190.27, 193.38, 199.59, 208.75, 213.2, 219.87, 225.45, 234.33, 239.09];
+  const flows  = [1716.0, 1341.0, 1790.0, 1130.0, 1925.0, 2514.0, 6737.0, 3188.0, 2780.0, 3169.0, 3851.0, 3844.0];
+  new Chart(document.getElementById('chart-monthly-2024'), {
+    data: {
+      labels,
+      datasets: [
+        { type: 'line',  label: 'AUM ($B)',         data: aums,  borderColor: '#3b82f6', backgroundColor: '#3b82f620', fill: true,  tension: 0.3, pointRadius: 2, borderWidth: 2, yAxisID: 'yAUM' },
+        { type: 'bar',   label: 'Net Flows ($M)',    data: flows, backgroundColor: flows.map(v => v >= 0 ? '#10b98180' : '#ef444480'), borderRadius: 2, yAxisID: 'yFlow' }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+      scales: {
+        x:     { ticks: { font: { size: 10 } }, grid: { display: false } },
+        yAUM:  { type: 'linear', position: 'left',  ticks: { font: { size: 10 }, callback: v => '$' + v + 'B' }, grid: { color: '#f1f5f9' } },
+        yFlow: { type: 'linear', position: 'right', ticks: { font: { size: 10 }, callback: v => '$' + v + 'M' }, grid: { display: false } }
+      }
+    }
+  });
+})();
+</script>
+
+
+<h2>Industry AUM: $66 Billion Added in a Single Year</h2>
+<p>Beginning 2024 at $173.0 billion, the industry closed at $239.1 billion — a $66.1 billion increase, or 38.2%, the largest single-year dollar gain in the industry's history. Net flows contributed $34.0 billion (excluding admission months), the highest annual figure ever recorded. Market appreciation accounted for the remaining $32.1 billion, meaning both flows and performance made roughly equal contributions to the growth. Total traded value reached $141.2 billion, up from $114.6 billion in 2023, as higher AUM drove larger turnover volumes. The ETF count grew to 379 products.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Net Flows: $34.0 Billion — A Record by a Wide Margin</h2>
+<p>The $34.0 billion in net flows represented a near-doubling of the prior year's $13.9 billion and shattered all previous records. The flows were notably broad-based. International equity ETFs collectively dominated: IVV led all products with $2.1 billion in inflows, VGS attracted $1.9 billion, QUAL drew $1.5 billion, and IOZ received $1.0 billion. Domestic equity also remained strong: VAS pulled in $2.3 billion and A200 received $1.9 billion. The domestic-vs-international split was closer to parity than in prior years, reflecting growing comfort among Australian investors with global equity exposure.</p>
+<p>Fixed income had another strong year. VBND attracted $1.0 billion, SUBD drew $910 million, and the category as a whole collected multi-billion-dollar inflows — cementing fixed income ETFs as a permanent feature of Australian portfolios rather than a rate-cycle novelty. QSML (VanEck MSCI International Small Companies Quality) attracted $913 million, reflecting new interest in small-cap quality international exposure. BGBL (BetaShares Global Shares ETF) drew $859 million in its ongoing ascent as a low-cost global equities vehicle.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Top Performing ETFs: US Tech Surges Again</h2>
+<p>Return dispersion was wide in 2024. Among products with at least $500 million in AUM, FANG (Global X FANG+ ETF) delivered 65.1% — powered by the continued concentration of US market returns in a handful of mega-cap technology companies. HYGG (Hyperion Global Growth) returned 52.9% for its second consecutive strong year. LPGD returned 40.9%, IOO (iShares Global 100) delivered 39.1%, and PMGOLD (Perth Mint Physical Gold) returned 38.0% as gold reached all-time highs on geopolitical risk and central bank buying.</p>
+<p>IVV (S&P 500) returned 37.0% and NDQ (Nasdaq 100) returned 38.0%, while VGS (global developed markets) returned 30.6% and QUAL returned 30.4% — an exceptional cohort of returns from broad global equity products.</p>
+<p>At the bottom, bond and interest-rate-sensitive products lagged. USTB returned -1.1% and ILB (iShares Government Inflation) fell -0.9% as longer-duration fixed income struggled in the persistent higher-rate environment.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Fund Flows Leaders: Diversification at Scale</h2>
+<p>For the first time, no single product captured a dominant share of flows. VAS led with $2.3 billion, but the ten largest flow recipients were spread across Australian equities (VAS, A200, IOZ), international equities (IVV, VGS, QUAL, BGBL), fixed income (VBND, SUBD), and small-cap (QSML). This diversification of flows signalled an industry that had moved beyond the early phase of a few dominant "go-to" products and into a more sophisticated multi-product allocation framework.</p>
+<p>On the outflow side, FAIR (BetaShares Australian Sustainability Leaders) shed $422 million, and XARO (Alphinity Global Equity) lost $377 million. The ESG product category showed signs of flow pressure as investor enthusiasm for sustainability-labelled products moderated.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Asset Class Trends: Equities Dominant, Fixed Income Consolidates</h2>
+<p>Equity ETFs grew to $195.2 billion (81.6% of total AUM), while fixed income reached $30.3 billion — a 24.7% increase from 2023's $24.3 billion. The "Other" category (primarily active and alternative ETPs) reached $5.4 billion, reflecting the growing scale of products outside traditional equity and bond categories, including the new crypto ETF segment. Money market products grew to $1.2 billion. Commodities rose to $6.3 billion, driven by gold's strong performance.</p>
+
+<hr class="my-6 border-gray-200">
+
+
+<div class="chart-grid">
+  <div class="chart-box" style="margin:0">
+    <h3>Asset Class Breakdown</h3>
+    <div style="position:relative;height:220px"><canvas id="chart-ac-2024"></canvas></div>
+  </div>
+  <div class="chart-box" style="margin:0">
+    <h3>Issuer Market Share</h3>
+    <table>
+      <thead><tr><th>Issuer</th><th>AUM</th><th>ETFs</th><th>Share</th></tr></thead>
+      <tbody>
+        <tr><td>Vanguard</td><td>$67.2B</td><td>29</td><td>30.4%</td></tr>
+        <tr><td>Betashares</td><td>$44.5B</td><td>94</td><td>20.1%</td></tr>
+        <tr><td>iShares</td><td>$42.4B</td><td>47</td><td>19.2%</td></tr>
+        <tr><td>VanEck</td><td>$23.6B</td><td>43</td><td>10.7%</td></tr>
+        <tr><td>Other</td><td>$15.4B</td><td>6</td><td>7.0%</td></tr>
+        <tr><td>StateStreet</td><td>$9.7B</td><td>17</td><td>4.4%</td></tr>
+        <tr><td>Magellan</td><td>$9.6B</td><td>4</td><td>4.3%</td></tr>
+        <tr><td>Global X</td><td>$8.7B</td><td>37</td><td>3.9%</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+<script>
+(function() {
+  const acLabels = ["International Equities", "Australian Equities", "Fixed Income", "Commodity", "Other", "Money Market", "Alternative", "Specialty", "Mixed Allocation"];
+  const acData   = [134.7, 60.5, 30.3, 6.3, 5.4, 1.2, 0.5, 0.1, 0.1];
+  const PALETTE  = ['#3b82f6','#f59e0b','#10b981','#ef4444','#8b5cf6','#ec4899','#06b6d4','#f97316','#84cc16','#6366f1'];
+  new Chart(document.getElementById('chart-ac-2024'), {
+    type: 'doughnut',
+    data: { labels: acLabels, datasets: [{ data: acData, backgroundColor: PALETTE, borderWidth: 2, borderColor: '#fff' }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } } }
+    }
+  });
+})();
+</script>
+
+<div class="chart-box">
+  <h3>Top 10 ETFs by AUM &#8212; 2024-12-31</h3>
+  <table>
+    <thead><tr><th>#</th><th>Code</th><th>Name</th><th>Issuer</th><th>AUM ($M)</th><th>1Y Return</th><th>Year Flows ($M)</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td><strong>VAS</strong></td><td>Vanguard Australian Shares Index ETF</td><td>Vanguard</td><td>$17,854M</td><td><span class="pos">+12.5%</span></td><td><span class="pos">+$2,299M</span></td></tr>
+      <tr><td>2</td><td><strong>IVV</strong></td><td>iShares S&P 500 ETF</td><td>iShares</td><td>$11,036M</td><td><span class="pos">+37.0%</span></td><td><span class="pos">+$2,070M</span></td></tr>
+      <tr><td>3</td><td><strong>VGS</strong></td><td>Vanguard MSCI Index International Shares ETF</td><td>Vanguard</td><td>$10,377M</td><td><span class="pos">+30.6%</span></td><td><span class="pos">+$1,924M</span></td></tr>
+      <tr><td>4</td><td><strong>MGOC</strong></td><td>Magellan Global Fund - Open Class Units</td><td>Magellan</td><td>$8,380M</td><td><span class="pos">+29.7%</span></td><td><span class="pos">+$516M</span></td></tr>
+      <tr><td>5</td><td><strong>QUAL</strong></td><td>VanEck MSCI International Quality ETF</td><td>VanEck</td><td>$7,139M</td><td><span class="pos">+30.4%</span></td><td><span class="pos">+$1,462M</span></td></tr>
+      <tr><td>6</td><td><strong>A200</strong></td><td>BetaShares Australia 200 ETF</td><td>Betashares</td><td>$6,277M</td><td><span class="pos">+12.6%</span></td><td><span class="pos">+$1,895M</span></td></tr>
+      <tr><td>7</td><td><strong>IOZ</strong></td><td>iShares Core S&P/ASX 200 ETF</td><td>iShares</td><td>$6,245M</td><td><span class="pos">+12.5%</span></td><td><span class="pos">+$1,015M</span></td></tr>
+      <tr><td>8</td><td><strong>NDQ</strong></td><td>BetaShares NASDAQ 100 ETF</td><td>Betashares</td><td>$6,073M</td><td><span class="pos">+38.0%</span></td><td><span class="pos">+$825M</span></td></tr>
+      <tr><td>9</td><td><strong>VTS</strong></td><td>Vanguard US Total Market Shares Index ETF</td><td>Vanguard</td><td>$5,548M</td><td><span class="pos">+35.8%</span></td><td><span class="pos">+$422M</span></td></tr>
+      <tr><td>10</td><td><strong>STW</strong></td><td>SPDR S&P/ASX 200 Fund</td><td>StateStreet</td><td>$5,462M</td><td><span class="pos">+12.6%</span></td><td><span class="pos">+$149M</span></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="chart-grid">
+  <div class="chart-box" style="margin:0">
+    <h3>Top 5 Performers (min $500M AUM)</h3>
+    <table>
+      <thead><tr><th>Code</th><th>Name</th><th>Asset Class</th><th>1Y Return</th></tr></thead>
+      <tbody>
+      <tr><td><strong>FANG</strong></td><td>Global X FANG+ ETF</td><td>Equity</td><td><span class="pos">+65.1%</span></td></tr>
+      <tr><td><strong>HYGG</strong></td><td>Hyperion Global Growth Companies Fund</td><td>Equity</td><td><span class="pos">+52.9%</span></td></tr>
+      <tr><td><strong>LPGD</strong></td><td>Loftus Peak Global Disruption Fund</td><td>Equity</td><td><span class="pos">+40.9%</span></td></tr>
+      <tr><td><strong>IOO</strong></td><td>iShares Global 100 ETF</td><td>Equity</td><td><span class="pos">+39.1%</span></td></tr>
+      <tr><td><strong>PMGOLD</strong></td><td>Perth Mint Gold</td><td>Commodity</td><td><span class="pos">+38.0%</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="chart-box" style="margin:0">
+    <h3>Worst 5 Performers (min $500M AUM)</h3>
+    <table>
+      <thead><tr><th>Code</th><th>Name</th><th>Asset Class</th><th>1Y Return</th></tr></thead>
+      <tbody>
+      <tr><td><strong>USTB</strong></td><td>Global X US Treasury Bond ETF (Currency Hedged)</td><td>Fixed Income</td><td><span class="neg">-1.1%</span></td></tr>
+      <tr><td><strong>ILB</strong></td><td>iShares Government Inflation ETF</td><td>Fixed Income</td><td><span class="neg">-0.9%</span></td></tr>
+      <tr><td><strong>DAVA</strong></td><td>Dimensional Australian Value Trust</td><td>—</td><td>0.0%</td></tr>
+      <tr><td><strong>DGSM</strong></td><td>Dimensional Global Small Company Trust</td><td>—</td><td>0.0%</td></tr>
+      <tr><td><strong>DGVA</strong></td><td>Dimensional Global Value Trust</td><td>—</td><td>0.0%</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<h2>New Launches: 54 Products Including Bitcoin ETFs</h2>
+<p>Fifty-four new ETPs launched in 2024, sustaining the record-breaking pace of product development. The most significant category breakthrough was crypto: BTXX (DigitalX Bitcoin ETF) and several other bitcoin-related products launched, giving Australian investors regulated access to cryptocurrency through their brokerage accounts for the first time. Other notable launches included LEND (VanEck Global Listed Private Credit), reflecting interest in private credit as an asset class, and a range of currency-hedged variants of existing popular products.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Issuer Landscape: The Big Four Pull Away</h2>
+<p>Vanguard grew to $67.2 billion, BetaShares to $44.5 billion, and iShares to $42.4 billion — three issuers now commanding over 60% of industry AUM. VanEck grew to $23.6 billion, driven by strong flows into QUAL, QSML, and fixed income products. The "Other" category grew to $15.4 billion, reflecting the continued expansion of the specialist and active management segment. Magellan stabilised at $9.6 billion — the first year since 2020 that its AUM did not decline sharply — while Global X grew to $8.7 billion.</p>
+<p>December's monthly flow figures told the competitive story clearly: Vanguard attracted $1.3 billion in a single month, BetaShares $899 million, and iShares $760 million.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Fee Trends: Relentless Compression</h2>
+<p>The AUM-weighted MER fell to 0.339% — down from 0.346% in 2023 and 0.389% in 2022. The simple average MER was 0.538%. The divergence between these two metrics (0.199 percentage points) was the widest yet, reflecting the continued concentration of assets in the industry's lowest-cost products. Vanguard's flagship ETFs — with MERs as low as 0.03–0.10% — were growing fastest, pulling the weighted average down even as the overall product shelf became more expensive on a simple-average basis.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Looking Back</h2>
+<p>2024 was the year Australian ETF investing became definitively mainstream. With $239 billion in AUM, over 379 products, and $34 billion in new money entering the market, the ETF structure had effectively won the competition for Australian investors' new savings. The year also confirmed that Australian investors were not deterred by either elevated valuations or the memory of 2022 — they were buying systematically and broadly, a hallmark of a structurally committed investor base.</p>
+""",
+    },
+
+    {
+        "slug": "etf-year-review-2023",
+        "title": "Australian ETF Year in Review: 2023",
+        "subtitle": "After the bruising conditions of 2022, 2023 delivered a powerful recovery for most risk assets, with the Australian ETF industry growing from $130.4 billion to $173.0 billion.",
+        "date": "2023-12-31",
+        "category": "Annual Report",
+        "summary": "After the bruising conditions of 2022, 2023 delivered a powerful recovery for most risk assets. US equities surged — led by the \"Magnificent Seven\" technology stocks — AI-related enthusiasm swept through markets, and the Australian ETF industry grew from $130.4 billion to $173.0 billion, a gain of 32.7%.",
+        "body": """
+<h2>Rebound, Resilience, and the Rise of Fixed Income</h2>
+<p>After the bruising conditions of 2022, 2023 delivered a powerful recovery for most risk assets. US equities surged — led by the "Magnificent Seven" technology stocks — AI-related enthusiasm swept through markets, and bond yields, while elevated, stabilised enough to allow fixed income to attract meaningful flows. The Australian ETF industry grew from $130.4 billion to $173.0 billion, a gain of 32.7%, and net flows of $13.9 billion confirmed that investor appetite remained structurally robust even after the prior year's losses.</p>
+
+<hr class="my-6 border-gray-200">
+
+<div class="chart-box">
+  <h3>Monthly AUM &amp; Net Flows &#8212; 2023</h3>
+  <div style="position:relative;height:260px"><canvas id="chart-monthly-2023"></canvas></div>
+</div>
+<script>
+(function() {
+  const labels = ["2023-01", "2023-02", "2023-03", "2023-04", "2023-05", "2023-06", "2023-07", "2023-08", "2023-09", "2023-10", "2023-11", "2023-12"];
+  const aums   = [135.05, 136.2, 138.79, 142.13, 143.46, 145.93, 149.42, 151.84, 148.15, 145.83, 165.08, 172.98];
+  const flows  = [487.0, 797.0, 533.0, 716.0, 874.0, 735.0, 1032.0, 2090.0, 1643.0, 1652.0, 1964.0, 1419.0];
+  new Chart(document.getElementById('chart-monthly-2023'), {
+    data: {
+      labels,
+      datasets: [
+        { type: 'line',  label: 'AUM ($B)',         data: aums,  borderColor: '#3b82f6', backgroundColor: '#3b82f620', fill: true,  tension: 0.3, pointRadius: 2, borderWidth: 2, yAxisID: 'yAUM' },
+        { type: 'bar',   label: 'Net Flows ($M)',    data: flows, backgroundColor: flows.map(v => v >= 0 ? '#10b98180' : '#ef444480'), borderRadius: 2, yAxisID: 'yFlow' }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+      scales: {
+        x:     { ticks: { font: { size: 10 } }, grid: { display: false } },
+        yAUM:  { type: 'linear', position: 'left',  ticks: { font: { size: 10 }, callback: v => '$' + v + 'B' }, grid: { color: '#f1f5f9' } },
+        yFlow: { type: 'linear', position: 'right', ticks: { font: { size: 10 }, callback: v => '$' + v + 'M' }, grid: { display: false } }
+      }
+    }
+  });
+})();
+</script>
+
+
+<h2>Industry AUM: A $42.6 Billion Recovery</h2>
+<p>The industry began 2023 at $130.4 billion — below its 2021 year-end level — and closed at $173.0 billion, surpassing the prior peak by nearly $40 billion. Net flows contributed $13.9 billion of the increase, with the remaining $28.7 billion driven by market appreciation, particularly in US and global equity ETFs. A record 52 new ETPs launched during the year, expanding the product universe to 328 funds. Total traded value was $114.6 billion, slightly below the prior year's elevated level.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Net Flows: $13.9 Billion — Fixed Income Breaks Through</h2>
+<p>While equities remained the dominant flow recipient, 2023 was the year fixed income ETFs truly arrived. With short-term interest rates offering yields not seen in over a decade, investors rotated meaningful capital into bond and hybrid products. SUBD (VanEck) attracted $772 million, AAA (BetaShares Australian High Interest Cash) drew $730 million, USTB (VanEck US Treasury Bond) received $538 million, and VBND (Vanguard Australian Fixed Interest Index) attracted $529 million. These figures represented a step-change from prior years, when fixed income flows had been a fraction of equity flows.</p>
+<p>In equities, VAS again led the field with $1.5 billion, followed by A200 ($1.1 billion) and IOZ ($938 million). The Australian equity trio dominated domestic flows, while IVV added $511 million in international exposure. Notably, VHY (Vanguard Australian Shares High Yield) attracted $606 million, reflecting investors' continued preference for income in a higher-yield environment.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Top Performing ETFs: Tech's Revenge</h2>
+<p>The 2023 return environment was almost a mirror image of 2022. Products that had fallen hardest bounced hardest. HYGG (Hyperion Global Growth), which had declined 43% in 2022, surged 70.1% to become the best-performing major ETF of the year among products with at least $500 million in AUM. NDQ (BetaShares NASDAQ 100) returned 53.6% as the technology sector roared back. HACK (BetaShares Global Cybersecurity) returned 39.0%, QUAL returned 30.6%, and MOAT (VanEck Morningstar Wide Moat) returned 30.6%.</p>
+<p>The worst performers were at the other extreme: infrastructure-oriented products and Asia-focused ETFs lagged, with IFRA (iShares Global Infrastructure) returning -0.9%, and IAA (iShares Asia 50) returning just 1.4% as China's anticipated post-COVID recovery disappointed.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Fund Flows Leaders: Domestic Equities, Bonds — and Magellan Continues to Bleed</h2>
+<p>The three major Australian equity ETFs (VAS, A200, and IOZ) collectively attracted $3.6 billion, demonstrating the enduring appeal of home-bias investing among Australian self-directed investors. SUBD and USTB captured the new fixed income interest, as higher yields made duration-light and short-maturity products attractive.</p>
+<p>Magellan's outflows continued, albeit at a reduced pace: MGOC shed $2.5 billion, extending a multi-year redemption cycle that had seen the fund shrink from over $14 billion to $6.1 billion by year-end. GOLD (Global X) also experienced $512 million in outflows as gold's relative underperformance compared to surging equities prompted rotation. HYGG itself saw $264 million in outflows despite its exceptional return — a pattern consistent with investors locking in gains or reducing concentration in a single active manager.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Asset Class Trends: Fixed Income's Structural Moment</h2>
+<p>The most significant structural development of 2023 was the acceleration in fixed income ETF growth. The asset class ended the year at $24.3 billion in AUM — up from $17.8 billion at the end of 2022, a 36.5% increase that outpaced equity AUM growth (12.0% from $107.0B to $142.1B, though note equity also benefited from strong performance). Fixed income's share of industry AUM rose to approximately 14.0%. Money market products also grew, reaching $1.1 billion as investors sought capital-stable yield.</p>
+<p>Equity AUM recovered to $142.1 billion (82.1% of total), commodities reached $4.6 billion, and the alternative category grew to $500 million.</p>
+
+<hr class="my-6 border-gray-200">
+
+
+<div class="chart-grid">
+  <div class="chart-box" style="margin:0">
+    <h3>Asset Class Breakdown</h3>
+    <div style="position:relative;height:220px"><canvas id="chart-ac-2023"></canvas></div>
+  </div>
+  <div class="chart-box" style="margin:0">
+    <h3>Issuer Market Share</h3>
+    <table>
+      <thead><tr><th>Issuer</th><th>AUM</th><th>ETFs</th><th>Share</th></tr></thead>
+      <tbody>
+        <tr><td>Vanguard</td><td>$50.4B</td><td>29</td><td>31.4%</td></tr>
+        <tr><td>Betashares</td><td>$31.7B</td><td>84</td><td>19.8%</td></tr>
+        <tr><td>iShares</td><td>$29.9B</td><td>44</td><td>18.6%</td></tr>
+        <tr><td>VanEck</td><td>$15.4B</td><td>38</td><td>9.6%</td></tr>
+        <tr><td>Other</td><td>$11.0B</td><td>3</td><td>6.9%</td></tr>
+        <tr><td>StateStreet</td><td>$8.7B</td><td>17</td><td>5.4%</td></tr>
+        <tr><td>Magellan</td><td>$7.3B</td><td>4</td><td>4.5%</td></tr>
+        <tr><td>Global X</td><td>$6.1B</td><td>32</td><td>3.8%</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+<script>
+(function() {
+  const acLabels = ["International Equities", "Australian Equities", "Fixed Income", "Commodity", "Money Market", "Alternative", "Other", "Specialty", "Mixed Allocation"];
+  const acData   = [92.8, 49.4, 24.4, 4.6, 1.1, 0.5, 0.2, 0.1, 0.1];
+  const PALETTE  = ['#3b82f6','#f59e0b','#10b981','#ef4444','#8b5cf6','#ec4899','#06b6d4','#f97316','#84cc16','#6366f1'];
+  new Chart(document.getElementById('chart-ac-2023'), {
+    type: 'doughnut',
+    data: { labels: acLabels, datasets: [{ data: acData, backgroundColor: PALETTE, borderWidth: 2, borderColor: '#fff' }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } } }
+    }
+  });
+})();
+</script>
+
+<div class="chart-box">
+  <h3>Top 10 ETFs by AUM &#8212; 2023-12-29</h3>
+  <table>
+    <thead><tr><th>#</th><th>Code</th><th>Name</th><th>Issuer</th><th>AUM ($M)</th><th>1Y Return</th><th>Year Flows ($M)</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td><strong>VAS</strong></td><td>Vanguard Australian Shares Index ETF</td><td>Vanguard</td><td>$14,384M</td><td><span class="pos">+13.7%</span></td><td><span class="pos">+$1,542M</span></td></tr>
+      <tr><td>2</td><td><strong>VGS</strong></td><td>Vanguard MSCI Index International Shares ETF</td><td>Vanguard</td><td>$6,490M</td><td><span class="pos">+23.0%</span></td><td><span class="pos">+$414M</span></td></tr>
+      <tr><td>3</td><td><strong>IVV</strong></td><td>iShares S&P 500 ETF</td><td>iShares</td><td>$6,458M</td><td><span class="pos">+25.0%</span></td><td><span class="pos">+$511M</span></td></tr>
+      <tr><td>4</td><td><strong>MGOC</strong></td><td>Magellan Global Fund - Open Class Units</td><td>Magellan</td><td>$6,058M</td><td><span class="pos">+20.8%</span></td><td><span class="neg">$-2,523M</span></td></tr>
+      <tr><td>5</td><td><strong>STW</strong></td><td>SPDR S&P/ASX 200 Fund</td><td>StateStreet</td><td>$4,919M</td><td><span class="pos">+13.8%</span></td><td><span class="neg">$-22M</span></td></tr>
+      <tr><td>6</td><td><strong>DACE</strong></td><td>Dimensional Australian Core Equity Trust</td><td>Other</td><td>$4,845M</td><td>&#8212;</td><td><span class="neg">$-13M</span></td></tr>
+      <tr><td>7</td><td><strong>IOZ</strong></td><td>iShares Core S&P/ASX 200 ETF</td><td>iShares</td><td>$4,827M</td><td><span class="pos">+13.8%</span></td><td><span class="pos">+$938M</span></td></tr>
+      <tr><td>8</td><td><strong>QUAL</strong></td><td>VanEck MSCI International Quality ETF</td><td>VanEck</td><td>$4,467M</td><td><span class="pos">+30.6%</span></td><td><span class="pos">+$600M</span></td></tr>
+      <tr><td>9</td><td><strong>A200</strong></td><td>BetaShares Australia 200 ETF</td><td>Betashares</td><td>$3,978M</td><td><span class="pos">+13.7%</span></td><td><span class="pos">+$1,072M</span></td></tr>
+      <tr><td>10</td><td><strong>NDQ</strong></td><td>BetaShares NASDAQ 100 ETF</td><td>Betashares</td><td>$3,781M</td><td><span class="pos">+53.6%</span></td><td><span class="pos">+$296M</span></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="chart-grid">
+  <div class="chart-box" style="margin:0">
+    <h3>Top 5 Performers (min $500M AUM)</h3>
+    <table>
+      <thead><tr><th>Code</th><th>Name</th><th>Asset Class</th><th>1Y Return</th></tr></thead>
+      <tbody>
+      <tr><td><strong>HYGG</strong></td><td>Hyperion Global Growth Companies Fund</td><td>Equity</td><td><span class="pos">+70.1%</span></td></tr>
+      <tr><td><strong>NDQ</strong></td><td>BetaShares NASDAQ 100 ETF</td><td>Equity</td><td><span class="pos">+53.6%</span></td></tr>
+      <tr><td><strong>HACK</strong></td><td>BetaShares Global Cybersecurity ETF</td><td>Equity</td><td><span class="pos">+39.0%</span></td></tr>
+      <tr><td><strong>QUAL</strong></td><td>VanEck MSCI International Quality ETF</td><td>Equity</td><td><span class="pos">+30.6%</span></td></tr>
+      <tr><td><strong>MOAT</strong></td><td>VanEck Morningstar Wide Moat ETF</td><td>Equity</td><td><span class="pos">+30.6%</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="chart-box" style="margin:0">
+    <h3>Worst 5 Performers (min $500M AUM)</h3>
+    <table>
+      <thead><tr><th>Code</th><th>Name</th><th>Asset Class</th><th>1Y Return</th></tr></thead>
+      <tbody>
+      <tr><td><strong>IFRA</strong></td><td>VanEck FTSE Global Infrastructure (Hedged) ETF</td><td>Equity</td><td><span class="neg">-0.9%</span></td></tr>
+      <tr><td><strong>DACE</strong></td><td>Dimensional Australian Core Equity Trust</td><td>Equity</td><td>0.0%</td></tr>
+      <tr><td><strong>DFGH</strong></td><td>Dimensional Global Core Equity Trust - Hedged</td><td>Equity</td><td>0.0%</td></tr>
+      <tr><td><strong>DGCE</strong></td><td>Dimensional Global Core Equity Trust - Unhedged</td><td>Equity</td><td>0.0%</td></tr>
+      <tr><td><strong>IAA</strong></td><td>iShares Asia 50 ETF</td><td>Equity</td><td><span class="pos">+1.4%</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<h2>New Launches: 52 Products — A New Record</h2>
+<p>Fifty-two new ETPs launched in 2023, setting a new annual record. The year saw significant innovation in covered-call products — AYLD, UYLD, and QYLD from Global X offered yield-enhancement strategies on Australian, US, and Nasdaq 100 indices respectively. Active management within ETF wrappers continued to expand, with ESG-focused credit (GOOD from Janus Henderson) and other specialist strategies debuting. The growing diversity of the product shelf reflected both issuer innovation and an investor base willing to engage with more complex strategies.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Issuer Landscape: VanEck's Rise, Magellan's Continued Slide</h2>
+<p>Vanguard extended its lead with $50.4 billion in AUM. BetaShares overtook iShares to take second place with $31.7 billion versus iShares' $29.9 billion — a competitive milestone that confirmed BetaShares' status as the industry's most dynamic domestic player. VanEck grew to $15.4 billion (up from $10.9 billion), driven by strong flows into QUAL, SUBD, and USTB. Magellan fell further to $7.3 billion, barely above State Street's $8.7 billion. The "Other" category — comprising smaller and newer issuers — reached $11.0 billion, reflecting the growing long tail of specialist and active managers entering the ETF market.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Fee Trends: AUM-Weighted MER Falls Further</h2>
+<p>The simple average MER was 0.547%, broadly stable year-on-year. The AUM-weighted MER fell to 0.346% — a notable compression from 0.389% in 2022 — as the largest, cheapest products (particularly at Vanguard and iShares) continued to grow faster than the average. This fee pressure was being felt most acutely by mid-tier issuers with products charging 0.40–0.70% competing against Vanguard's flagship sub-0.10% offerings.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Looking Back</h2>
+<p>2023 confirmed that Australian ETF investors were not deterred by the prior year's losses — flows were positive even in the depths of the market decline, and when conditions improved, the industry recovered sharply. In retrospect, the year also marked the arrival of fixed income as a genuine growth category within Australian ETFs, a shift that would continue and accelerate as yields remained elevated into 2024.</p>
+""",
+    },
+
+    {
+        "slug": "etf-year-review-2022",
+        "title": "Australian ETF Year in Review: 2022",
+        "subtitle": "2022 was the most challenging year for investment returns since the Global Financial Crisis, yet Australian ETF investors continued to add $12.8 billion in net new flows.",
+        "date": "2022-12-31",
+        "category": "Annual Report",
+        "summary": "2022 was the most challenging year for investment returns since the Global Financial Crisis. Central banks around the world launched aggressive interest rate hiking cycles to combat inflation, global equities fell sharply, bonds collapsed in tandem — yet Australian ETF investors continued to add money, demonstrating a structural shift in how Australians invest.",
+        "body": """
+<h2>The Year the Bull Market Ended</h2>
+<p>2022 was the most challenging year for investment returns since the Global Financial Crisis. Central banks around the world — including the Reserve Bank of Australia — launched aggressive interest rate hiking cycles to combat inflation that had reached multi-decade highs. Global equities fell sharply, bonds collapsed in tandem (removing the traditional diversification benefit), and growth-oriented ETFs that had led the 2020–2021 rally suffered some of their worst-ever drawdowns. Yet despite the adverse conditions, Australian ETF investors continued to add money — $12.8 billion in net new flows — demonstrating a structural shift in how Australians invest.</p>
+
+<hr class="my-6 border-gray-200">
+
+<div class="chart-box">
+  <h3>Monthly AUM &amp; Net Flows &#8212; 2022</h3>
+  <div style="position:relative;height:260px"><canvas id="chart-monthly-2022"></canvas></div>
+</div>
+<script>
+(function() {
+  const labels = ["2022-01", "2022-02", "2022-03", "2022-04", "2022-05", "2022-06", "2022-07", "2022-08", "2022-09", "2022-10", "2022-11", "2022-12"];
+  const aums   = [128.96, 127.16, 132.34, 130.36, 128.33, 121.45, 127.24, 126.94, 121.47, 128.51, 132.85, 130.44];
+  const flows  = [1359.0, 156.0, 1236.0, 1157.0, 1428.0, 533.0, 2224.0, 547.0, 705.0, 1446.0, 997.0, 982.0];
+  new Chart(document.getElementById('chart-monthly-2022'), {
+    data: {
+      labels,
+      datasets: [
+        { type: 'line',  label: 'AUM ($B)',         data: aums,  borderColor: '#3b82f6', backgroundColor: '#3b82f620', fill: true,  tension: 0.3, pointRadius: 2, borderWidth: 2, yAxisID: 'yAUM' },
+        { type: 'bar',   label: 'Net Flows ($M)',    data: flows, backgroundColor: flows.map(v => v >= 0 ? '#10b98180' : '#ef444480'), borderRadius: 2, yAxisID: 'yFlow' }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+      scales: {
+        x:     { ticks: { font: { size: 10 } }, grid: { display: false } },
+        yAUM:  { type: 'linear', position: 'left',  ticks: { font: { size: 10 }, callback: v => '$' + v + 'B' }, grid: { color: '#f1f5f9' } },
+        yFlow: { type: 'linear', position: 'right', ticks: { font: { size: 10 }, callback: v => '$' + v + 'M' }, grid: { display: false } }
+      }
+    }
+  });
+})();
+</script>
+
+
+<h2>Industry AUM: Flat Despite Strong Flows</h2>
+<p>The Australian ETP industry began 2022 at $134.0 billion and ended the year at $130.4 billion — a decline of $3.6 billion despite $12.8 billion in net new flows. This means that market depreciation erased roughly $16.4 billion in value during the year. It was the first calendar-year decline in industry AUM in the modern ETF era. Forty-one new products launched during the year, bringing the total ETF count to 278. Total traded value rose to $117.3 billion — the highest since 2020's crisis-elevated level — as investors actively repositioned through a volatile year.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Net Flows: $12.8 Billion Despite the Bear Market</h2>
+<p>The resilience of flows was perhaps the most significant story of 2022. Net flows of $12.8 billion (excluding admission months) represented a continuation of strong structural demand for ETFs despite a difficult return environment. Equity ETFs continued to dominate, with VAS attracting $2.6 billion — its highest annual intake to that point — as investors continued to buy Australian equities through the volatility. International equity also drew strong flows: VGS received $989 million, QUAL $666 million, VGAD $543 million, and VHY $535 million.</p>
+<p>Notably, fixed income began attracting more serious attention, with HBRD (BetaShares Australian Major Bank Hybrids) drawing $405 million as rising yields made fixed income more attractive than it had been in years.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Top Performing ETFs: Value and Commodities Shine</h2>
+<p>In a year when almost everything fell, the best performers were those with value, commodity, or domestic income tilts. Among products with at least $500 million in AUM, VHY (Vanguard Australian Shares High Yield) returned +11.3%, PMGOLD (Perth Mint Physical Gold) returned +7.0%, GOLD (Global X Physical Gold) returned +6.5%, and SFY (SPDR S&P/ASX 50) returned +4.1%. Energy exposure and domestic value stocks — heavily weighted in Australian large-cap — held up well as commodity prices surged.</p>
+<p>The worst performers were the products that had soared in 2021. HYGG (Hyperion Global Growth) fell -43.0%, NDQ dropped -28.5%, QHAL (iShares Hedged International Equity) fell -23.0%, and HACK (BetaShares Global Cybersecurity) declined -22.1%. These were exactly the high-multiple, long-duration growth funds that were most exposed to the rise in discount rates. Investors who had poured money into these products in 2021 faced significant paper losses.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Fund Flows Leaders: VAS Dominant, MGOC in Freefall</h2>
+<p>VAS continued its reign atop the flow tables with $2.6 billion for the year — suggesting that market declines were read as buying opportunities by Australian investors with a long-term perspective. A200 (BetaShares Australia 200) attracted $768 million and VGS $989 million.</p>
+<p>The year's defining outflow story was MGOC (Magellan Global Open Class), which suffered $4.1 billion in net redemptions — by far the largest single-year outflow of any ETF in the industry's history at that point. The fund's underperformance relative to passive benchmarks, combined with Magellan's well-publicised corporate governance problems including the departure of founder Hamish Douglass, triggered a wave of institutional and retail redemptions. IOZ also saw $1.0 billion in outflows as some investors rotated out of the product in favour of lower-cost alternatives or chose different international exposures.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Asset Class Trends: Fixed Income Reclaims Relevance</h2>
+<p>The most notable structural shift of 2022 was in fixed income. After years of negligible yields making bonds unattractive, the rapid rise in rates finally began drawing investors to fixed income ETFs. The asset class ended the year with $17.8 billion in AUM — up from $15.4 billion at the end of 2021 — and December's monthly flow of $881 million was the strongest single-month showing for fixed income in years. Equity ETFs fell to $107.0 billion (82.1% of total AUM), reflecting both price depreciation and Magellan's mass redemptions.</p>
+<p>Commodities reached $4.2 billion, supported by gold's relative resilience.</p>
+
+<hr class="my-6 border-gray-200">
+
+
+<div class="chart-grid">
+  <div class="chart-box" style="margin:0">
+    <h3>Asset Class Breakdown</h3>
+    <div style="position:relative;height:220px"><canvas id="chart-ac-2022"></canvas></div>
+  </div>
+  <div class="chart-box" style="margin:0">
+    <h3>Issuer Market Share</h3>
+    <table>
+      <thead><tr><th>Issuer</th><th>AUM</th><th>ETFs</th><th>Share</th></tr></thead>
+      <tbody>
+        <tr><td>Vanguard</td><td>$41.2B</td><td>29</td><td>33.6%</td></tr>
+        <tr><td>iShares</td><td>$23.8B</td><td>40</td><td>19.4%</td></tr>
+        <tr><td>Betashares</td><td>$23.4B</td><td>75</td><td>19.1%</td></tr>
+        <tr><td>VanEck</td><td>$10.9B</td><td>31</td><td>8.9%</td></tr>
+        <tr><td>Magellan</td><td>$8.9B</td><td>4</td><td>7.2%</td></tr>
+        <tr><td>StateStreet</td><td>$8.2B</td><td>17</td><td>6.7%</td></tr>
+        <tr><td>Global X</td><td>$4.8B</td><td>24</td><td>3.9%</td></tr>
+        <tr><td>Other</td><td>$1.6B</td><td>1</td><td>1.3%</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+<script>
+(function() {
+  const acLabels = ["International Equities", "Australian Equities", "Fixed Income", "Commodity", "Money Market", "Alternative", "Specialty", "Other", "Mixed Allocation"];
+  const acData   = [70.5, 36.5, 17.8, 4.2, 0.8, 0.4, 0.2, 0.1, 0.1];
+  const PALETTE  = ['#3b82f6','#f59e0b','#10b981','#ef4444','#8b5cf6','#ec4899','#06b6d4','#f97316','#84cc16','#6366f1'];
+  new Chart(document.getElementById('chart-ac-2022'), {
+    type: 'doughnut',
+    data: { labels: acLabels, datasets: [{ data: acData, backgroundColor: PALETTE, borderWidth: 2, borderColor: '#fff' }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } } }
+    }
+  });
+})();
+</script>
+
+<div class="chart-box">
+  <h3>Top 10 ETFs by AUM &#8212; 2022-12-30</h3>
+  <table>
+    <thead><tr><th>#</th><th>Code</th><th>Name</th><th>Issuer</th><th>AUM ($M)</th><th>1Y Return</th><th>Year Flows ($M)</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td><strong>VAS</strong></td><td>Vanguard Australian Shares Index ETF</td><td>Vanguard</td><td>$11,844M</td><td><span class="neg">-0.3%</span></td><td><span class="pos">+$2,619M</span></td></tr>
+      <tr><td>2</td><td><strong>MGOC</strong></td><td>Magellan Global Fund - Open Class Units</td><td>Magellan</td><td>$7,536M</td><td><span class="neg">-15.5%</span></td><td><span class="neg">$-4,134M</span></td></tr>
+      <tr><td>3</td><td><strong>VGS</strong></td><td>Vanguard MSCI Index International Shares ETF</td><td>Vanguard</td><td>$5,023M</td><td><span class="neg">-12.4%</span></td><td><span class="pos">+$989M</span></td></tr>
+      <tr><td>4</td><td><strong>IVV</strong></td><td>iShares S&P 500 ETF</td><td>iShares</td><td>$4,794M</td><td><span class="neg">-12.6%</span></td><td><span class="neg">$-16M</span></td></tr>
+      <tr><td>5</td><td><strong>STW</strong></td><td>SPDR S&P/ASX 200 Fund</td><td>StateStreet</td><td>$4,612M</td><td><span class="pos">+0.9%</span></td><td><span class="pos">+$171M</span></td></tr>
+      <tr><td>6</td><td><strong>IOZ</strong></td><td>iShares Core S&P/ASX 200 ETF</td><td>iShares</td><td>$3,561M</td><td><span class="pos">+1.1%</span></td><td><span class="neg">$-1,038M</span></td></tr>
+      <tr><td>7</td><td><strong>QUAL</strong></td><td>VanEck MSCI International Quality ETF</td><td>VanEck</td><td>$2,969M</td><td><span class="neg">-17.0%</span></td><td><span class="pos">+$666M</span></td></tr>
+      <tr><td>8</td><td><strong>VTS</strong></td><td>Vanguard US Total Market Shares Index ETF</td><td>Vanguard</td><td>$2,897M</td><td><span class="neg">-13.9%</span></td><td><span class="pos">+$178M</span></td></tr>
+      <tr><td>9</td><td><strong>AAA</strong></td><td>BetaShares Australian High Interest Cash ETF</td><td>Betashares</td><td>$2,700M</td><td><span class="pos">+1.4%</span></td><td><span class="pos">+$65M</span></td></tr>
+      <tr><td>10</td><td><strong>VHY</strong></td><td>Vanguard Australian Shares High Yield ETF</td><td>Vanguard</td><td>$2,643M</td><td><span class="pos">+11.3%</span></td><td><span class="pos">+$535M</span></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="chart-grid">
+  <div class="chart-box" style="margin:0">
+    <h3>Top 5 Performers (min $500M AUM)</h3>
+    <table>
+      <thead><tr><th>Code</th><th>Name</th><th>Asset Class</th><th>1Y Return</th></tr></thead>
+      <tbody>
+      <tr><td><strong>VHY</strong></td><td>Vanguard Australian Shares High Yield ETF</td><td>Equity</td><td><span class="pos">+11.3%</span></td></tr>
+      <tr><td><strong>PMGOLD</strong></td><td>Perth Mint Gold</td><td>Commodity</td><td><span class="pos">+7.0%</span></td></tr>
+      <tr><td><strong>GOLD</strong></td><td>Global X Physical Gold</td><td>Commodity</td><td><span class="pos">+6.5%</span></td></tr>
+      <tr><td><strong>SFY</strong></td><td>SPDR S&P/ASX 50 Fund</td><td>Equity</td><td><span class="pos">+4.1%</span></td></tr>
+      <tr><td><strong>HBRD</strong></td><td>BetaShares Active Australian Hybrids Fund</td><td>Fixed Income</td><td><span class="pos">+2.7%</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="chart-box" style="margin:0">
+    <h3>Worst 5 Performers (min $500M AUM)</h3>
+    <table>
+      <thead><tr><th>Code</th><th>Name</th><th>Asset Class</th><th>1Y Return</th></tr></thead>
+      <tbody>
+      <tr><td><strong>HYGG</strong></td><td>Hyperion Global Growth Companies Fund</td><td>Equity</td><td><span class="neg">-43.0%</span></td></tr>
+      <tr><td><strong>NDQ</strong></td><td>BetaShares NASDAQ 100 ETF</td><td>Equity</td><td><span class="neg">-28.5%</span></td></tr>
+      <tr><td><strong>QHAL</strong></td><td>VanEck MSCI World Ex-Australia Quality (Hedged)</td><td>Equity</td><td><span class="neg">-23.0%</span></td></tr>
+      <tr><td><strong>HACK</strong></td><td>BetaShares Global Cybersecurity ETF</td><td>Equity</td><td><span class="neg">-22.1%</span></td></tr>
+      <tr><td><strong>IHVV</strong></td><td>iShares S&P 500 AUD Hedged ETF</td><td>Equity</td><td><span class="neg">-20.8%</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<h2>New Launches: A Record 41 Products</h2>
+<p>Despite the difficult market environment, 41 new ETPs were admitted to the ASX — nearly double the prior year's tally. The wave included niche thematic products (GAME for video games and e-sports, IBUY for e-commerce) as well as ESG-focused and alternative products. The large number of launches reflected issuers' long product development pipelines and confidence in the structural growth of the ETF market even during a cyclical downturn.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Issuer Landscape: Magellan's Fall Reshapes the Rankings</h2>
+<p>Vanguard consolidated its leadership position with $41.2 billion in AUM, growing despite the market decline through strong flows. BetaShares ($23.4 billion) pulled effectively level with iShares ($23.8 billion) in a significant competitive milestone. VanEck grew to $10.9 billion. Magellan fell from a peak of over $16 billion to $8.9 billion by year-end — a dramatic contraction driven almost entirely by MGOC redemptions rather than market performance alone. State Street held $8.2 billion.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Fee Trends: MER Creep from New Products</h2>
+<p>The simple average MER rose to 0.555% as the wave of specialist and thematic product launches pushed the unweighted average higher. However, the AUM-weighted MER fell to 0.389% — a meaningful compression from 0.444% the prior year — as the largest products remained predominantly low-cost index funds. The growing divergence between the two metrics captured the dual-speed nature of the market: cheap core products growing rapidly at scale, and more expensive specialist products multiplying in number but remaining small.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Looking Back</h2>
+<p>In retrospect, 2022 was a year that tested the conviction of Australian ETF investors — and found it solid. Flows never turned negative despite some of the worst return environments in decades. The year also completed Magellan's fall from dominance: what had been Australia's largest ETF in early 2022 would close the year having lost more than half its AUM, a cautionary tale about the vulnerability of high-profile active management products to performance and reputational risk.</p>
+""",
+    },
+
+    {
+        "slug": "etf-year-review-2021",
+        "title": "Australian ETF Year in Review: 2021",
+        "subtitle": "2021 was a year of extraordinary performance for global equity markets, with the Australian ETF industry growing from $94.4 billion to $134.0 billion — crossing $100 billion for the first time.",
+        "date": "2021-12-31",
+        "category": "Annual Report",
+        "summary": "2021 was a year of extraordinary performance for global equity markets. Vaccine rollouts, fiscal stimulus, and surging corporate earnings pushed major indices to record highs. The Australian ETF industry mirrored this euphoria, growing from $94.4 billion to $134.0 billion in assets — a 42% expansion.",
+        "body": """
+<h2>The Bull Market Matures — and Magellan Cracks</h2>
+<p>2021 was a year of extraordinary performance for global equity markets. Vaccine rollouts, fiscal stimulus, and surging corporate earnings pushed major indices to record highs. The Australian ETF industry mirrored this euphoria, growing from $94.4 billion to $134.0 billion in assets — a 42% expansion. Yet the year also contained the seeds of a major structural shift: Magellan Financial Group's flagship product began suffering significant outflows that would reshape the industry's competitive landscape for years to come.</p>
+
+<hr class="my-6 border-gray-200">
+
+<div class="chart-box">
+  <h3>Monthly AUM &amp; Net Flows &#8212; 2021</h3>
+  <div style="position:relative;height:260px"><canvas id="chart-monthly-2021"></canvas></div>
+</div>
+<script>
+(function() {
+  const labels = ["2021-01", "2021-02", "2021-03", "2021-04", "2021-05", "2021-06", "2021-07", "2021-08", "2021-09", "2021-10", "2021-11", "2021-12"];
+  const aums   = [96.04, 96.57, 102.07, 106.67, 109.49, 113.52, 116.5, 122.78, 122.95, 124.64, 129.93, 133.97];
+  const flows  = [1592.0, 1420.0, 1218.0, 1964.0, 1465.0, 976.0, 2738.0, 2433.0, 2855.0, 2357.0, 1726.0, 2617.0];
+  new Chart(document.getElementById('chart-monthly-2021'), {
+    data: {
+      labels,
+      datasets: [
+        { type: 'line',  label: 'AUM ($B)',         data: aums,  borderColor: '#3b82f6', backgroundColor: '#3b82f620', fill: true,  tension: 0.3, pointRadius: 2, borderWidth: 2, yAxisID: 'yAUM' },
+        { type: 'bar',   label: 'Net Flows ($M)',    data: flows, backgroundColor: flows.map(v => v >= 0 ? '#10b98180' : '#ef444480'), borderRadius: 2, yAxisID: 'yFlow' }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+      scales: {
+        x:     { ticks: { font: { size: 10 } }, grid: { display: false } },
+        yAUM:  { type: 'linear', position: 'left',  ticks: { font: { size: 10 }, callback: v => '$' + v + 'B' }, grid: { color: '#f1f5f9' } },
+        yFlow: { type: 'linear', position: 'right', ticks: { font: { size: 10 }, callback: v => '$' + v + 'M' }, grid: { display: false } }
+      }
+    }
+  });
+})();
+</script>
+
+
+<h2>Industry AUM: $39.6 Billion Added in a Single Year</h2>
+<p>Beginning the year at $94.4 billion, the industry closed 2021 at $134.0 billion — an increase of $39.6 billion. Net flows contributed $23.4 billion of that growth (excluding admission-month distortions), while market appreciation accounted for roughly $16 billion. It was a near-ideal environment: equities rose sharply, flows were strong, and new product launches kept the product universe expanding. Total traded value for the year was $95.7 billion, down slightly from 2020's crisis-elevated $98.7 billion but still reflecting a deeply liquid and active market.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Net Flows: $23.4 Billion — All Roads Lead to Equities</h2>
+<p>Net flows of $23.4 billion were overwhelmingly directed into equity ETFs, which captured essentially all net new money. Australian broad-market equity remained the largest category by flows, led by VAS ($1.9 billion), but the year's defining theme was international equity — particularly US and global growth funds. VGS attracted $1.3 billion, NDQ drew $822 million, QUAL brought in $712 million, and IVV added $642 million. Investors were chasing the US equity rally with conviction, and diversified multi-asset products like VDHG (Vanguard Diversified High Growth) drew $856 million as the broader "set and forget" ETF investor base matured.</p>
+<p>A striking new entrant to the flow leaders was HYGG (Hyperion Global Growth Companies Fund), a high-conviction active growth fund that launched during the year and drew $916 million in its first partial year — an extraordinary debut reflecting strong investor appetite for quality growth.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Top Performing ETFs: American Giants Dominate</h2>
+<p>Performance in 2021 was led by US large-cap and growth exposures. Among products with at least $500 million in AUM, IVV (iShares S&P 500) returned 37.2%, NDQ returned 35.4%, VTS (Vanguard US Total Market) returned 34.1%, and QUAL returned 34.0%. IOO (iShares Global 100) returned 33.4%. Every top-performing product had heavy US or global tech exposure.</p>
+<p>The worst performers were concentrated in Asian equities and bonds. ASIA returned -15.5%, reversing its exceptional 2020 gain as Chinese regulatory crackdowns devastated the technology sector that had driven its prior-year surge. The emerging markets exposure in IAA (iShares Asia 50) fell 5.5%. Bond funds including CRED, VGB, and IAF posted modest negative returns as inflation expectations began to rise and bond yields crept higher in the second half of the year.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Fund Flows Leaders: Equity Enthusiasm, Magellan's Reversal</h2>
+<p>VAS again topped the flow tables at $1.9 billion, consolidating its position as Australia's most popular ETF for new money. But the year's defining flow story was the collapse in demand for MGOC (Magellan Global Open Class), which shed $1.4 billion in net outflows — a dramatic reversal for a product that had been Australia's largest ETF by AUM. Concerns about Magellan's performance, corporate governance, and co-founder departure began surfacing, and sophisticated investors began voting with their feet.</p>
+<p>On the institutional side, MHHT and MSTR (Magellan-branded hedged products) each suffered over $100 million in outflows, suggesting the problem was systemic to the franchise rather than product-specific.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Asset Class Trends: Equities Extend Their Dominance</h2>
+<p>Equity ETFs grew to $113.4 billion at year-end, representing 84.6% of industry AUM. Fixed income reached $15.4 billion, commodities $3.8 billion, and alternatives $400 million. The proportion of AUM in equities actually increased year-on-year, reflecting both the strong market performance of equities and investors' continued preference for equity exposure over bonds — even as interest rate risk began to build.</p>
+
+<hr class="my-6 border-gray-200">
+
+
+<div class="chart-grid">
+  <div class="chart-box" style="margin:0">
+    <h3>Asset Class Breakdown</h3>
+    <div style="position:relative;height:220px"><canvas id="chart-ac-2021"></canvas></div>
+  </div>
+  <div class="chart-box" style="margin:0">
+    <h3>Issuer Market Share</h3>
+    <table>
+      <thead><tr><th>Issuer</th><th>AUM</th><th>ETFs</th><th>Share</th></tr></thead>
+      <tbody>
+        <tr><td>Vanguard</td><td>$38.3B</td><td>30</td><td>30.0%</td></tr>
+        <tr><td>iShares</td><td>$25.5B</td><td>36</td><td>20.0%</td></tr>
+        <tr><td>Betashares</td><td>$22.2B</td><td>62</td><td>17.4%</td></tr>
+        <tr><td>Magellan</td><td>$16.3B</td><td>4</td><td>12.8%</td></tr>
+        <tr><td>VanEck</td><td>$10.0B</td><td>29</td><td>7.8%</td></tr>
+        <tr><td>StateStreet</td><td>$8.5B</td><td>17</td><td>6.7%</td></tr>
+        <tr><td>Global X</td><td>$4.7B</td><td>18</td><td>3.7%</td></tr>
+        <tr><td>Other</td><td>$2.3B</td><td>1</td><td>1.8%</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+<script>
+(function() {
+  const acLabels = ["International Equities", "Australian Equities", "Fixed Income", "Commodity", "Money Market", "Alternative", "Specialty", "Mixed Allocation", "Other"];
+  const acData   = [78.6, 34.9, 15.4, 3.8, 0.6, 0.4, 0.2, 0.1, 0.1];
+  const PALETTE  = ['#3b82f6','#f59e0b','#10b981','#ef4444','#8b5cf6','#ec4899','#06b6d4','#f97316','#84cc16','#6366f1'];
+  new Chart(document.getElementById('chart-ac-2021'), {
+    type: 'doughnut',
+    data: { labels: acLabels, datasets: [{ data: acData, backgroundColor: PALETTE, borderWidth: 2, borderColor: '#fff' }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } } }
+    }
+  });
+})();
+</script>
+
+<div class="chart-box">
+  <h3>Top 10 ETFs by AUM &#8212; 2021-12-31</h3>
+  <table>
+    <thead><tr><th>#</th><th>Code</th><th>Name</th><th>Issuer</th><th>AUM ($M)</th><th>1Y Return</th><th>Year Flows ($M)</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td><strong>MGOC</strong></td><td>Magellan Global Fund - Open Class Units</td><td>Magellan</td><td>$14,228M</td><td><span class="pos">+19.8%</span></td><td><span class="neg">$-1,394M</span></td></tr>
+      <tr><td>2</td><td><strong>VAS</strong></td><td>Vanguard Australian Shares Index ETF</td><td>Vanguard</td><td>$10,124M</td><td><span class="pos">+18.7%</span></td><td><span class="pos">+$1,929M</span></td></tr>
+      <tr><td>3</td><td><strong>IVV</strong></td><td>iShares S&P 500 ETF</td><td>iShares</td><td>$5,577M</td><td><span class="pos">+37.2%</span></td><td><span class="pos">+$642M</span></td></tr>
+      <tr><td>4</td><td><strong>IOZ</strong></td><td>iShares Core S&P/ASX 200 ETF</td><td>iShares</td><td>$4,961M</td><td><span class="pos">+18.1%</span></td><td><span class="pos">+$772M</span></td></tr>
+      <tr><td>5</td><td><strong>STW</strong></td><td>SPDR S&P/ASX 200 Fund</td><td>StateStreet</td><td>$4,817M</td><td><span class="pos">+18.2%</span></td><td><span class="pos">+$74M</span></td></tr>
+      <tr><td>6</td><td><strong>VGS</strong></td><td>Vanguard MSCI Index International Shares ETF</td><td>Vanguard</td><td>$4,727M</td><td><span class="pos">+29.7%</span></td><td><span class="pos">+$1,280M</span></td></tr>
+      <tr><td>7</td><td><strong>VTS</strong></td><td>Vanguard US Total Market Shares Index ETF</td><td>Vanguard</td><td>$3,220M</td><td><span class="pos">+34.1%</span></td><td><span class="pos">+$411M</span></td></tr>
+      <tr><td>8</td><td><strong>QUAL</strong></td><td>VanEck MSCI International Quality ETF</td><td>VanEck</td><td>$2,831M</td><td><span class="pos">+34.0%</span></td><td><span class="pos">+$712M</span></td></tr>
+      <tr><td>9</td><td><strong>NDQ</strong></td><td>BetaShares NASDAQ 100 ETF</td><td>Betashares</td><td>$2,819M</td><td><span class="pos">+35.4%</span></td><td><span class="pos">+$822M</span></td></tr>
+      <tr><td>10</td><td><strong>IOO</strong></td><td>iShares Global 100 ETF</td><td>iShares</td><td>$2,721M</td><td><span class="pos">+33.4%</span></td><td><span class="pos">+$136M</span></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="chart-grid">
+  <div class="chart-box" style="margin:0">
+    <h3>Top 5 Performers (min $500M AUM)</h3>
+    <table>
+      <thead><tr><th>Code</th><th>Name</th><th>Asset Class</th><th>1Y Return</th></tr></thead>
+      <tbody>
+      <tr><td><strong>IVV</strong></td><td>iShares S&P 500 ETF</td><td>Equity</td><td><span class="pos">+37.2%</span></td></tr>
+      <tr><td><strong>NDQ</strong></td><td>BetaShares NASDAQ 100 ETF</td><td>Equity</td><td><span class="pos">+35.4%</span></td></tr>
+      <tr><td><strong>VTS</strong></td><td>Vanguard US Total Market Shares Index ETF</td><td>Equity</td><td><span class="pos">+34.1%</span></td></tr>
+      <tr><td><strong>QUAL</strong></td><td>VanEck MSCI International Quality ETF</td><td>Equity</td><td><span class="pos">+34.0%</span></td></tr>
+      <tr><td><strong>IOO</strong></td><td>iShares Global 100 ETF</td><td>Equity</td><td><span class="pos">+33.4%</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="chart-box" style="margin:0">
+    <h3>Worst 5 Performers (min $500M AUM)</h3>
+    <table>
+      <thead><tr><th>Code</th><th>Name</th><th>Asset Class</th><th>1Y Return</th></tr></thead>
+      <tbody>
+      <tr><td><strong>ASIA</strong></td><td>BetaShares Asia Technology Tigers ETF</td><td>Equity</td><td><span class="neg">-15.5%</span></td></tr>
+      <tr><td><strong>IAA</strong></td><td>iShares Asia 50 ETF</td><td>Equity</td><td><span class="neg">-5.5%</span></td></tr>
+      <tr><td><strong>CRED</strong></td><td>BetaShares Australian Investment Grade Bond E</td><td>Fixed Income</td><td><span class="neg">-3.4%</span></td></tr>
+      <tr><td><strong>VGB</strong></td><td>Vanguard Australian Government Bond Index ETF</td><td>Fixed Income</td><td><span class="neg">-3.3%</span></td></tr>
+      <tr><td><strong>IAF</strong></td><td>iShares Core Composite Bond ETF</td><td>Fixed Income</td><td><span class="neg">-3.1%</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<h2>New Launches: 24 Products, Themes Diversify</h2>
+<p>Twenty-four new ETPs launched in 2021. The year saw a wave of thematic products: CLDD (BetaShares Cloud Computing), CLNE (VanEck Global Clean Energy), ERTH (BetaShares Climate Change Innovation), and HYGG (Hyperion Global Growth). ESG-themed products also gained traction with the launch of IESG (iShares Core MSCI Australia ESG Leaders). The diversity of new launches signalled that issuers were moving beyond plain-vanilla beta to compete for investors interested in specific themes or active management within an ETF wrapper.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Issuer Landscape: BetaShares Closes the Gap</h2>
+<p>Vanguard retained top position with $38.3 billion in AUM (up 48% from $25.8 billion), but the most dynamic mover was BetaShares, which grew from $14.4 billion to $22.2 billion — a 54% increase — overtaking iShares ($25.5 billion) was within reach. BetaShares' aggressive product development strategy and strong marketing to retail investors was paying clear dividends. VanEck also grew substantially, reaching $10.0 billion. Magellan, meanwhile, slipped from joint third position to fourth despite AUM growth to $16.3 billion, as outflows from MGOC masked the impact of market gains.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Fee Trends: Scale Drives AUM-Weighted Compression</h2>
+<p>The simple average MER rose marginally to 0.534%, reflecting a growing cohort of newer, more specialised (and therefore higher-fee) products. However, the AUM-weighted MER fell to 0.444% — down from 0.457% in 2020 — as the largest, cheapest products continued to grow faster than the rest of the market. Vanguard and iShares, with MERs on flagship products often below 0.10%, were capturing disproportionate flows.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Looking Back</h2>
+<p>2021 was the year the Australian ETF industry crossed $100 billion in AUM for the first time — a milestone that arrived faster than almost any forecast had predicted. In retrospect, the year also marked the peak of a growth-and-technology investment cycle that would begin to unravel in 2022, and the beginning of Magellan's prolonged institutional outflow problem that would reconfigure the industry's competitive map.</p>
+""",
+    },
+
+    {
+        "slug": "etf-year-review-2020",
+        "title": "Australian ETF Year in Review: 2020",
+        "subtitle": "A global pandemic triggered the sharpest equity market crash in decades — only to stage an equally stunning recovery — as the Australian ETF market closed the year with record inflows.",
+        "date": "2020-12-31",
+        "category": "Annual Report",
+        "summary": "2020 was the most dramatic year in the history of the Australian ETF industry. A global pandemic triggered the sharpest equity market crash in decades, with Australian and global indices losing roughly a third of their value between February and March — only to stage an equally stunning recovery.",
+        "body": """
+<h2>A Year Defined by Crisis and Recovery</h2>
+<p>2020 was the most dramatic year in the history of the Australian ETF industry. A global pandemic triggered the sharpest equity market crash in decades, with Australian and global indices losing roughly a third of their value between February and March — only to stage an equally stunning recovery. Against this backdrop of extreme volatility, the Australian ETF market not only survived but flourished, closing the year with record inflows and an industry reshaped by crisis-driven investor behaviour.</p>
+
+<hr class="my-6 border-gray-200">
+
+<div class="chart-box">
+  <h3>Monthly AUM &amp; Net Flows &#8212; 2020</h3>
+  <div style="position:relative;height:260px"><canvas id="chart-monthly-2020"></canvas></div>
+</div>
+<script>
+(function() {
+  const labels = ["2020-01", "2020-02", "2020-03", "2020-04", "2020-05", "2020-06", "2020-07", "2020-08", "2020-09", "2020-10", "2020-11", "2020-12"];
+  const aums   = [65.68, 63.63, 56.89, 61.02, 63.73, 65.55, 66.9, 70.47, 71.12, 73.55, 92.07, 94.44];
+  const flows  = [1915.0, 1512.0, 355.0, 1072.0, 1639.0, 1597.0, 1159.0, 1654.0, 2042.0, 2228.0, 2486.0, 2218.0];
+  new Chart(document.getElementById('chart-monthly-2020'), {
+    data: {
+      labels,
+      datasets: [
+        { type: 'line',  label: 'AUM ($B)',         data: aums,  borderColor: '#3b82f6', backgroundColor: '#3b82f620', fill: true,  tension: 0.3, pointRadius: 2, borderWidth: 2, yAxisID: 'yAUM' },
+        { type: 'bar',   label: 'Net Flows ($M)',    data: flows, backgroundColor: flows.map(v => v >= 0 ? '#10b98180' : '#ef444480'), borderRadius: 2, yAxisID: 'yFlow' }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+      scales: {
+        x:     { ticks: { font: { size: 10 } }, grid: { display: false } },
+        yAUM:  { type: 'linear', position: 'left',  ticks: { font: { size: 10 }, callback: v => '$' + v + 'B' }, grid: { color: '#f1f5f9' } },
+        yFlow: { type: 'linear', position: 'right', ticks: { font: { size: 10 }, callback: v => '$' + v + 'M' }, grid: { display: false } }
+      }
+    }
+  });
+})();
+</script>
+
+
+<h2>Industry AUM: From Shock to Record Highs</h2>
+<p>The Australian ETP industry began 2020 with $61.5 billion in assets under management. Despite the March sell-off, strong flows and a rapid market rebound propelled total AUM to $94.4 billion by year-end — a gain of $32.9 billion, or approximately 53%. The growth was driven by a combination of price appreciation and substantial net inflows. Net flows for the year (excluding admission-month distortions) reached $19.9 billion, meaning market performance contributed roughly $13 billion of the gain. Trading activity was exceptional, with $98.7 billion in total transacted value reflecting investors' heavy use of ETFs to reposition during the volatility.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Net Flows: $19.9 Billion in a Year of Extremes</h2>
+<p>Full-year net flows of $19.9 billion represented a step-change for the industry. Equity ETFs dominated, capturing the lion's share as investors used the March drawdown as a buying opportunity. The most telling signal was that broad Australian equity products led inflows — suggesting that retail and self-managed super investors were buying the dip rather than fleeing to safety. Fixed income attracted $524 million into iShares' IAF alone, as investors also sought bond exposure during the uncertainty. Gold also had an exceptional year, with GOLD (Global X) attracting $826 million in net flows — reflecting demand for defensive assets.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Top Performing ETFs: Tech and Asia Lead, Cash Lags</h2>
+<p>The return dispersion in 2020 was extreme. Among ETFs with at least $500 million in AUM, the best performer was the BetaShares Asia Technology Tigers ETF (ASIA) at +48.7%, followed by the BetaShares NASDAQ 100 ETF (NDQ) at +36.9% and the BetaShares Global Sustainability Leaders ETF (ETHI) at +30.6%. Technology and growth themes were supercharged by the pandemic-driven acceleration in digital adoption.</p>
+<p>At the other end of the spectrum, cash-like instruments unsurprisingly delivered near-zero returns in an emergency rate-cut environment. MGOC (Magellan Global Open Class) posted a 0.0% 1-year return in the data, while BILL and AAA returned just 1.0% and 1.2% respectively as the RBA slashed rates toward zero.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Fund Flows Leaders: Australian Equities and Gold</h2>
+<p>The top flow recipient for the year was VAS (Vanguard Australian Shares Index ETF), which attracted $2.3 billion in net new money — a record for the product at the time. IOZ (iShares Core S&P/ASX 200) followed with $1.6 billion. GOLD drew $826 million as investors sought inflation protection and safe-haven exposure amid unprecedented monetary stimulus. NDQ and QUAL (VanEck MSCI International Quality) each attracted roughly $550–570 million, capitalising on the quality-and-growth rotation.</p>
+<p>Outflows were modest in absolute terms; the largest was IHEB (iShares J.P. Morgan USD Emerging Markets Bond) at -$101 million, reflecting the EM stress early in the year.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Asset Class Trends: Equities Dominant, Commodities Surge</h2>
+<p>Equity ETFs ended the year with $77.1 billion in AUM — 81.7% of total industry assets. Fixed income held $12.6 billion (13.4%), while commodities reached $3.5 billion, boosted by gold's strong performance. The equity-dominated structure of the Australian ETF market was firmly established, with all other asset classes remaining comparatively small.</p>
+
+<hr class="my-6 border-gray-200">
+
+
+<div class="chart-grid">
+  <div class="chart-box" style="margin:0">
+    <h3>Asset Class Breakdown</h3>
+    <div style="position:relative;height:220px"><canvas id="chart-ac-2020"></canvas></div>
+  </div>
+  <div class="chart-box" style="margin:0">
+    <h3>Issuer Market Share</h3>
+    <table>
+      <thead><tr><th>Issuer</th><th>AUM</th><th>ETFs</th><th>Share</th></tr></thead>
+      <tbody>
+        <tr><td>Vanguard</td><td>$25.8B</td><td>30</td><td>28.2%</td></tr>
+        <tr><td>iShares</td><td>$19.1B</td><td>35</td><td>20.9%</td></tr>
+        <tr><td>Magellan</td><td>$14.4B</td><td>3</td><td>15.8%</td></tr>
+        <tr><td>Betashares</td><td>$14.4B</td><td>56</td><td>15.8%</td></tr>
+        <tr><td>StateStreet</td><td>$7.1B</td><td>17</td><td>7.8%</td></tr>
+        <tr><td>VanEck</td><td>$6.4B</td><td>25</td><td>7.0%</td></tr>
+        <tr><td>Global X</td><td>$3.3B</td><td>16</td><td>3.6%</td></tr>
+        <tr><td>Other</td><td>$0.9B</td><td>5</td><td>1.0%</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+<script>
+(function() {
+  const acLabels = ["International Equities", "Australian Equities", "Fixed Income", "Commodity", "Money Market", "Alternative", "Specialty", "Mixed Allocation", "Other"];
+  const acData   = [51.1, 26.0, 12.6, 3.5, 0.7, 0.3, 0.2, 0.1, 0.0];
+  const PALETTE  = ['#3b82f6','#f59e0b','#10b981','#ef4444','#8b5cf6','#ec4899','#06b6d4','#f97316','#84cc16','#6366f1'];
+  new Chart(document.getElementById('chart-ac-2020'), {
+    type: 'doughnut',
+    data: { labels: acLabels, datasets: [{ data: acData, backgroundColor: PALETTE, borderWidth: 2, borderColor: '#fff' }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } } }
+    }
+  });
+})();
+</script>
+
+<div class="chart-box">
+  <h3>Top 10 ETFs by AUM &#8212; 2020-12-31</h3>
+  <table>
+    <thead><tr><th>#</th><th>Code</th><th>Name</th><th>Issuer</th><th>AUM ($M)</th><th>1Y Return</th><th>Year Flows ($M)</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td><strong>MGOC</strong></td><td>Magellan Global Fund - Open Class Units</td><td>Magellan</td><td>$13,348M</td><td>&#8212;</td><td><span class="pos">+$402M</span></td></tr>
+      <tr><td>2</td><td><strong>VAS</strong></td><td>Vanguard Australian Shares Index ETF</td><td>Vanguard</td><td>$7,170M</td><td><span class="pos">+13.7%</span></td><td><span class="pos">+$2,287M</span></td></tr>
+      <tr><td>3</td><td><strong>STW</strong></td><td>SPDR S&P/ASX 200 Fund</td><td>StateStreet</td><td>$4,222M</td><td><span class="pos">+13.2%</span></td><td><span class="pos">+$505M</span></td></tr>
+      <tr><td>4</td><td><strong>IOZ</strong></td><td>iShares Core S&P/ASX 200 ETF</td><td>iShares</td><td>$3,676M</td><td><span class="pos">+13.0%</span></td><td><span class="pos">+$1,642M</span></td></tr>
+      <tr><td>5</td><td><strong>IVV</strong></td><td>iShares S&P 500 ETF</td><td>iShares</td><td>$3,572M</td><td><span class="pos">+18.9%</span></td><td><span class="neg">$-1M</span></td></tr>
+      <tr><td>6</td><td><strong>VGS</strong></td><td>Vanguard MSCI Index International Shares ETF</td><td>Vanguard</td><td>$2,624M</td><td><span class="pos">+16.8%</span></td><td><span class="pos">+$337M</span></td></tr>
+      <tr><td>7</td><td><strong>AAA</strong></td><td>BetaShares Australian High Interest Cash ETF</td><td>Betashares</td><td>$2,206M</td><td><span class="pos">+1.2%</span></td><td><span class="pos">+$415M</span></td></tr>
+      <tr><td>8</td><td><strong>VTS</strong></td><td>Vanguard US Total Market Shares Index ETF</td><td>Vanguard</td><td>$2,084M</td><td><span class="pos">+20.2%</span></td><td><span class="pos">+$70M</span></td></tr>
+      <tr><td>9</td><td><strong>GOLD</strong></td><td>Global X Physical Gold</td><td>Global X</td><td>$2,041M</td><td><span class="pos">+16.1%</span></td><td><span class="pos">+$826M</span></td></tr>
+      <tr><td>10</td><td><strong>IOO</strong></td><td>iShares Global 100 ETF</td><td>iShares</td><td>$1,958M</td><td><span class="pos">+18.6%</span></td><td><span class="pos">+$40M</span></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="chart-grid">
+  <div class="chart-box" style="margin:0">
+    <h3>Top 5 Performers (min $500M AUM)</h3>
+    <table>
+      <thead><tr><th>Code</th><th>Name</th><th>Asset Class</th><th>1Y Return</th></tr></thead>
+      <tbody>
+      <tr><td><strong>ASIA</strong></td><td>BetaShares Asia Technology Tigers ETF</td><td>Equity</td><td><span class="pos">+48.7%</span></td></tr>
+      <tr><td><strong>NDQ</strong></td><td>BetaShares NASDAQ 100 ETF</td><td>Equity</td><td><span class="pos">+36.9%</span></td></tr>
+      <tr><td><strong>ETHI</strong></td><td>BetaShares Global Sustainability Leaders ETF</td><td>Equity</td><td><span class="pos">+30.6%</span></td></tr>
+      <tr><td><strong>QUAL</strong></td><td>VanEck MSCI International Quality ETF</td><td>Equity</td><td><span class="pos">+23.3%</span></td></tr>
+      <tr><td><strong>IAA</strong></td><td>iShares Asia 50 ETF</td><td>Equity</td><td><span class="pos">+21.6%</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="chart-box" style="margin:0">
+    <h3>Worst 5 Performers (min $500M AUM)</h3>
+    <table>
+      <thead><tr><th>Code</th><th>Name</th><th>Asset Class</th><th>1Y Return</th></tr></thead>
+      <tbody>
+      <tr><td><strong>MGOC</strong></td><td>Magellan Global Fund - Open Class Units</td><td>Equity</td><td>0.0%</td></tr>
+      <tr><td><strong>BILL</strong></td><td>iShares Core Cash ETF</td><td>Money Market</td><td><span class="pos">+1.0%</span></td></tr>
+      <tr><td><strong>AAA</strong></td><td>BetaShares Australian High Interest Cash ETF</td><td>Fixed Income</td><td><span class="pos">+1.2%</span></td></tr>
+      <tr><td><strong>QPON</strong></td><td>BetaShares Australian Bank Senior Floating Ra</td><td>Fixed Income</td><td><span class="pos">+3.1%</span></td></tr>
+      <tr><td><strong>HBRD</strong></td><td>BetaShares Active Australian Hybrids Fund</td><td>Fixed Income</td><td><span class="pos">+5.1%</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<h2>New Launches: 23 Products in a Volatile Year</h2>
+<p>Despite the market turmoil, 23 new ETPs were admitted to the ASX in 2020. Notable debuts included FANG (Global X FANG+ ETF), providing targeted exposure to mega-cap US tech; ATEC (BetaShares S&P/ASX Australian Technology ETF), which tapped into the domestic tech boom; and LNAS (Global X Ultra Long Nasdaq 100 Hedge Fund), a leveraged product catering to sophisticated investors. The diversity of launches signalled that issuers saw the pandemic dip as an opportunity rather than a deterrent.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Issuer Landscape: The Big Four Hold Firm</h2>
+<p>Vanguard ended 2020 as the clear market leader with $25.8 billion in AUM, followed by iShares at $19.1 billion. Magellan and BetaShares were tied at approximately $14.4 billion each, with Magellan's position largely reflecting the enormous MGOC product. State Street held $7.1 billion and VanEck $6.4 billion. BetaShares was the most active product launcher and was gaining ground on the established index giants.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Fee Trends: Fees Compress as Scale Grows</h2>
+<p>The average management expense ratio (MER) across the industry stood at 0.504%, while the AUM-weighted MER — a better measure of what investors actually paid — was 0.457%. The divergence between these figures reflected the concentration of assets in lower-cost index products run by Vanguard and iShares, pulling the weighted average well below the simple mean.</p>
+
+<hr class="my-6 border-gray-200">
+
+<h2>Looking Back</h2>
+<p>2020 demonstrated that ETFs are particularly well-suited to crisis environments — they provided intraday liquidity and price discovery when active funds were gating or suspending redemptions. The year's record inflows during a bear market confirmed a structural shift: Australian investors were increasingly turning to exchange-traded vehicles as their primary investment tool, not just a complement to managed funds.</p>
+""",
+    },
+
     {
         "slug": "etf-fund-flows-march-2026",
         "title": "Where the Money Went: $5.2 Billion in ETF Inflows",
