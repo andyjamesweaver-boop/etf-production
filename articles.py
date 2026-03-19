@@ -5,6 +5,180 @@ Each article is a dict with: slug, title, subtitle, date, category, summary, bod
 
 ARTICLES = [
 
+    # ── Thematic / Performance Articles ───────────────────────────────────────
+
+    {
+        "slug": "gold-miners-leverage-mnrs-2026",
+        "title": "Miners vs Metal: How MNRS Turned Gold's Rally Into a 363% Return",
+        "subtitle": "Physical gold ETFs returned 137% over the past two years. Gold miners returned more than twice that. Here's why the gap exists — and why it can reverse.",
+        "date": "2026-03-19",
+        "category": "Performance",
+        "summary": "Physical gold ETFs returned 137% from January 2024 to March 2026. Over the same period, VanEck's Gold Miners ETF (MNRS) returned 363%. The gap is not a mistake — it is operating leverage. But the same mechanism that amplifies gains also amplifies losses, and investors who chased MNRS in early 2024 endured two months of underperformance before the trade delivered.",
+        "body": """
+<p>When gold goes up, gold miners tend to go up more. And when gold falls, they tend to fall harder. This relationship — operating leverage — has been on vivid display over the past two years on the ASX, as VanEck's Gold Miners ETF (MNRS) delivered returns that dwarfed those of the physical gold ETFs it nominally tracks alongside.</p>
+
+<p>From January 2024 to March 2026, MNRS rose from $5.01 to $18.21 — a gain of <strong>263%</strong>. Over the same period, the VanEck Gold Bullion ETF (NUGG) rose from $30.45 to $72.28 — a gain of <strong>137%</strong>. Both products benefited from the same underlying commodity. One returned nearly twice the other.</p>
+
+<h2>Performance at a glance</h2>
+<table>
+  <thead><tr><th>ETF</th><th>Type</th><th>1Y Return</th><th>2Y Return (est.)</th><th>FUM</th><th>Fee</th></tr></thead>
+  <tbody>
+    <tr><td>MNRS</td><td>Gold miners equity</td><td class="pos">+190%</td><td class="pos">+263%</td><td>$289M</td><td>0.57%</td></tr>
+    <tr><td>GDX</td><td>Gold miners equity (large-cap)</td><td class="pos">+138%</td><td>—</td><td>$1,580M</td><td>0.53%</td></tr>
+    <tr><td>NUGG</td><td>Physical gold bullion</td><td class="pos">+65%</td><td class="pos">+137%</td><td>$259M</td><td>0.25%</td></tr>
+    <tr><td>GLDN</td><td>Physical gold bullion</td><td class="pos">+65%</td><td>—</td><td>$394M</td><td>0.18%</td></tr>
+  </tbody>
+</table>
+
+<div class="chart-box">
+  <h3>MNRS vs NUGG — Indexed to 100 (January 2024)</h3>
+  <div style="position:relative;height:260px"><canvas id="chart-gold-leverage"></canvas></div>
+</div>
+<script>
+(function() {
+  const labels = ["2024-01","2024-02","2024-03","2024-04","2024-05","2024-06","2024-07","2024-08","2024-09","2024-10","2024-11","2024-12","2025-01","2025-02","2025-03","2025-04","2025-05","2025-06","2025-07","2025-08","2025-09","2025-10","2025-11","2025-12","2026-01","2026-02","2026-03"];
+  const mnrs  = [100.0,92.7,98.2,109.9,120.5,121.6,119.3,119.9,123.1,135.4,137.3,137.0,131.8,146.3,145.7,165.6,167.2,184.9,184.7,208.4,231.1,269.1,253.6,290.0,326.7,325.7,363.2];
+  const nugg  = [100.0,102.8,106.4,113.6,116.6,116.5,114.7,120.3,122.5,128.2,132.5,133.9,141.0,149.2,151.1,168.3,169.2,169.3,165.4,169.8,177.8,197.1,201.5,207.4,217.4,226.3,237.4];
+  new Chart(document.getElementById('chart-gold-leverage'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'MNRS (Gold Miners)', data: mnrs, borderColor: '#f59e0b', backgroundColor: '#f59e0b18', fill: true, tension: 0.3, pointRadius: 2, borderWidth: 2 },
+        { label: 'NUGG (Physical Gold)', data: nugg, borderColor: '#6b7280', backgroundColor: '#6b728018', fill: true, tension: 0.3, pointRadius: 2, borderWidth: 2 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+      scales: {
+        x: { ticks: { font: { size: 10 } }, grid: { display: false } },
+        y: { ticks: { font: { size: 10 }, callback: v => v + '' }, grid: { color: '#f1f5f9' }, title: { display: true, text: 'Indexed (Jan 2024 = 100)', font: { size: 10 } } }
+      }
+    }
+  });
+})();
+</script>
+
+<h2>Why miners amplify gold's moves</h2>
+
+<p>A gold mining company's revenue is determined by the gold price, but its costs — labour, energy, equipment, capital — are largely fixed in the short term. When gold rises from, say, $2,000 to $2,600 per ounce (a 30% gain), a miner whose all-in sustaining cost is $1,400 per ounce sees its profit margin expand from $600 to $1,200 per ounce — a 100% increase. The equity market prices that profit expansion, not just the commodity gain.</p>
+
+<p>This is operating leverage in action. The same mechanism works in reverse: if gold falls 20%, a high-cost miner may see its margin halved or eliminated entirely, causing the stock to fall 50% or more. Gold miners carry more risk than the metal itself.</p>
+
+<h2>The first half of 2024: a painful lesson</h2>
+
+<p>The leverage story did not play out cleanly from the start. In January and February 2024, gold was rising (NUGG climbed from $30.45 to $31.29, a 2.8% gain) while MNRS fell — from $5.01 to $4.65, a drop of 7.2%. This apparent paradox reflects that gold miners are affected by more than just the gold price: input cost inflation, operational disruptions, currency movements, and general equity market sentiment all play a role. In early 2024, equity markets were cautious about mining stocks even as the metal itself appreciated.</p>
+
+<p>By April 2024, the leverage kicked in properly. Gold broke above $2,300 per ounce for the first time, and MNRS moved from $4.65 to $5.51 in a month — erasing its early underperformance and then some. From that point, the divergence between the two ETFs began to widen meaningfully.</p>
+
+<h2>The acceleration phase: mid-2025 onward</h2>
+
+<p>The most dramatic divergence emerged in the second half of 2025. From July to October 2025, NUGG rose from $50.35 to $60.02 — a solid 19% over four months. MNRS over the same period rose from $9.26 to $13.49 — a 46% gain. The leverage ratio in this period was approximately 2.4×, consistent with the leverage effect as gold approached and then exceeded $3,000 per ounce.</p>
+
+<p>By March 2026, MNRS had returned 263% from its January 2024 starting point, compared with NUGG's 137%. In absolute unit price terms, MNRS moved from $5.01 to $18.21 and NUGG from $30.45 to $72.28 — both extraordinary outcomes, but with very different risk profiles along the way.</p>
+
+<h2>What investors should understand</h2>
+
+<p>MNRS and GDX are equity products, not commodity products. They are affected by company-specific risks, management quality, hedging policies, and equity market valuations, in addition to the gold price. Investors who want pure commodity exposure with lower volatility are better served by NUGG or GLDN (iShares Physical Gold ETF, $394M, fee 0.18%), both of which hold physical gold directly.</p>
+
+<p>The fee difference is also meaningful over time. NUGG charges 0.25% and GLDN 0.18%, while MNRS charges 0.57%. In a flat gold environment, that spread compounds unfavourably for miners holders. The case for MNRS rests entirely on the gold price rising — and rising enough to justify the additional volatility, equity risk, and fee cost.</p>
+
+<p>Over the past two years, that case was emphatically made. But investors considering adding gold miners exposure today are buying at prices that already reflect a 263% gain. The leverage that worked so powerfully on the way up will work equally powerfully on the way down.</p>
+""",
+    },
+
+    {
+        "slug": "hjpn-japan-currency-hedging-2026",
+        "title": "The Yen Trade: How Currency Hedging Added 39 Percentage Points to Japan Returns",
+        "subtitle": "Two Japan ETFs, the same underlying market, a 39-percentage-point performance gap. The difference was whether you hedged the yen.",
+        "date": "2026-03-19",
+        "category": "Performance",
+        "summary": "HJPN, VanEck's currency-hedged Japan ETF, returned 74% from January 2024 to March 2026. IJP, the iShares unhedged equivalent, returned 40% over the same period. Both hold the same Japanese equities. The gap — 34 percentage points — reflects the cost of holding unhedged yen exposure as Japan's currency weakened against the Australian dollar.",
+        "body": """
+<p>Japan's equity market has been one of the world's better-performing major markets over the past two years. The Nikkei 225 broke above 40,000 for the first time in March 2024, a milestone that resonated globally as Japanese equities shook off three decades of stagnation. Corporate governance reforms, the end of negative interest rates, and the return of domestic inflation all contributed to a genuine re-rating of Japanese stocks.</p>
+
+<p>Yet two Australia-listed Japan ETFs that both hold Japanese equities produced very different outcomes for investors. VanEck's HJPN (Japan ETF — Currency Hedged) returned <strong>+55.5%</strong> over the past twelve months. The iShares IJP (MSCI Japan ETF, unhedged) returned <strong>+15.7%</strong> over the same period. Both track Japanese equities. The difference is almost entirely currency.</p>
+
+<h2>Performance comparison</h2>
+<table>
+  <thead><tr><th>ETF</th><th>Currency Hedging</th><th>1Y Return</th><th>3Y Return</th><th>FUM</th><th>Fee</th></tr></thead>
+  <tbody>
+    <tr><td>HJPN</td><td>AUD hedged (removes JPY risk)</td><td class="pos">+55.5%</td><td class="pos">+33.2%</td><td>$247M</td><td>0.56%</td></tr>
+    <tr><td>IJP</td><td>Unhedged (full JPY exposure)</td><td class="pos">+15.7%</td><td class="pos">+59.2%</td><td>$1,229M</td><td>0.50%</td></tr>
+  </tbody>
+</table>
+
+<div class="chart-box">
+  <h3>HJPN vs IJP — Indexed to 100 (January 2024)</h3>
+  <div style="position:relative;height:260px"><canvas id="chart-japan-hedge"></canvas></div>
+</div>
+<script>
+(function() {
+  const labels = ["2024-01","2024-02","2024-03","2024-04","2024-05","2024-06","2024-07","2024-08","2024-09","2024-10","2024-11","2024-12","2025-01","2025-02","2025-03","2025-04","2025-05","2025-06","2025-07","2025-08","2025-09","2025-10","2025-11","2025-12","2026-01","2026-02","2026-03"];
+  const hjpn = [100.0,110.6,119.2,118.3,119.4,121.2,121.2,108.0,111.6,120.4,121.6,121.7,123.5,123.2,120.6,106.9,121.4,124.1,126.3,133.5,137.4,145.6,150.0,154.4,162.7,172.4,173.6];
+  const ijp  = [100.0,109.0,115.2,112.7,109.8,110.7,110.7,105.8,111.6,112.9,112.4,117.5,115.4,119.5,120.5,114.5,122.6,123.2,120.8,130.2,132.5,134.6,139.8,138.2,140.4,142.2,140.1];
+  new Chart(document.getElementById('chart-japan-hedge'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'HJPN (hedged)', data: hjpn, borderColor: '#ef4444', backgroundColor: '#ef444418', fill: true, tension: 0.3, pointRadius: 2, borderWidth: 2 },
+        { label: 'IJP (unhedged)', data: ijp,  borderColor: '#3b82f6', backgroundColor: '#3b82f618', fill: true, tension: 0.3, pointRadius: 2, borderWidth: 2 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+      scales: {
+        x: { ticks: { font: { size: 10 } }, grid: { display: false } },
+        y: { ticks: { font: { size: 10 } }, grid: { color: '#f1f5f9' }, title: { display: true, text: 'Indexed (Jan 2024 = 100)', font: { size: 10 } } }
+      }
+    }
+  });
+})();
+</script>
+
+<h2>How currency hedging works</h2>
+
+<p>When an Australian investor buys IJP, they are exposed to two things: the performance of Japanese equities, and the AUD/JPY exchange rate. If Japanese stocks rise 20% in yen terms but the yen weakens 15% against the Australian dollar over the same period, the Australian investor pockets only around 5% — the currency move has eaten most of the equity gain.</p>
+
+<p>HJPN eliminates that second exposure. It enters into forward contracts to lock in the exchange rate, so that Australian investors receive the equity return in full, regardless of what the yen does. The cost of this hedge is embedded in the product's returns — roughly the interest rate differential between Australian and Japanese rates.</p>
+
+<p>The key question is always the direction of the currency. Hedging helps when your home currency (AUD) strengthens against the foreign currency (JPY). It hurts when your home currency weakens.</p>
+
+<h2>The yen's structural weakness</h2>
+
+<p>The yen has been under sustained pressure since 2021, driven by the Bank of Japan's commitment to yield curve control and ultra-loose monetary policy at a time when most other central banks were aggressively raising rates. The resulting interest rate differential drove investors out of yen and into higher-yielding currencies, including the Australian dollar.</p>
+
+<p>By mid-2024, the AUD had appreciated meaningfully against the JPY from historical norms. Unhedged Japanese equity investors — those holding IJP — saw a significant portion of their equity gains eroded by the currency. HJPN holders experienced no such erosion.</p>
+
+<p>The chart tells the story cleanly. Both ETFs moved largely in tandem through early 2024 as both the yen weakness and equity gains were still developing. The divergence became pronounced from mid-2025 onward, with HJPN accelerating to a 73.6% total return from the January 2024 start point versus IJP's 40.1%.</p>
+
+<h2>August 2024: a sharp reminder of hedge risk</h2>
+
+<p>The hedged strategy was not uniformly superior. In August 2024, HJPN fell sharply — from $19.62 to $17.49, a drop of 10.9% in a single month — while IJP held up better, declining only 5.4%. This divergence came when the Bank of Japan surprised markets with a rate hike in late July 2024, causing the yen to rapidly strengthen. Unhedged investors benefited from that yen bounce; hedged investors did not.</p>
+
+<p>That episode illustrated that hedging is not a free lunch. When the yen rallies — as it did briefly in August 2024 — HJPN underperforms. The bet embedded in HJPN is that the yen will remain weak relative to the AUD, or at least not significantly strengthen. Over the past two years, that bet has paid off handsomely. It does not always.</p>
+
+<h2>Three-year returns tell a different story</h2>
+
+<p>The three-year return figures reveal an interesting reversal. IJP's three-year return of <strong>59.2%</strong> significantly exceeds HJPN's <strong>33.2%</strong>. This is because Japanese equities delivered strong gains over 2022–2024, but the yen was more stable in the earlier part of that period — meaning unhedged investors captured more of the equity return before the yen depreciation became severe.</p>
+
+<p>The lesson is that the value of currency hedging is time-dependent and direction-dependent. Investors who held IJP for the full three years were rewarded by earlier periods when the yen was not a meaningful drag. Those who added in 2024–2025 found the yen to be a significant headwind that HJPN's hedge removed.</p>
+
+<h2>Which product is right for you?</h2>
+
+<p>HJPN charges 0.56% per annum versus IJP's 0.50%. The cost difference is modest. The more important question is your view on the yen. If you believe the Bank of Japan will continue normalising rates and the yen will structurally recover against the AUD, IJP's unhedged exposure may be more attractive. If you are agnostic about currency direction and simply want clean Japanese equity exposure, HJPN removes one significant source of uncertainty.</p>
+
+<p>IJP is also the far larger product at $1.23 billion versus HJPN's $247 million, reflecting its longer track record and broader institutional ownership. Both products are liquid and well-run. The choice between them is fundamentally a view on currency, not a view on the quality of the products themselves.</p>
+
+<p>Over the past twelve months, having a view on the yen — and acting on it — was worth 39 percentage points.</p>
+""",
+    },
+
     # ── Annual Year-in-Review Reports ─────────────────────────────────────────
 
     {
