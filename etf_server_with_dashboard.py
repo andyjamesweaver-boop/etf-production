@@ -1875,34 +1875,108 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
 <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.3.1/dist/chartjs-adapter-luxon.umd.min.js"></script>
 <style>
+  /* ── Dark Navy Theme ── */
+  html, body { background: #0a1628 !important; color: #e2e8f0 !important; }
+
+  /* Backgrounds */
+  .bg-white                { background: #0f2040 !important; }
+  .bg-gray-50, .bg-slate-50 { background: #0d1c35 !important; }
+  .bg-gray-100, .bg-slate-100, .bg-slate-200 { background: #0a1628 !important; }
+  .bg-blue-50              { background: #0d2050 !important; }
+  .bg-green-50             { background: #0d2820 !important; }
+  .bg-red-50               { background: #2a0f0f !important; }
+  .bg-amber-50             { background: #1e1a00 !important; }
+  .bg-sky-50               { background: #0d1f38 !important; }
+
+  /* Text */
+  .text-gray-900, .text-gray-800, .text-gray-700 { color: #e2e8f0 !important; }
+  .text-gray-600, .text-gray-500                 { color: #7fa3c8 !important; }
+  .text-gray-400, .text-gray-300                 { color: #4a6fa5 !important; }
+  .text-slate-800, .text-slate-700               { color: #e2e8f0 !important; }
+  .text-slate-600, .text-slate-500               { color: #7fa3c8 !important; }
+  .text-slate-400                                { color: #4a6fa5 !important; }
+  .text-blue-900, .text-blue-800                 { color: #93c5fd !important; }
+  .text-blue-700, .text-blue-600                 { color: #60a5fa !important; }
+  .text-blue-500                                 { color: #3b82f6 !important; }
+  .text-green-800, .text-green-700               { color: #4ade80 !important; }
+  .text-red-800, .text-red-700                   { color: #f87171 !important; }
+  .text-indigo-800, .text-indigo-700             { color: #a5b4fc !important; }
+  .text-purple-800                               { color: #c4b5fd !important; }
+  .text-amber-800                                { color: #fcd34d !important; }
+  .text-teal-800                                 { color: #5eead4 !important; }
+  .text-orange-800                               { color: #fb923c !important; }
+
+  /* Borders */
+  .border-gray-100, .border-gray-200, .border-gray-300 { border-color: #1e3860 !important; }
+  .border-slate-100, .border-slate-200                 { border-color: #1e3860 !important; }
+  .divide-gray-50, .divide-gray-100                    { --tw-divide-opacity: 1; }
+  .divide-y > * + * { border-color: #1e3860 !important; }
+
+  /* Badge chips */
+  .bg-blue-50  { background: #0d2050 !important; }
+  .bg-blue-100 { background: #0d2050 !important; }
+  .bg-green-100 { background: #0d2820 !important; }
+  .bg-red-100  { background: #2a0f0f !important; }
+  .bg-purple-100 { background: #1e1040 !important; }
+  .bg-amber-100  { background: #1e1800 !important; }
+  .bg-teal-100   { background: #081e20 !important; }
+  .bg-orange-100 { background: #1e0f00 !important; }
+  .bg-gray-100, .bg-gray-200 { background: #142850 !important; }
+  .bg-indigo-100 { background: #121840 !important; }
+  .bg-sky-100    { background: #081e38 !important; }
+
+  /* Inputs & forms */
+  input[type=text], input[type=number], input[type=search], select, textarea {
+    background: #0d1c35 !important;
+    border-color: #1e3860 !important;
+    color: #e2e8f0 !important;
+  }
+  input::placeholder { color: #4a6fa5 !important; }
+  select option { background: #0f2040; color: #e2e8f0; }
+
+  /* Cards with shadow */
+  .shadow, .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl {
+    box-shadow: 0 4px 24px rgba(0,0,0,.5) !important;
+  }
+
+  /* Hover states on rows/cards */
+  .hover\:bg-blue-50:hover   { background: #142850 !important; }
+  .hover\:bg-gray-50:hover   { background: #142850 !important; }
+  .hover\:bg-slate-50:hover  { background: #142850 !important; }
+  .hover\:text-blue-600:hover, .hover\:text-blue-700:hover { color: #60a5fa !important; }
+
+  /* Range input */
+  input[type=range] { accent-color: #3b82f6; }
+
   /* Exchange badges */
-  .badge-asx { background: #1e40af; color: #fff; }
-  .badge-cboe { background: #7c3aed; color: #fff; }
+  .badge-asx  { background: #1e40af; color: #fff; }
+  .badge-cboe { background: #5b21b6; color: #fff; }
 
   /* Asset class colour chips */
-  .ac-au   { background: #dbeafe; color: #1e40af; }
-  .ac-int  { background: #dcfce7; color: #166534; }
-  .ac-fi   { background: #fef3c7; color: #92400e; }
-  .ac-prop { background: #fce7f3; color: #9d174d; }
-  .ac-com  { background: #fef9c3; color: #713f12; }
-  .ac-div  { background: #e0e7ff; color: #3730a3; }
-  .ac-alt  { background: #f3f4f6; color: #374151; }
+  .ac-au   { background: #0d2050; color: #93c5fd; }
+  .ac-int  { background: #0d2820; color: #4ade80; }
+  .ac-fi   { background: #1e1800; color: #fcd34d; }
+  .ac-prop { background: #2a0a20; color: #f9a8d4; }
+  .ac-com  { background: #1e1600; color: #fde68a; }
+  .ac-div  { background: #121840; color: #a5b4fc; }
+  .ac-alt  { background: #142030; color: #94a3b8; }
 
   /* Table rows */
-  #etf-table tr { border-bottom: 1px solid #f1f5f9; transition: background .1s; }
-  #etf-table tr:hover { background: #eff6ff; }
-  #etf-table tr.row-selected { background: #dbeafe; }
+  #etf-table tr { border-bottom: 1px solid #1e3860; transition: background .1s; }
+  #etf-table tr:hover { background: #142850 !important; }
+  #etf-table tr.row-selected { background: #1a3a6b !important; }
 
   /* Detail tabs */
-  .dtab { color: #9ca3af; padding-bottom: 10px; font-weight: 500; transition: color .15s; border-bottom: 2px solid transparent; }
-  .dtab:hover { color: #2563eb; }
-  .tab-active { color: #2563eb !important; border-bottom-color: #2563eb; }
+  .dtab { color: #4a6fa5; padding-bottom: 10px; font-weight: 500; transition: color .15s; border-bottom: 2px solid transparent; }
+  .dtab:hover { color: #60a5fa; }
+  .tab-active { color: #3b82f6 !important; border-bottom-color: #3b82f6; }
 
   /* Search dropdown */
   #search-results { position: absolute; z-index: 50; top: calc(100% + 6px); left: 0; right: 0; }
+  #search-results .bg-white { background: #0f2040 !important; }
 
   /* Spinner */
-  .spinner { border: 3px solid #e5e7eb; border-top-color: #2563eb; border-radius: 50%;
+  .spinner { border: 3px solid #1e3860; border-top-color: #3b82f6; border-radius: 50%;
              width: 28px; height: 28px; animation: spin .7s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -1911,24 +1985,27 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
 
   /* Scrollbar */
   ::-webkit-scrollbar { width: 5px; height: 5px; }
-  ::-webkit-scrollbar-track { background: #f8fafc; }
-  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+  ::-webkit-scrollbar-track { background: #0a1628; }
+  ::-webkit-scrollbar-thumb { background: #1e3860; border-radius: 4px; }
 
   /* Stat card hover lift */
   .stat-card { transition: transform .15s, box-shadow .15s; }
-  .stat-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,.08); }
+  .stat-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,.4); }
 
   /* Main view tabs */
-  .main-tab { color: #6b7280; padding: 10px 0; font-weight: 500; transition: color .15s;
+  .main-tab { color: #4a6fa5; padding: 10px 0; font-weight: 500; transition: color .15s;
               border-bottom: 2px solid transparent; white-space: nowrap; }
-  .main-tab:hover { color: #2563eb; }
-  .main-tab.active { color: #2563eb; border-bottom-color: #2563eb; }
+  .main-tab:hover { color: #60a5fa; }
+  .main-tab.active { color: #3b82f6; border-bottom-color: #3b82f6; }
+
+  /* Tab bar background */
+  .border-b { border-color: #1e3860 !important; }
 
   /* Screener */
   .sc-check-list { max-height: 130px; overflow-y: auto; }
   .sc-check-list label { display: flex; align-items: center; gap: 6px; padding: 3px 0;
-                         cursor: pointer; font-size: .8125rem; color: #374151; }
-  .sc-check-list label:hover { color: #2563eb; }
+                         cursor: pointer; font-size: .8125rem; color: #7fa3c8; }
+  .sc-check-list label:hover { color: #60a5fa; }
 
   /* Compare mini-bars */
   .cmp-bar-wrap { display: flex; align-items: center; gap: 4px; }
@@ -1936,22 +2013,36 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
   .cmp-bar-neg { background: #ef4444; }
 
   /* Screener table rows */
-  #screener-table tr { border-bottom: 1px solid #f1f5f9; transition: background .1s; }
-  #screener-table tr:hover { background: #eff6ff; }
+  #screener-table tr { border-bottom: 1px solid #1e3860; transition: background .1s; }
+  #screener-table tr:hover { background: #142850 !important; }
 
   /* Holdings table */
-  #holdings-table tr { border-bottom: 1px solid #f1f5f9; }
-  #holdings-table tr:hover { background: #eff6ff; }
+  #holdings-table tr { border-bottom: 1px solid #1e3860; }
+  #holdings-table tr:hover { background: #142850 !important; }
 
   /* Data freshness tooltip trigger */
   .dated { cursor: help; }
-  .dated:hover { border-bottom: 1px dotted #94a3b8; }
+  .dated:hover { border-bottom: 1px dotted #4a6fa5; }
+
+  /* Article/content pages */
+  .prose, .prose p, .prose h2, .prose h3 { color: #e2e8f0 !important; }
+  table th { background: #0d1c35 !important; color: #7fa3c8 !important; border-color: #1e3860 !important; }
+  table td { border-color: #1e3860 !important; }
+  .chart-box { background: #0f2040; border: 1px solid #1e3860; border-radius: 8px; padding: 16px; margin: 16px 0; }
+
+  /* Positive / negative text (returns) */
+  .pos { color: #4ade80 !important; }
+  .neg { color: #f87171 !important; }
+
+  /* Buttons */
+  .bg-blue-600 { background: #2563eb !important; }
+  .bg-blue-600:hover, .hover\:bg-blue-700:hover { background: #1d4ed8 !important; }
 </style>
 </head>
-<body class="bg-slate-100 min-h-screen text-sm text-gray-800 antialiased">
+<body class="bg-[#0a1628] min-h-screen text-sm text-slate-100 antialiased">
 
 <!-- ── Header ── -->
-<header class="bg-gradient-to-r from-slate-800 to-slate-700 shadow-xl">
+<header class="bg-gradient-to-r from-[#071422] to-[#0d2860] shadow-xl">
   <div class="max-w-[1400px] mx-auto px-5 py-3 flex flex-wrap items-center gap-4">
     <div class="flex-1 min-w-[180px]">
       <h1 class="text-lg font-bold text-white tracking-tight leading-tight">
@@ -5522,19 +5613,19 @@ def _articles_head(title):
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
-  body {{ font-family: Inter, system-ui, -apple-system, sans-serif; background: #f8fafc; color: #1e293b; }}
-  article h2 {{ font-size: 1.15rem; font-weight: 700; margin: 1.5rem 0 .6rem; color: #1e293b; }}
-  article p  {{ margin-bottom: 1rem; line-height: 1.7; font-size: .9rem; color: #374151; }}
+  body {{ font-family: Inter, system-ui, -apple-system, sans-serif; background: #0a1628; color: #e2e8f0; }}
+  article h2 {{ font-size: 1.15rem; font-weight: 700; margin: 1.5rem 0 .6rem; color: #e2e8f0; }}
+  article p  {{ margin-bottom: 1rem; line-height: 1.7; font-size: .9rem; color: #7fa3c8; }}
   article table {{ width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: .82rem; }}
-  article th {{ text-align: left; padding: .4rem .7rem; background: #f1f5f9; border-bottom: 1px solid #e2e8f0;
-                font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #64748b; }}
-  article td {{ padding: .4rem .7rem; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }}
+  article th {{ text-align: left; padding: .4rem .7rem; background: #0d1c35; border-bottom: 1px solid #1e3860;
+                font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #7fa3c8; }}
+  article td {{ padding: .4rem .7rem; border-bottom: 1px solid #1e3860; vertical-align: middle; color: #e2e8f0; }}
   article tr:last-child td {{ border-bottom: none; }}
-  article tr:hover td {{ background: #f8fafc; }}
-  .pos {{ color: #16a34a; font-weight: 600; }}
-  .neg {{ color: #dc2626; font-weight: 600; }}
-  .chart-box {{ background: #fff; border: 1px solid #e2e8f0; border-radius: .75rem; padding: 1.25rem; margin: 1.5rem 0; }}
-  .chart-box h3 {{ font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #64748b; margin-bottom: .75rem; }}
+  article tr:hover td {{ background: #142850; }}
+  .pos {{ color: #4ade80; font-weight: 600; }}
+  .neg {{ color: #f87171; font-weight: 600; }}
+  .chart-box {{ background: #0f2040; border: 1px solid #1e3860; border-radius: .75rem; padding: 1.25rem; margin: 1.5rem 0; }}
+  .chart-box h3 {{ font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #7fa3c8; margin-bottom: .75rem; }}
   .chart-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1.5rem 0; }}
   @media (max-width: 640px) {{ .chart-grid {{ grid-template-columns: 1fr; }} }}
 </style>
@@ -5543,7 +5634,7 @@ def _articles_head(title):
 
 def _articles_nav(active_slug=None):
     return """
-<header class="bg-gradient-to-r from-slate-800 to-slate-700 shadow-xl">
+<header class="bg-gradient-to-r from-[#071422] to-[#0d2860] shadow-xl">
   <div class="max-w-4xl mx-auto px-5 py-3 flex items-center gap-4">
     <a href="/dashboard" class="text-white/70 hover:text-white text-sm flex items-center gap-1.5">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
@@ -5628,7 +5719,7 @@ def _handle_articles_list(self):
                            issuer_arts, cols=2)
 
     html = _articles_head('Articles') + _articles_nav() + f"""
-<body class="bg-slate-100 min-h-screen">
+<body class="bg-[#0a1628] min-h-screen">
 <main class="max-w-5xl mx-auto px-5 py-8">
   <h1 class="text-2xl font-bold text-gray-900 mb-1">Articles</h1>
   <p class="text-sm text-gray-500 mb-8">Analysis, education and issuer profiles for the Australian ETF market.</p>
@@ -5660,7 +5751,7 @@ def _handle_article_detail(self, slug):
     bg, fg = category_colors.get(a['category'], ('bg-gray-100', 'text-gray-800'))
 
     html = _articles_head(a['title']) + _articles_nav(slug) + f"""
-<body class="bg-slate-100 min-h-screen">
+<body class="bg-[#0a1628] min-h-screen">
 <main class="max-w-4xl mx-auto px-5 py-8">
   <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-7">
     <span class="inline-block {bg} {fg} text-xs font-semibold px-2 py-0.5 rounded mb-3">{a['category']}</span>
