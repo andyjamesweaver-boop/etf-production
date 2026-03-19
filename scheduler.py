@@ -48,6 +48,25 @@ def _run_pcf_job():
         logger.error(f"[scheduler] PCF job failed: {e}", exc_info=True)
 
 
+def _run_price_history_job():
+    """Update price history from Yahoo Finance (weekly, Sunday evenings)."""
+    now_sydney = datetime.now(SYDNEY).strftime("%Y-%m-%d %H:%M %Z")
+    logger.info(f"[scheduler] Price history update starting — {now_sydney}")
+    try:
+        import subprocess, sys
+        result = subprocess.run(
+            [sys.executable, "scrapers/price_history_fetcher.py", "--update"],
+            capture_output=True, text=True, timeout=1800
+        )
+        logger.info(f"[scheduler] Price history update complete — exit {result.returncode}")
+        if result.stdout:
+            logger.info(result.stdout[-2000:])
+        if result.returncode != 0 and result.stderr:
+            logger.error(result.stderr[-2000:])
+    except Exception as e:
+        logger.error(f"[scheduler] Price history update failed: {e}", exc_info=True)
+
+
 def _schedule_loop():
     """
     Convert Sydney schedule times to UTC, register jobs, then run the
@@ -76,6 +95,13 @@ def _schedule_loop():
     # Re-register at midnight UTC so any DST shift is absorbed automatically
     _register_today()
     schedule.every().day.at("00:01", "UTC").do(_register_today).tag("pcf-reregister")
+
+    # Price history: update weekly on Sunday at 18:00 Sydney (market closed)
+    from datetime import timezone as _tz
+    _ph_sydney = datetime(2000, 1, 2, 18, 0, tzinfo=SYDNEY)  # Sunday
+    _ph_utc = _ph_sydney.astimezone(_tz.utc).strftime("%H:%M")
+    schedule.every().sunday.at(_ph_utc, "UTC").do(_run_price_history_job).tag("price-history")
+    logger.info(f"[scheduler] Price history update scheduled weekly Sunday 18:00 Sydney = {_ph_utc} UTC")
 
     while True:
         schedule.run_pending()

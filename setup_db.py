@@ -17,9 +17,10 @@ DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'etf_data.db'
 
 
 def get_connection(db_path=None):
-    conn = sqlite3.connect(db_path or DB_PATH)
+    conn = sqlite3.connect(db_path or DB_PATH, timeout=30)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
+    conn.execute("PRAGMA busy_timeout=30000")
     return conn
 
 
