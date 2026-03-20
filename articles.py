@@ -22,27 +22,27 @@ ARTICLES = [
 
 <div class="chart-box">
   <h3>Weekly Return by Asset Class — Week to 16 March 2026</h3>
-  <canvas id="chart-ac-weekly" height="160"></canvas>
-  <script>
-  (function() {
-    const labels = ['Cash','Digital Assets','Alternatives','Fixed Income','Thematic','Property','Diversified','Intl Equities','Aust Equities','Commodities'];
-    const data   = [+0.1,+1.2,+0.1,-0.2,-0.5,-0.4,-0.6,-0.7,-1.4,-4.8];
-    const colors = data.map(v => v >= 0 ? '#4ade8080' : '#f8717180');
-    const borders = data.map(v => v >= 0 ? '#4ade80' : '#f87171');
-    new Chart(document.getElementById('chart-ac-weekly').getContext('2d'), {
-      type: 'bar',
-      data: { labels, datasets: [{ label: 'Return %', data, backgroundColor: colors, borderColor: borders, borderWidth: 1, borderRadius: 3, borderSkipped: false }] },
-      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.x.toFixed(1) + '%' } } },
-        scales: {
-          x: { ticks: { font: { size: 10 }, callback: v => v + '%' }, grid: { color: '#1e3860' } },
-          y: { ticks: { font: { size: 10 } }, grid: { display: false } }
-        }
-      }
-    });
-  })();
-  </script>
+  <div style="position:relative;height:240px"><canvas id="chart-ac-weekly"></canvas></div>
 </div>
+<script>
+(function() {
+  const labels = ['Cash','Digital Assets','Alternatives','Fixed Income','Thematic','Property','Diversified','Intl Equities','Aust Equities','Commodities'];
+  const data   = [+0.1,+1.2,+0.1,-0.2,-0.5,-0.4,-0.6,-0.7,-1.4,-4.8];
+  const colors = data.map(v => v >= 0 ? '#4ade8080' : '#f8717180');
+  const borders = data.map(v => v >= 0 ? '#4ade80' : '#f87171');
+  new Chart(document.getElementById('chart-ac-weekly'), {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Return %', data, backgroundColor: colors, borderColor: borders, borderWidth: 1, borderRadius: 3, borderSkipped: false }] },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.x.toFixed(1) + '%' } } },
+      scales: {
+        x: { ticks: { font: { size: 10 }, callback: v => v + '%' }, grid: { color: '#1e3860' } },
+        y: { ticks: { font: { size: 10 } }, grid: { display: false } }
+      }
+    }
+  });
+})();
+</script>
 
 <h2>The Commodity Selloff: Gold Miners' Sharpest Week in Months</h2>
 <p>Gold miners had the worst week across the entire ETF market. VanEck's GDX (Global Gold Miners) fell <strong>11.3%</strong> and BetaShares' MNRS (Global Gold Miners Currency Hedged) fell <strong>11.0%</strong>. Silver miners were worse: Global X's SLVM dropped <strong>12.2%</strong> and BetaShares' XMET (Global Uranium and Copper Miners) fell <strong>10.8%</strong>. Uranium also sold off, with URNM declining 7.2%.</p>
@@ -55,25 +55,25 @@ ARTICLES = [
 
 <div class="chart-box">
   <h3>Worst Performers — Week to 16 March (FUM ≥ $10M)</h3>
-  <canvas id="chart-bottom" height="160"></canvas>
-  <script>
-  (function() {
-    const labels = ['SLVM','GDX','MNRS','XMET','GMTL','WIRE','URNM','ETPMAG','ATOM','QAU'];
-    const data   = [-12.2,-11.3,-11.0,-10.8,-8.6,-7.8,-7.2,-7.0,-5.7,-5.0];
-    new Chart(document.getElementById('chart-bottom').getContext('2d'), {
-      type: 'bar',
-      data: { labels, datasets: [{ label: 'Return %', data, backgroundColor: '#f8717166', borderColor: '#f87171', borderWidth: 1, borderRadius: 3, borderSkipped: false }] },
-      options: { responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.y.toFixed(1) + '%' } } },
-        scales: {
-          x: { ticks: { font: { size: 10 } }, grid: { display: false } },
-          y: { ticks: { font: { size: 10 }, callback: v => v + '%' }, grid: { color: '#1e3860' } }
-        }
-      }
-    });
-  })();
-  </script>
+  <div style="position:relative;height:200px"><canvas id="chart-bottom"></canvas></div>
 </div>
+<script>
+(function() {
+  const labels = ['SLVM','GDX','MNRS','XMET','GMTL','WIRE','URNM','ETPMAG','ATOM','QAU'];
+  const data   = [-12.2,-11.3,-11.0,-10.8,-8.6,-7.8,-7.2,-7.0,-5.7,-5.0];
+  new Chart(document.getElementById('chart-bottom'), {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Return %', data, backgroundColor: '#f8717166', borderColor: '#f87171', borderWidth: 1, borderRadius: 3, borderSkipped: false }] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.y.toFixed(1) + '%' } } },
+      scales: {
+        x: { ticks: { font: { size: 10 } }, grid: { display: false } },
+        y: { ticks: { font: { size: 10 }, callback: v => v + '%' }, grid: { color: '#1e3860' } }
+      }
+    }
+  });
+})();
+</script>
 
 <h2>Asian Equities: The Week's Clear Outperformer</h2>
 <p>While commodities sold off, Asian equities were the standout positive theme. iShares' IKO (MSCI South Korea ETF) led all ETFs with FUM above $10M, rising <strong>+5.8%</strong> on the week. South Korea's equity market has been a beneficiary of renewed investor interest in AI hardware and semiconductor exposure, with Samsung Electronics and SK Hynix representing significant weights in the benchmark.</p>
