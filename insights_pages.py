@@ -78,9 +78,39 @@ const AC_COLORS = {
   'leveraged & inverse': '#ef4444', 'Currency': '#a855f7',
 };
 const ISS_COLORS = {
-  'Vanguard': '#c41230', 'BetaShares': '#e2211c', 'iShares': '#13294b',
-  'VanEck': '#f7941d', 'Global X': '#00adef', 'SPDR': '#1a9dd9',
-  'DFA': '#004b87', 'Magellan': '#b8141a', 'Perpetual': '#003087',
+  'BetaShares':                '#1b2b6b',
+  'iShares':                   '#13294b',
+  'Global X':                  '#00adef',
+  'VanEck':                    '#f7941d',
+  'Vanguard':                  '#c41230',
+  'JPMorgan':                  '#003087',
+  'StateStreet':               '#1a9dd9',
+  'SPDR':                      '#1a9dd9',
+  'Macquarie':                 '#002b5c',
+  'DFA':                       '#004b87',
+  'Magellan':                  '#b8141a',
+  'Russell Investments':       '#007dc5',
+  'Fidelity':                  '#4caf50',
+  'Schroders':                 '#00429c',
+  'PIMCO':                     '#00a0af',
+  'Janus Henderson':           '#cc3300',
+  'Franklin Templeton':        '#af1f24',
+  'ClearBridge / Franklin Templeton': '#af1f24',
+  'Perpetual':                 '#5b0c8f',
+  'JPMAM / Perpetual':         '#5b0c8f',
+  'Coolabah':                  '#0d6efd',
+  'Hyperion / Pinnacle':       '#7c3aed',
+  'Hyperion':                  '#7c3aed',
+  'Resolution / Pinnacle':     '#0891b2',
+  'The Perth Mint':            '#d4a017',
+  'Hejaz / EQT':               '#2e7d32',
+  'InvestSMART':               '#e65100',
+  'Australian Ethical':        '#388e3c',
+  'Platinum':                  '#7b1fa2',
+  'Monochrome':                '#212121',
+  'Munro / GSFM':              '#00695c',
+  'Ausbil':                    '#0277bd',
+  'Avantis':                   '#558b2f',
 };
 function acColor(n) { return AC_COLORS[n] || '#94a3b8'; }
 function issColor(n) { return ISS_COLORS[n] || '#64748b'; }
@@ -310,6 +340,8 @@ const PALETTES = {
 };
 const FALLBACK_COLORS = ['#3b82f6','#8b5cf6','#f59e0b','#10b981','#ef4444','#f97316','#06b6d4','#ec4899','#6366f1','#84cc16','#a855f7','#14b8a6'];
 function dimColor(dim, val, i) {
+  if (dim === 'issuer') return issColor(val);
+  if (dim === 'asset_class') return acColor(val);
   return (PALETTES[dim] && PALETTES[dim][val]) ? PALETTES[dim][val] : FALLBACK_COLORS[i % FALLBACK_COLORS.length];
 }
 """

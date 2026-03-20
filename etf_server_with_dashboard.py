@@ -1349,8 +1349,25 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
     # ----- Insights: listings history -----
     def handle_insights_listings(self):
         import re as _re
-        def year_from(d):
+        from datetime import datetime as _dt
+
+        _DATE_FMTS = ('%Y-%m-%d', '%d %b %Y', '%d-%b-%Y', '%d-%b-%y',
+                      '%d/%m/%Y', '%d/%m/%y', '%b %d, %Y')
+
+        def parse_iso(d):
+            """Return YYYY-MM-DD string or None; handles all stored date formats."""
             if not d: return None
+            s = str(d).strip()
+            for fmt in _DATE_FMTS:
+                try:
+                    return _dt.strptime(s, fmt).strftime('%Y-%m-%d')
+                except ValueError:
+                    pass
+            return None
+
+        def year_from(d):
+            iso = parse_iso(d)
+            if iso: return iso[:4]
             m = _re.search(r'\b(20\d{2}|199\d)\b', str(d))
             return m.group(1) if m else None
 
@@ -1360,9 +1377,9 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
                 "SELECT code, name, issuer, asset_class, exchange, inception_date, fund_type FROM etfs"
             ).fetchall()
 
-            # Recent / oldest — sort lexicographically (ISO dates sort correctly)
-            dated = [r for r in all_etfs if r['inception_date']]
-            dated_sorted = sorted(dated, key=lambda r: str(r['inception_date']))
+            # Recent / oldest — parse all dates to ISO so sort is correct regardless of stored format
+            dated = [(r, parse_iso(r['inception_date'])) for r in all_etfs if parse_iso(r['inception_date'])]
+            dated_sorted = [r for r, _ in sorted(dated, key=lambda x: x[1])]
 
             # Build per-ETF list with year for client-side slicing
             etf_list = []
@@ -1401,10 +1418,15 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
             fund_types = sorted({r['fund_type'] for r in all_etfs if r['fund_type']})
             asset_classes = sorted({r['asset_class'] for r in all_etfs if r['asset_class']})
 
+            def to_dict_norm(r):
+                d = dict(r)
+                d['inception_date'] = parse_iso(d.get('inception_date')) or d.get('inception_date')
+                return d
+
             self.send_json({
                 'total': len(all_etfs),
-                'recent': [dict(r) for r in reversed(dated_sorted[-30:])],
-                'oldest': [dict(r) for r in dated_sorted[:30]],
+                'recent': [to_dict_norm(r) for r in reversed(dated_sorted[-30:])],
+                'oldest': [to_dict_norm(r) for r in dated_sorted[:30]],
                 'etf_list': etf_list,
                 'by_issuer':      [dict(r) for r in by_issuer],
                 'by_asset_class': [dict(r) for r in by_ac],
