@@ -68,22 +68,23 @@ def build_master_list(db_path=None) -> int:
 
     # ── Sync units_on_issue from etp_monthly ──────────────────────────────────
     # For every ETF, take the most-recent etp_monthly row and propagate
-    # total_units → etfs.units_on_issue where it is currently missing.
+    # chess_units → etfs.units_on_issue where it is currently missing.
+    # chess_units pairs correctly with chess_mc (CHESS settlement figures).
     # Also fill fund_size_aud_millions from chess_mc where FUM is absent.
     conn.execute('''
         UPDATE etfs
         SET units_on_issue = (
-            SELECT CAST(m.total_units AS INTEGER)
+            SELECT CAST(m.chess_units AS INTEGER)
             FROM etp_monthly m
             WHERE m.code = etfs.code
-              AND m.total_units IS NOT NULL
+              AND m.chess_units IS NOT NULL
             ORDER BY m.date DESC
             LIMIT 1
         )
         WHERE units_on_issue IS NULL
           AND EXISTS (
             SELECT 1 FROM etp_monthly m
-            WHERE m.code = etfs.code AND m.total_units IS NOT NULL
+            WHERE m.code = etfs.code AND m.chess_units IS NOT NULL
           )
     ''')
     conn.execute('''
@@ -105,7 +106,7 @@ def build_master_list(db_path=None) -> int:
     synced = conn.execute(
         "SELECT COUNT(*) FROM etfs WHERE units_on_issue IS NOT NULL"
     ).fetchone()[0]
-    logger.info(f"Master list: {synced} ETFs have units_on_issue after etp_monthly sync")
+    logger.info(f"Master list: {synced} ETFs have units_on_issue after chess_units sync")
 
     # ── Estimate units for ETFs still missing (CXA / newer listings) ─────────
     # Derive units_on_issue = fund_size_aud_millions * 1e6 / current_price
@@ -125,7 +126,7 @@ def build_master_list(db_path=None) -> int:
         WHERE units_on_issue IS NOT NULL
           AND NOT EXISTS (
             SELECT 1 FROM etp_monthly m
-            WHERE m.code = etfs.code AND m.total_units IS NOT NULL
+            WHERE m.code = etfs.code AND m.chess_units IS NOT NULL
           )
           AND fund_size_aud_millions IS NOT NULL
     ''').fetchone()[0]
