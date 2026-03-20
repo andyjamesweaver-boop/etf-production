@@ -1642,16 +1642,525 @@ PAGE_UPCOMING = _page(
 
 
 # ---------------------------------------------------------------------------
+# ASSET CLASS ANALYSER PAGE
+# ---------------------------------------------------------------------------
+_AC_BODY = """
+<div id="lens-tabs" class="flex gap-2 flex-wrap mb-5">
+  <button data-lens="asset"   class="lens-btn active-lens px-4 py-2 rounded-lg text-sm font-semibold border transition-colors">Asset Classes</button>
+  <button data-lens="sector"  class="lens-btn px-4 py-2 rounded-lg text-sm font-semibold border transition-colors">GICS Sectors</button>
+  <button data-lens="country" class="lens-btn px-4 py-2 rounded-lg text-sm font-semibold border transition-colors">Geography</button>
+  <button data-lens="factor"  class="lens-btn px-4 py-2 rounded-lg text-sm font-semibold border transition-colors">Factors</button>
+</div>
+
+<!-- LENS: Asset Classes -->
+<div id="lens-asset">
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+    <div class="card lg:col-span-2">
+      <h2 class="font-semibold text-sm text-slate-300 mb-3">Market AUM by Asset Class</h2>
+      <div style="position:relative;height:320px"><canvas id="ac-fum-chart"></canvas></div>
+    </div>
+    <div class="card">
+      <h2 class="font-semibold text-sm text-slate-300 mb-3">1Y Return by Asset Class</h2>
+      <div style="position:relative;height:320px"><canvas id="ac-ret-chart"></canvas></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+      <h2 class="font-semibold text-sm text-slate-300" id="ac-drill-title">Click an asset class above to drill into sub-categories</h2>
+      <button id="ac-clear" class="text-xs text-blue-400 hover:text-blue-300 hidden">← All classes</button>
+    </div>
+    <div id="ac-subcats" class="mb-4"></div>
+    <div class="overflow-x-auto">
+      <table>
+        <thead><tr>
+          <th>Code</th><th>Fund Name</th><th>Issuer</th><th>Sub-Category</th>
+          <th style="text-align:right">FUM</th>
+          <th style="text-align:right">1Y</th><th style="text-align:right">3Y</th><th style="text-align:right">5Y</th>
+          <th style="text-align:right">MER</th>
+        </tr></thead>
+        <tbody id="ac-etf-table"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- LENS: GICS Sectors -->
+<div id="lens-sector" class="hidden">
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+    <div class="card lg:col-span-2">
+      <h2 class="font-semibold text-sm text-slate-300 mb-1">Market Exposure by GICS Sector</h2>
+      <p class="text-xs text-slate-500 mb-3">FUM-weighted sector allocation across all ETFs with holdings data. Click a sector to see which ETFs offer the most targeted exposure.</p>
+      <div style="position:relative;height:420px"><canvas id="sector-chart"></canvas></div>
+    </div>
+    <div class="card">
+      <h2 class="font-semibold text-sm text-slate-300 mb-1" id="sector-drill-title">Select a sector →</h2>
+      <p class="text-xs text-slate-500 mb-3">ETFs with highest allocation to selected sector</p>
+      <div id="sector-etf-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- LENS: Geography -->
+<div id="lens-country" class="hidden">
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+    <div class="card lg:col-span-2">
+      <h2 class="font-semibold text-sm text-slate-300 mb-1">Geographic Exposure — FUM-Weighted</h2>
+      <p class="text-xs text-slate-500 mb-3">Aggregated country weights across all ETFs with holdings data, weighted by FUM. Click a country to see targeted ETFs.</p>
+      <div style="position:relative;height:480px"><canvas id="country-chart"></canvas></div>
+    </div>
+    <div class="card">
+      <h2 class="font-semibold text-sm text-slate-300 mb-1" id="country-drill-title">Select a country →</h2>
+      <p class="text-xs text-slate-500 mb-3">ETFs with highest allocation to selected country</p>
+      <div id="country-etf-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- LENS: Factors -->
+<div id="lens-factor" class="hidden">
+  <div id="factor-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-5"></div>
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+    <div class="card">
+      <h2 class="font-semibold text-sm text-slate-300 mb-3">Factor Return Comparison</h2>
+      <div style="position:relative;height:280px"><canvas id="factor-ret-chart"></canvas></div>
+    </div>
+    <div class="card">
+      <h2 class="font-semibold text-sm text-slate-300 mb-1" id="factor-table-title">Factor ETF List</h2>
+      <p class="text-xs text-slate-500 mb-3" id="factor-table-sub">Click a factor card to filter</p>
+      <div class="overflow-x-auto" style="max-height:260px;overflow-y:auto">
+        <table>
+          <thead><tr><th>Code</th><th>Name</th><th>FUM</th><th>1Y</th><th>3Y</th><th>MER</th></tr></thead>
+          <tbody id="factor-etf-table"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+"""
+
+_AC_JS = """
+let _d = null;
+let _acChart = null, _acRetChart = null, _sectorChart = null, _countryChart = null, _factorChart = null;
+let _activeLens = 'asset';
+let _activeAC = null;
+let _activeSector = null;
+let _activeCountry = null;
+let _activeFactor = null;
+
+// ── Lens styles ────────────────────────────────────────────────────────────
+const LENS_BTN_BASE   = 'lens-btn px-4 py-2 rounded-lg text-sm font-semibold border transition-colors';
+const LENS_BTN_ACTIVE = 'bg-blue-600 border-blue-600 text-white';
+const LENS_BTN_IDLE   = 'bg-[#0f2040] border-[#1e3860] text-slate-300 hover:border-blue-500/60';
+
+// ── Factor definitions (Fama-French inspired) ──────────────────────────────
+const FACTORS = [
+  { id:'market',    label:'Market (Beta)',    color:'#3b82f6',
+    test: e => /broad market|developed markets|us market|global shares|world shares|all ordinaries|s&p 500|asx 200|asx 300/i.test((e.sub_category||'')+(e.name||'')+(e.benchmark||'')) && !/factor|quality|value|momentum|dividend|income|small|growth|esg|responsible|low.vol/i.test((e.sub_category||'')+(e.name||'')) },
+  { id:'quality',   label:'Quality',          color:'#10b981',
+    test: e => /quality/i.test((e.sub_category||'')+(e.name||'')) },
+  { id:'value',     label:'Value',            color:'#f59e0b',
+    test: e => /factor.*value|value.*factor|value equity|value etf/i.test((e.sub_category||'')+(e.name||'')) && !/quality|momentum/i.test(e.name||'') },
+  { id:'momentum',  label:'Momentum',         color:'#ef4444',
+    test: e => /momentum/i.test((e.sub_category||'')+(e.name||'')) },
+  { id:'dividend',  label:'Dividend/Income',  color:'#f97316',
+    test: e => /dividend|income|high yield|hyield|harvester/i.test((e.sub_category||'')+(e.name||'')) && !/bond|fixed|credit|hybrid|subordinated/i.test(e.name||'') },
+  { id:'smallcap',  label:'Small Cap',        color:'#8b5cf6',
+    test: e => /small.cap|small.*mid|smid|small companies|smaller companies/i.test((e.sub_category||'')+(e.name||'')) },
+  { id:'growth',    label:'Growth',           color:'#06b6d4',
+    test: e => /growth/i.test((e.sub_category||'')+(e.name||'')) && !/dividend|income|value/i.test(e.name||'') && !/diversified/i.test(e.sub_category||'') },
+  { id:'esg',       label:'ESG',              color:'#84cc16',
+    test: e => /esg|responsible|sustain|ethical|environmental|carbon|climate|green/i.test((e.sub_category||'')+(e.name||'')) },
+  { id:'lowvol',    label:'Low Volatility',   color:'#a855f7',
+    test: e => /low.vol|min.vol|minimum.vol|defensive|managed.risk/i.test((e.sub_category||'')+(e.name||'')) },
+  { id:'emerging',  label:'Emerging Markets', color:'#14b8a6',
+    test: e => /emerging/i.test((e.sub_category||'')+(e.name||'')) },
+  { id:'hedged',    label:'Currency Hedged',  color:'#ec4899',
+    test: e => /hedged|currency.hedged|aud.hedged/i.test(e.name||'') && !/unhedged/i.test(e.name||'') && (e.asset_class||'').includes('Equities') },
+  { id:'sector',    label:'Sector ETFs',      color:'#6366f1',
+    test: e => /sector/i.test(e.sub_category||'') },
+];
+
+function assignFactor(e) {
+  for (const f of FACTORS) { if (f.test(e)) return f.id; }
+  return null;
+}
+
+// ── Colour helpers ─────────────────────────────────────────────────────────
+const AC_PALETTE = {
+  'International Equities':'#3b82f6','Australian Equities':'#10b981',
+  'Fixed Income':'#f59e0b','Commodities':'#f97316','Property':'#8b5cf6',
+  'Diversified':'#06b6d4','Cash':'#84cc16','Thematic':'#ec4899',
+  'Alternatives':'#6366f1','Digital Assets':'#14b8a6','Currency':'#a855f7',
+};
+const GICS_PALETTE = {
+  'Information Technology':'#3b82f6','Financials':'#10b981','Health Care':'#f59e0b',
+  'Consumer Discretionary':'#ef4444','Industrials':'#f97316','Energy':'#8b5cf6',
+  'Communication Services':'#06b6d4','Consumer Staples':'#84cc16','Materials':'#a855f7',
+  'Real Estate':'#ec4899','Utilities':'#14b8a6',
+};
+function acColor(n)     { return AC_PALETTE[n]   || '#64748b'; }
+function gicsColor(n)   { return GICS_PALETTE[n] || '#64748b'; }
+function retColor(v)    { return v == null ? '#64748b' : v >= 0 ? '#4ade80' : '#f87171'; }
+function factorColor(id){ return (FACTORS.find(f=>f.id===id)||{}).color || '#64748b'; }
+
+// ── Init ───────────────────────────────────────────────────────────────────
+async function init() {
+  _d = await api('/api/v1/insights/asset-classes');
+  document.getElementById('ts').textContent = new Date().toLocaleTimeString('en-AU');
+
+  // Lens buttons
+  document.getElementById('lens-tabs').addEventListener('click', e => {
+    const btn = e.target.closest('.lens-btn');
+    if (!btn) return;
+    _activeLens = btn.dataset.lens;
+    document.querySelectorAll('.lens-btn').forEach(b => {
+      b.className = LENS_BTN_BASE + ' ' + (b.dataset.lens === _activeLens ? LENS_BTN_ACTIVE : LENS_BTN_IDLE);
+    });
+    ['asset','sector','country','factor'].forEach(l => {
+      document.getElementById('lens-'+l).classList.toggle('hidden', l !== _activeLens);
+    });
+    if (_activeLens === 'asset'   && !_acChart)      renderAssetLens();
+    if (_activeLens === 'sector'  && !_sectorChart)  renderSectorLens();
+    if (_activeLens === 'country' && !_countryChart) renderCountryLens();
+    if (_activeLens === 'factor'  && !_factorChart)  renderFactorLens();
+  });
+  // set initial btn styles
+  document.querySelectorAll('.lens-btn').forEach(b => {
+    b.className = LENS_BTN_BASE + ' ' + (b.dataset.lens === 'asset' ? LENS_BTN_ACTIVE : LENS_BTN_IDLE);
+  });
+
+  renderAssetLens();
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// LENS 1: ASSET CLASSES
+// ─────────────────────────────────────────────────────────────────────────
+function renderAssetLens() {
+  // Aggregate by top-level asset class
+  const acMap = {};
+  _d.by_asset_class.forEach(r => {
+    if (!acMap[r.asset_class]) acMap[r.asset_class] = { fum:0, etf_count:0, ret_sum:0, ret_n:0 };
+    acMap[r.asset_class].fum       += r.total_fum || 0;
+    acMap[r.asset_class].etf_count += r.etf_count;
+    if (r.avg_1y != null) { acMap[r.asset_class].ret_sum += r.avg_1y * r.etf_count; acMap[r.asset_class].ret_n += r.etf_count; }
+  });
+  const acs = Object.entries(acMap).map(([k,v]) => ({
+    name: k, fum: v.fum, etf_count: v.etf_count,
+    avg_1y: v.ret_n ? v.ret_sum / v.ret_n : null,
+  })).sort((a,b) => b.fum - a.fum);
+
+  // FUM chart
+  const ctx1 = document.getElementById('ac-fum-chart').getContext('2d');
+  if (_acChart) _acChart.destroy();
+  _acChart = new Chart(ctx1, {
+    type: 'bar',
+    data: {
+      labels: acs.map(a => a.name),
+      datasets: [{ label: 'FUM ($M)', data: acs.map(a => a.fum),
+        backgroundColor: acs.map(a => (_activeAC === a.name ? acColor(a.name) : acColor(a.name)+'99')),
+        borderColor: acs.map(a => acColor(a.name)), borderWidth: 1, borderRadius: 4 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend:{display:false}, tooltip:{ callbacks:{ label: c => fmtFum(c.raw) } } },
+      scales: {
+        x: { ticks:{ font:{size:9}, maxRotation:35 }, grid:{display:false} },
+        y: { ticks:{ font:{size:10}, callback: v => fmtFum(v) }, grid:{color:'#1e3860'} }
+      },
+      onClick: (_, els) => { if (els[0]) drillAssetClass(acs[els[0].index].name); }
+    }
+  });
+
+  // Return chart
+  const ctx2 = document.getElementById('ac-ret-chart').getContext('2d');
+  if (_acRetChart) _acRetChart.destroy();
+  _acRetChart = new Chart(ctx2, {
+    type: 'bar',
+    data: {
+      labels: acs.map(a=>a.name),
+      datasets:[{ label:'Avg 1Y Return', data: acs.map(a=>a.avg_1y),
+        backgroundColor: acs.map(a => a.avg_1y >= 0 ? '#4ade8066' : '#f8717166'),
+        borderColor: acs.map(a => a.avg_1y >= 0 ? '#4ade80' : '#f87171'),
+        borderWidth:1, borderRadius:4 }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false, indexAxis:'y',
+      plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>c.parsed.x != null ? c.parsed.x.toFixed(1)+'%' : '—'}}},
+      scales:{
+        x:{ticks:{font:{size:10},callback:v=>v+'%'}, grid:{color:'#1e3860'}},
+        y:{ticks:{font:{size:9}}, grid:{display:false}}
+      }
+    }
+  });
+
+  renderACTable(null);
+}
+
+function drillAssetClass(ac) {
+  _activeAC = ac;
+  document.getElementById('ac-drill-title').textContent = ac + ' — Sub-categories';
+  document.getElementById('ac-clear').classList.remove('hidden');
+  renderACSubcats(ac);
+  renderACTable(ac);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('ac-clear').addEventListener('click', () => {
+    _activeAC = null;
+    document.getElementById('ac-drill-title').textContent = 'Click an asset class above to drill into sub-categories';
+    document.getElementById('ac-clear').classList.add('hidden');
+    document.getElementById('ac-subcats').innerHTML = '';
+    renderACTable(null);
+  });
+});
+
+function renderACSubcats(ac) {
+  const subs = _d.by_asset_class.filter(r => r.asset_class === ac && r.sub_category);
+  const maxFum = Math.max(...subs.map(s => s.total_fum || 0), 1);
+  document.getElementById('ac-subcats').innerHTML = subs.length
+    ? `<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">${
+        subs.map(s => `<div class="border border-[#1e3860] rounded-lg p-3 bg-[#0d1c35] cursor-pointer hover:border-blue-500/60"
+          onclick="renderACTable('${ac}','${(s.sub_category||'').replace(/'/g,"\\'")}')">
+          <div class="text-xs text-slate-400 font-medium mb-1 truncate" title="${s.sub_category||''}">${s.sub_category||'—'}</div>
+          <div class="text-base font-bold text-slate-100">${fmtFum(s.total_fum)}</div>
+          <div class="flex items-center gap-2 mt-1">
+            <span class="text-xs text-slate-500">${s.etf_count} ETFs</span>
+            ${s.avg_1y != null ? `<span class="text-xs font-semibold ${s.avg_1y>=0?'text-green-400':'text-red-400'}">${s.avg_1y>=0?'+':''}${s.avg_1y.toFixed(1)}%</span>` : ''}
+          </div>
+          <div class="bar-track mt-2"><div class="bar-fill" style="width:${Math.min(s.total_fum/maxFum*100,100).toFixed(1)}%;background:${acColor(ac)}"></div></div>
+        </div>`).join('')
+      }</div>` : '';
+}
+
+function renderACTable(ac, subcat) {
+  let etfs = _d.etf_list;
+  if (ac)     etfs = etfs.filter(e => e.asset_class === ac);
+  if (subcat) etfs = etfs.filter(e => e.sub_category === subcat);
+  etfs = etfs.slice(0, 50);
+  document.getElementById('ac-etf-table').innerHTML = etfs.map(e => `<tr>
+    <td class="font-bold" style="color:${acColor(e.asset_class)}">${e.code}</td>
+    <td class="text-slate-300" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.name||''}">${e.name||'—'}</td>
+    <td class="text-slate-400 text-xs">${e.issuer||'—'}</td>
+    <td class="text-slate-500 text-xs">${e.sub_category||'—'}</td>
+    <td class="text-right tabular-nums text-slate-300">${fmtFum(e.fum)}</td>
+    <td class="text-right tabular-nums text-xs ${e.return_1y>=0?'text-green-400':'text-red-400'}">${e.return_1y!=null?(e.return_1y>=0?'+':'')+e.return_1y.toFixed(1)+'%':'—'}</td>
+    <td class="text-right tabular-nums text-xs text-slate-400">${e.return_3y!=null?(e.return_3y>=0?'+':'')+e.return_3y.toFixed(1)+'%':'—'}</td>
+    <td class="text-right tabular-nums text-xs text-slate-400">${e.return_5y!=null?(e.return_5y>=0?'+':'')+e.return_5y.toFixed(1)+'%':'—'}</td>
+    <td class="text-right tabular-nums text-xs text-slate-500">${e.mer!=null?e.mer.toFixed(2)+'%':'—'}</td>
+  </tr>`).join('') || '<tr><td colspan="9" class="text-center text-slate-500 py-4">No ETFs found</td></tr>';
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// LENS 2: GICS SECTORS
+// ─────────────────────────────────────────────────────────────────────────
+function renderSectorLens() {
+  const sectors = _d.gics_sectors.slice(0, 18);
+  const ctx = document.getElementById('sector-chart').getContext('2d');
+  if (_sectorChart) _sectorChart.destroy();
+  _sectorChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: sectors.map(s => s.sector_norm),
+      datasets: [{
+        label: 'FUM-Weighted Exposure ($M)',
+        data: sectors.map(s => s.fum_weighted_m),
+        backgroundColor: sectors.map(s => gicsColor(s.sector_norm) + '99'),
+        borderColor: sectors.map(s => gicsColor(s.sector_norm)),
+        borderWidth: 1, borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+      plugins: { legend:{display:false}, tooltip:{ callbacks:{ label: c => '$' + (c.raw/1000).toFixed(1) + 'B exposure' } } },
+      scales: {
+        x: { ticks:{font:{size:10}, callback: v => '$'+(v/1000).toFixed(0)+'B'}, grid:{color:'#1e3860'} },
+        y: { ticks:{font:{size:10}}, grid:{display:false} }
+      },
+      onClick: (_, els) => { if (els[0]) drillSector(sectors[els[0].index].sector_norm); }
+    }
+  });
+}
+
+function drillSector(sector) {
+  _activeSector = sector;
+  document.getElementById('sector-drill-title').textContent = sector;
+  const etfs = (_d.sector_etfs || [])
+    .filter(r => r.sector_norm === sector)
+    .sort((a,b) => b.weight_pct - a.weight_pct)
+    .slice(0, 10);
+  document.getElementById('sector-etf-list').innerHTML = etfs.length
+    ? etfs.map(e => `<div class="flex items-center justify-between py-2 border-b border-[#1a3050] last:border-0">
+        <div class="min-w-0">
+          <span class="font-bold text-sm" style="color:${gicsColor(sector)}">${e.etf_code}</span>
+          <span class="text-xs text-slate-400 ml-2 truncate">${(e.name||'').substring(0,30)}</span>
+        </div>
+        <div class="text-right shrink-0 ml-2">
+          <div class="text-sm font-semibold text-slate-200">${e.weight_pct.toFixed(1)}%</div>
+          <div class="text-xs text-slate-500">${fmtFum(e.fum)}</div>
+        </div>
+      </div>`).join('')
+    : '<p class="text-sm text-slate-500">No data</p>';
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// LENS 3: GEOGRAPHY
+// ─────────────────────────────────────────────────────────────────────────
+function renderCountryLens() {
+  const countries = _d.countries.slice(0, 25);
+  const ctx = document.getElementById('country-chart').getContext('2d');
+  if (_countryChart) _countryChart.destroy();
+  _countryChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: countries.map(c => c.country_norm),
+      datasets: [{
+        label: 'FUM-Weighted Exposure ($M)',
+        data: countries.map(c => c.fum_weighted_m),
+        backgroundColor: '#3b82f666',
+        borderColor: '#3b82f6',
+        borderWidth: 1, borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+      plugins: { legend:{display:false}, tooltip:{ callbacks:{ label: c => '$' + (c.raw/1000).toFixed(1) + 'B exposure · ' + (_d.countries.find(x=>x.country_norm===countries[c.dataIndex].country_norm)||{}).etf_count + ' ETFs' } } },
+      scales: {
+        x: { ticks:{font:{size:10}, callback: v => '$'+(v/1000).toFixed(0)+'B'}, grid:{color:'#1e3860'} },
+        y: { ticks:{font:{size:9}}, grid:{display:false} }
+      },
+      onClick: (_, els) => { if (els[0]) drillCountry(countries[els[0].index].country_norm); }
+    }
+  });
+}
+
+function drillCountry(country) {
+  _activeCountry = country;
+  document.getElementById('country-drill-title').textContent = country;
+  const etfs = (_d.country_etfs || [])
+    .filter(r => r.country_norm === country)
+    .sort((a,b) => b.total_weight_pct - a.total_weight_pct)
+    .slice(0, 10);
+  document.getElementById('country-etf-list').innerHTML = etfs.length
+    ? etfs.map(e => `<div class="flex items-center justify-between py-2 border-b border-[#1a3050] last:border-0">
+        <div class="min-w-0">
+          <span class="font-bold text-sm text-blue-400">${e.etf_code}</span>
+          <span class="text-xs text-slate-400 ml-2 truncate">${(e.name||'').substring(0,28)}</span>
+        </div>
+        <div class="text-right shrink-0 ml-2">
+          <div class="text-sm font-semibold text-slate-200">${e.total_weight_pct.toFixed(1)}%</div>
+          <div class="text-xs text-slate-500">${fmtFum(e.fum)}</div>
+        </div>
+      </div>`).join('')
+    : '<p class="text-sm text-slate-500">No data for this country</p>';
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// LENS 4: FACTORS (Fama-French inspired)
+// ─────────────────────────────────────────────────────────────────────────
+function renderFactorLens() {
+  // Assign each ETF to a factor
+  const factorMap = {};
+  FACTORS.forEach(f => { factorMap[f.id] = { etfs:[], fum:0, r1:[], r3:[], r5:[] }; });
+
+  _d.etf_list.forEach(e => {
+    const fid = assignFactor(e);
+    if (!fid || !factorMap[fid]) return;
+    const fm = factorMap[fid];
+    fm.etfs.push(e);
+    fm.fum += e.fum || 0;
+    if (e.return_1y != null) fm.r1.push(e.return_1y);
+    if (e.return_3y != null) fm.r3.push(e.return_3y);
+    if (e.return_5y != null) fm.r5.push(e.return_5y);
+  });
+
+  const avg = arr => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : null;
+
+  // Factor cards
+  document.getElementById('factor-grid').innerHTML = FACTORS.map(f => {
+    const fm = factorMap[f.id];
+    const r1 = avg(fm.r1);
+    return `<div class="card cursor-pointer hover:border-blue-500/60 transition-colors factor-card" data-factor="${f.id}"
+        style="border-color:${f.color}30" onclick="drillFactor('${f.id}')">
+      <div class="text-xs font-bold uppercase tracking-wider mb-2" style="color:${f.color}">${f.label}</div>
+      <div class="text-2xl font-bold text-slate-100">${fm.etfs.length}</div>
+      <div class="text-xs text-slate-500 mb-2">ETFs · ${fmtFum(fm.fum)}</div>
+      <div class="text-lg font-semibold ${r1==null?'text-slate-500':r1>=0?'text-green-400':'text-red-400'}">${r1!=null?(r1>=0?'+':'')+r1.toFixed(1)+'%':'—'}</div>
+      <div class="text-xs text-slate-500">avg 1Y return</div>
+    </div>`;
+  }).join('');
+
+  // Factor comparison bar chart
+  const labels = FACTORS.map(f => f.label);
+  const r1data = FACTORS.map(f => avg(factorMap[f.id].r1));
+  const r3data = FACTORS.map(f => avg(factorMap[f.id].r3));
+  const ctx = document.getElementById('factor-ret-chart').getContext('2d');
+  if (_factorChart) _factorChart.destroy();
+  _factorChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: '1Y Return', data: r1data, backgroundColor: FACTORS.map(f=>f.color+'99'), borderColor: FACTORS.map(f=>f.color), borderWidth:1, borderRadius:3 },
+        { label: '3Y Return (ann.)', data: r3data, backgroundColor: '#ffffff22', borderColor: '#ffffff44', borderWidth:1, borderRadius:3 },
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{position:'bottom',labels:{font:{size:10},boxWidth:12}}, tooltip:{callbacks:{label:c=>c.dataset.label+': '+(c.parsed.y!=null?(c.parsed.y>=0?'+':'')+c.parsed.y.toFixed(1)+'%':'—')}}},
+      scales:{
+        x:{ticks:{font:{size:8},maxRotation:35},grid:{display:false}},
+        y:{ticks:{font:{size:10},callback:v=>v+'%'},grid:{color:'#1e3860'}}
+      },
+      onClick:(_, els) => { if(els[0]) drillFactor(FACTORS[els[0].index].id); }
+    }
+  });
+
+  drillFactor('quality');
+}
+
+function drillFactor(fid) {
+  _activeFactor = fid;
+  const f = FACTORS.find(x => x.id === fid);
+  document.querySelectorAll('.factor-card').forEach(c => {
+    c.style.borderColor = c.dataset.factor === fid ? (f.color) : (FACTORS.find(x=>x.id===c.dataset.factor)||{}).color + '30';
+  });
+  const factorMap = {};
+  FACTORS.forEach(ff => { factorMap[ff.id] = []; });
+  _d.etf_list.forEach(e => { const fid2 = assignFactor(e); if (fid2 && factorMap[fid2]) factorMap[fid2].push(e); });
+  const etfs = (factorMap[fid]||[]).sort((a,b)=>(b.fum||0)-(a.fum||0));
+  document.getElementById('factor-table-title').textContent = f ? f.label + ' ETFs' : 'Factor ETFs';
+  document.getElementById('factor-table-sub').textContent = etfs.length + ' ETFs matched';
+  document.getElementById('factor-etf-table').innerHTML = etfs.slice(0,40).map(e=>`<tr>
+    <td class="font-bold text-xs" style="color:${f.color}">${e.code}</td>
+    <td class="text-slate-300 text-xs" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.name||'—'}</td>
+    <td class="text-right tabular-nums text-xs text-slate-300">${fmtFum(e.fum)}</td>
+    <td class="text-right tabular-nums text-xs ${e.return_1y>=0?'text-green-400':'text-red-400'}">${e.return_1y!=null?(e.return_1y>=0?'+':'')+e.return_1y.toFixed(1)+'%':'—'}</td>
+    <td class="text-right tabular-nums text-xs text-slate-400">${e.return_3y!=null?(e.return_3y>=0?'+':'')+e.return_3y.toFixed(1)+'%':'—'}</td>
+    <td class="text-right tabular-nums text-xs text-slate-500">${e.mer!=null?e.mer.toFixed(2)+'%':'—'}</td>
+  </tr>`).join('') || '<tr><td colspan="6" class="text-center text-slate-500 py-3">No ETFs matched</td></tr>';
+}
+"""
+
+PAGE_ASSET_CLASSES = _page(
+    'Asset Class Analyser',
+    'Drill into GICS sectors, geography, and Fama-French factors across the Australian ETF market',
+    _AC_BODY,
+    _AC_JS,
+)
+
+
+# ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
 PAGES = {
-    'fum':      PAGE_FUM,
-    'listings': PAGE_LISTINGS,
-    'returns':  PAGE_RETURNS,
-    'expense':  PAGE_EXPENSE,
-    'issuers':  PAGE_ISSUERS,
-    'nav':      PAGE_NAV,
-    'upcoming': PAGE_UPCOMING,
+    'fum':           PAGE_FUM,
+    'listings':      PAGE_LISTINGS,
+    'returns':       PAGE_RETURNS,
+    'expense':       PAGE_EXPENSE,
+    'issuers':       PAGE_ISSUERS,
+    'nav':           PAGE_NAV,
+    'upcoming':      PAGE_UPCOMING,
+    'asset-classes': PAGE_ASSET_CLASSES,
 }
 
 def get_insights_page(name: str) -> str | None:

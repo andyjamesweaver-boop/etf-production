@@ -97,8 +97,9 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
             '/api/v1/insights/returns':  self.handle_insights_returns,
             '/api/v1/insights/expense':  self.handle_insights_expense,
             '/api/v1/insights/issuers':  self.handle_insights_issuers,
-            '/api/v1/insights/nav':      self.handle_insights_nav,
-            '/api/v1/insights/upcoming': self.handle_insights_upcoming,
+            '/api/v1/insights/nav':          self.handle_insights_nav,
+            '/api/v1/insights/upcoming':     self.handle_insights_upcoming,
+            '/api/v1/insights/asset-classes': self.handle_insights_asset_classes,
             # Insights pages
             '/insights/fum':      lambda: self.handle_insights_page('fum'),
             '/insights/listings': lambda: self.handle_insights_page('listings'),
@@ -106,7 +107,8 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
             '/insights/expense':  lambda: self.handle_insights_page('expense'),
             '/insights/issuers':  lambda: self.handle_insights_page('issuers'),
             '/insights/nav':      lambda: self.handle_insights_page('nav'),
-            '/insights/upcoming': lambda: self.handle_insights_page('upcoming'),
+            '/insights/upcoming':      lambda: self.handle_insights_page('upcoming'),
+            '/insights/asset-classes': lambda: self.handle_insights_page('asset-classes'),
             '/admin/sync-db':     self.handle_sync_db,
             # Articles
             '/articles':          self.handle_articles_list,
@@ -1792,6 +1794,171 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
         finally:
             conn.close()
 
+    def handle_insights_asset_classes(self):
+        conn = get_db()
+        try:
+            # 1. Asset class + sub_category breakdown
+            ac_rows = conn.execute('''
+                SELECT asset_class, sub_category,
+                       COUNT(*) etf_count,
+                       ROUND(SUM(fund_size_aud_millions),1) total_fum,
+                       ROUND(AVG(return_1y),2) avg_1y,
+                       ROUND(AVG(return_3y),2) avg_3y,
+                       ROUND(AVG(return_5y),2) avg_5y,
+                       ROUND(AVG(COALESCE(expense_ratio,management_fee)),3) avg_mer,
+                       ROUND(SUM(fund_flow_1m),1) net_flow_1m
+                FROM etfs
+                WHERE asset_class IS NOT NULL AND fund_size_aud_millions > 0
+                GROUP BY asset_class, sub_category
+                ORDER BY total_fum DESC
+            ''').fetchall()
+
+            # 2. GICS sectors — FUM-weighted across market (normalised)
+            gics_rows = conn.execute("""
+                SELECT
+                    CASE s.sector
+                        WHEN 'Healthcare'             THEN 'Health Care'
+                        WHEN 'Financial'              THEN 'Financials'
+                        WHEN 'Communication'          THEN 'Communication Services'
+                        WHEN 'Communications'         THEN 'Communication Services'
+                        WHEN 'Technology'             THEN 'Information Technology'
+                        ELSE s.sector
+                    END AS sector_norm,
+                    ROUND(SUM(s.weight_pct * e.fund_size_aud_millions / 100.0),1) AS fum_weighted_m,
+                    COUNT(DISTINCT s.etf_code) AS etf_count,
+                    ROUND(AVG(e.return_1y),2) AS avg_return_1y
+                FROM etf_sectors s
+                JOIN etfs e ON e.code = s.etf_code
+                WHERE s.sector NOT IN ('Cash and/or Derivatives','Cash','Derivatives','-','ETFs','Other','Unknown')
+                  AND s.sector IS NOT NULL AND e.fund_size_aud_millions > 0
+                GROUP BY sector_norm
+                HAVING fum_weighted_m > 100
+                ORDER BY fum_weighted_m DESC
+                LIMIT 20
+            """).fetchall()
+
+            # 3. GICS sector → ETF drill (top 5 ETFs per sector by weight_pct * FUM)
+            sector_etf_rows = conn.execute("""
+                SELECT
+                    CASE s.sector
+                        WHEN 'Healthcare'   THEN 'Health Care'
+                        WHEN 'Financial'    THEN 'Financials'
+                        WHEN 'Communication' THEN 'Communication Services'
+                        WHEN 'Communications' THEN 'Communication Services'
+                        WHEN 'Technology'   THEN 'Information Technology'
+                        ELSE s.sector
+                    END AS sector_norm,
+                    s.etf_code, e.name, e.issuer,
+                    ROUND(s.weight_pct,2) AS weight_pct,
+                    ROUND(e.fund_size_aud_millions,1) AS fum,
+                    ROUND(e.return_1y,2) AS return_1y
+                FROM etf_sectors s
+                JOIN etfs e ON e.code = s.etf_code
+                WHERE s.sector NOT IN ('Cash and/or Derivatives','Cash','Derivatives','-','ETFs','Other','Unknown')
+                  AND e.fund_size_aud_millions > 50
+                ORDER BY sector_norm, s.weight_pct DESC
+            """).fetchall()
+
+            # 4. Country exposure — FUM-weighted (normalised)
+            country_rows = conn.execute("""
+                SELECT
+                    CASE h.country
+                        WHEN 'US' THEN 'United States'  WHEN 'AU' THEN 'Australia'
+                        WHEN 'GB' THEN 'United Kingdom' WHEN 'Britain' THEN 'United Kingdom'
+                        WHEN 'JP' THEN 'Japan'          WHEN 'CN' THEN 'China'
+                        WHEN 'IN' THEN 'India'          WHEN 'FR' THEN 'France'
+                        WHEN 'KR' THEN 'South Korea'    WHEN 'Korea (South)' THEN 'South Korea'
+                        WHEN 'DE' THEN 'Germany'        WHEN 'NL' THEN 'Netherlands'
+                        WHEN 'CH' THEN 'Switzerland'    WHEN 'CA' THEN 'Canada'
+                        WHEN 'HK' THEN 'Hong Kong'      WHEN 'SG' THEN 'Singapore'
+                        WHEN 'SE' THEN 'Sweden'         WHEN 'NO' THEN 'Norway'
+                        WHEN 'DK' THEN 'Denmark'        WHEN 'IT' THEN 'Italy'
+                        WHEN 'ES' THEN 'Spain'          WHEN 'TW' THEN 'Taiwan'
+                        WHEN 'IL' THEN 'Israel'         WHEN 'NZ' THEN 'New Zealand'
+                        WHEN 'FI' THEN 'Finland'        WHEN 'BE' THEN 'Belgium'
+                        WHEN 'AT' THEN 'Austria'        WHEN 'PT' THEN 'Portugal'
+                        WHEN 'ZA' THEN 'South Africa'   WHEN 'BR' THEN 'Brazil'
+                        WHEN 'MX' THEN 'Mexico'         WHEN 'TH' THEN 'Thailand'
+                        WHEN 'ID' THEN 'Indonesia'      WHEN 'MY' THEN 'Malaysia'
+                        WHEN 'PH' THEN 'Philippines'    WHEN 'PL' THEN 'Poland'
+                        WHEN 'CZ' THEN 'Czech Republic' WHEN 'GR' THEN 'Greece'
+                        ELSE h.country
+                    END AS country_norm,
+                    ROUND(SUM(h.weight_pct * e.fund_size_aud_millions / 100.0),1) AS fum_weighted_m,
+                    COUNT(DISTINCT h.etf_code) AS etf_count
+                FROM etf_holdings h
+                JOIN etfs e ON e.code = h.etf_code
+                WHERE h.country IS NOT NULL
+                  AND h.country NOT IN ('','-','Europe','Cash')
+                  AND h.country NOT LIKE '%Exchange%'
+                  AND h.country NOT LIKE '%Market%'
+                  AND h.country NOT LIKE '%NASDAQ%'
+                  AND h.country NOT LIKE '%NYSE%'
+                  AND h.country NOT LIKE '%Ireland%'
+                  AND e.fund_size_aud_millions > 0
+                GROUP BY country_norm
+                HAVING fum_weighted_m > 20
+                ORDER BY fum_weighted_m DESC
+                LIMIT 30
+            """).fetchall()
+
+            # 5. Country → ETF drill (ETFs with most exposure to each country)
+            country_etf_rows = conn.execute("""
+                SELECT
+                    CASE h.country
+                        WHEN 'US' THEN 'United States'  WHEN 'AU' THEN 'Australia'
+                        WHEN 'GB' THEN 'United Kingdom' WHEN 'Britain' THEN 'United Kingdom'
+                        WHEN 'JP' THEN 'Japan'          WHEN 'CN' THEN 'China'
+                        WHEN 'IN' THEN 'India'          WHEN 'FR' THEN 'France'
+                        WHEN 'KR' THEN 'South Korea'    WHEN 'Korea (South)' THEN 'South Korea'
+                        WHEN 'DE' THEN 'Germany'        WHEN 'NL' THEN 'Netherlands'
+                        WHEN 'CH' THEN 'Switzerland'    WHEN 'CA' THEN 'Canada'
+                        WHEN 'HK' THEN 'Hong Kong'      WHEN 'SG' THEN 'Singapore'
+                        WHEN 'TW' THEN 'Taiwan'         WHEN 'IL' THEN 'Israel'
+                        ELSE h.country
+                    END AS country_norm,
+                    h.etf_code, e.name, e.issuer,
+                    ROUND(SUM(h.weight_pct),1) AS total_weight_pct,
+                    ROUND(e.fund_size_aud_millions,1) AS fum,
+                    ROUND(e.return_1y,2) AS return_1y
+                FROM etf_holdings h
+                JOIN etfs e ON e.code = h.etf_code
+                WHERE h.country IS NOT NULL
+                  AND h.country NOT IN ('','-','Europe','Cash')
+                  AND h.country NOT LIKE '%Exchange%'
+                  AND h.country NOT LIKE '%Market%'
+                  AND e.fund_size_aud_millions > 50
+                GROUP BY country_norm, h.etf_code
+                HAVING total_weight_pct > 5
+                ORDER BY country_norm, total_weight_pct DESC
+            """).fetchall()
+
+            # 6. Full ETF list for factor lens
+            etf_list = conn.execute('''
+                SELECT code, name, issuer, asset_class, sub_category,
+                       ROUND(fund_size_aud_millions,1) fum,
+                       return_1y, return_3y, return_5y,
+                       ROUND(COALESCE(expense_ratio,management_fee),3) mer,
+                       beta, sharpe_ratio, fx_hedged, fund_flow_1m,
+                       benchmark, volatility_1y
+                FROM etfs
+                WHERE fund_size_aud_millions > 0
+                ORDER BY fund_size_aud_millions DESC
+            ''').fetchall()
+
+            self.send_json({
+                'by_asset_class': [dict(r) for r in ac_rows],
+                'gics_sectors':   [dict(r) for r in gics_rows],
+                'sector_etfs':    [dict(r) for r in sector_etf_rows],
+                'countries':      [dict(r) for r in country_rows],
+                'country_etfs':   [dict(r) for r in country_etf_rows],
+                'etf_list':       [dict(r) for r in etf_list],
+            })
+        except Exception as e:
+            self.send_json({'error': str(e)}, 500)
+        finally:
+            conn.close()
+
     def handle_insights_upcoming(self):
         conn = get_db()
         try:
@@ -3150,11 +3317,12 @@ async function loadOverview() {
 /* ======================================================= stat card navigation */
 function goCard(type) {
   switch (type) {
-    case 'fum':      window.location.href = '/insights/fum';      break;
-    case 'listings': window.location.href = '/insights/listings';  break;
-    case 'returns':  window.location.href = '/insights/returns';   break;
-    case 'expense':  window.location.href = '/insights/expense';   break;
-    case 'issuers':  window.location.href = '/insights/issuers';   break;
+    case 'fum':           window.location.href = '/insights/asset-classes'; break;
+    case 'asset-classes': window.location.href = '/insights/asset-classes'; break;
+    case 'listings':      window.location.href = '/insights/listings';      break;
+    case 'returns':       window.location.href = '/insights/returns';       break;
+    case 'expense':       window.location.href = '/insights/expense';       break;
+    case 'issuers':       window.location.href = '/insights/issuers';       break;
     // legacy aliases
     case 'count':    window.location.href = '/insights/listings';  break;
     case 'return':   window.location.href = '/insights/returns';   break;
