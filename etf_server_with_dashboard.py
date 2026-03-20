@@ -5673,13 +5673,13 @@ def _handle_articles_list(self):
     articles = get_all_articles()
 
     CAT_COLORS = {
-        'Performance':    ('bg-green-100',  'text-green-800'),
-        'Market Trends':  ('bg-blue-100',   'text-blue-800'),
-        'Thematic':       ('bg-purple-100', 'text-purple-800'),
-        'Research':       ('bg-amber-100',  'text-amber-800'),
-        'Education':      ('bg-teal-100',   'text-teal-800'),
-        'Issuer Profile': ('bg-orange-100', 'text-orange-800'),
-        'Annual Report':  ('bg-amber-100',  'text-amber-800'),
+        'Performance':    ('bg-green-900/50',  'text-green-300'),
+        'Market Trends':  ('bg-blue-900/50',   'text-blue-300'),
+        'Thematic':       ('bg-purple-900/50', 'text-purple-300'),
+        'Research':       ('bg-amber-900/50',  'text-amber-300'),
+        'Education':      ('bg-teal-900/50',   'text-teal-300'),
+        'Issuer Profile': ('bg-orange-900/50', 'text-orange-300'),
+        'Annual Report':  ('bg-amber-900/50',  'text-amber-300'),
     }
 
     NEWS_CATS    = {'Performance', 'Market Trends', 'Thematic', 'Research'}
@@ -5707,14 +5707,14 @@ def _handle_articles_list(self):
     )
 
     def card(a, wide=False):
-        bg, fg = CAT_COLORS.get(a['category'], ('bg-gray-100', 'text-gray-800'))
+        bg, fg = CAT_COLORS.get(a['category'], ('bg-slate-800', 'text-slate-300'))
         cols = 'sm:col-span-2' if wide else ''
         return f"""
-    <a href="/articles/{a['slug']}" class="block {cols} bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow p-5">
+    <a href="/articles/{a['slug']}" class="block {cols} bg-[#0f2040] rounded-xl border border-[#1e3860] hover:border-blue-500/50 transition-colors p-5">
       <span class="inline-block {bg} {fg} text-xs font-semibold px-2 py-0.5 rounded mb-2">{a['category']}</span>
-      <h2 class="text-base font-bold text-gray-900 leading-snug mb-1">{a['title']}</h2>
-      <p class="text-sm text-gray-500 line-clamp-2">{a['subtitle']}</p>
-      <p class="text-xs text-gray-400 mt-3">{a['date']}</p>
+      <h2 class="text-base font-bold text-slate-100 leading-snug mb-1">{a['title']}</h2>
+      <p class="text-sm text-slate-400 line-clamp-2">{a['subtitle']}</p>
+      <p class="text-xs text-slate-500 mt-3">{a['date']}</p>
     </a>"""
 
     def section(heading, subheading, arts, cols=2, wide_first=False):
@@ -5725,8 +5725,8 @@ def _handle_articles_list(self):
         return f"""
   <section class="mb-10">
     <div class="mb-4">
-      <h2 class="text-lg font-bold text-gray-900">{heading}</h2>
-      <p class="text-sm text-gray-500 mt-0.5">{subheading}</p>
+      <h2 class="text-lg font-bold text-slate-100">{heading}</h2>
+      <p class="text-sm text-slate-400 mt-0.5">{subheading}</p>
     </div>
     <div class="grid {grid_cols} gap-4">{cards_html}</div>
   </section>"""
@@ -5743,8 +5743,8 @@ def _handle_articles_list(self):
     html = _articles_head('Articles') + _articles_nav() + f"""
 <body class="bg-[#0a1628] min-h-screen">
 <main class="max-w-5xl mx-auto px-5 py-8">
-  <h1 class="text-2xl font-bold text-gray-900 mb-1">Articles</h1>
-  <p class="text-sm text-gray-500 mb-8">Analysis, education and issuer profiles for the Australian ETF market.</p>
+  <h1 class="text-2xl font-bold text-slate-100 mb-1">Articles</h1>
+  <p class="text-sm text-slate-400 mb-8">Analysis, education and issuer profiles for the Australian ETF market.</p>
   {news_html}
   {annual_html}
   {basics_html}
@@ -5763,29 +5763,30 @@ def _handle_article_detail(self, slug):
         return
 
     category_colors = {
-        'Performance':    ('bg-green-100',  'text-green-800'),
-        'Market Trends':  ('bg-blue-100',   'text-blue-800'),
-        'Thematic':       ('bg-purple-100', 'text-purple-800'),
-        'Research':       ('bg-amber-100',  'text-amber-800'),
-        'Education':      ('bg-teal-100',   'text-teal-800'),
-        'Issuer Profile': ('bg-orange-100', 'text-orange-800'),
+        'Performance':    ('bg-green-900/50',  'text-green-300'),
+        'Market Trends':  ('bg-blue-900/50',   'text-blue-300'),
+        'Thematic':       ('bg-purple-900/50', 'text-purple-300'),
+        'Research':       ('bg-amber-900/50',  'text-amber-300'),
+        'Education':      ('bg-teal-900/50',   'text-teal-300'),
+        'Issuer Profile': ('bg-orange-900/50', 'text-orange-300'),
+        'Annual Report':  ('bg-amber-900/50',  'text-amber-300'),
     }
-    bg, fg = category_colors.get(a['category'], ('bg-gray-100', 'text-gray-800'))
+    bg, fg = category_colors.get(a['category'], ('bg-slate-800', 'text-slate-300'))
 
     html = _articles_head(a['title']) + _articles_nav(slug) + f"""
 <body class="bg-[#0a1628] min-h-screen">
 <main class="max-w-4xl mx-auto px-5 py-8">
-  <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-7">
+  <div class="bg-[#0f2040] rounded-xl border border-[#1e3860] p-7">
     <span class="inline-block {bg} {fg} text-xs font-semibold px-2 py-0.5 rounded mb-3">{a['category']}</span>
-    <h1 class="text-2xl font-bold text-gray-900 leading-tight mb-2">{a['title']}</h1>
-    <p class="text-gray-500 text-sm mb-1">{a['subtitle']}</p>
-    <p class="text-xs text-gray-400 mb-6">{a['date']}</p>
-    <article class="prose max-w-none">
+    <h1 class="text-2xl font-bold text-slate-100 leading-tight mb-2">{a['title']}</h1>
+    <p class="text-slate-400 text-sm mb-1">{a['subtitle']}</p>
+    <p class="text-xs text-slate-500 mb-6">{a['date']}</p>
+    <article>
       {a['body']}
     </article>
   </div>
   <div class="mt-5">
-    <a href="/articles" class="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1">
+    <a href="/articles" class="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
       Back to all articles
     </a>

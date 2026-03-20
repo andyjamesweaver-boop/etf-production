@@ -17,33 +17,33 @@ _HEAD = """<!DOCTYPE html>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
-  body { font-family: Inter, system-ui, -apple-system, sans-serif; background: #f8fafc; color: #1e293b; }
-  .card { background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.07); border: 1px solid #e2e8f0; padding: 1.25rem; }
+  body { font-family: Inter, system-ui, -apple-system, sans-serif; background: #0a1628; color: #e2e8f0; }
+  .card { background: #0f2040; border-radius: 12px; box-shadow: 0 1px 6px rgba(0,0,0,.35); border: 1px solid #1e3860; padding: 1.25rem; }
   table { width: 100%; border-collapse: collapse; }
   th { text-align: left; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
-       color: #64748b; padding: .45rem .75rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
-  td { padding: .45rem .75rem; font-size: .8rem; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+       color: #7fa3c8; padding: .45rem .75rem; background: #0d1c35; border-bottom: 1px solid #1e3860; }
+  td { padding: .45rem .75rem; font-size: .8rem; border-bottom: 1px solid #1a3050; vertical-align: middle; color: #e2e8f0; }
   tr:last-child td { border-bottom: none; }
-  tr:hover td { background: #f8fafc; }
-  .bar-track { height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; }
+  tr:hover td { background: #142850; }
+  .bar-track { height: 6px; background: #1e3860; border-radius: 3px; overflow: hidden; }
   .bar-fill  { height: 100%; border-radius: 3px; transition: width .5s ease; }
   .badge { display: inline-block; padding: .15rem .45rem; border-radius: 4px; font-size: .68rem; font-weight: 600; }
-  .spinner { width: 28px; height: 28px; border: 3px solid #e2e8f0; border-top-color: #3b82f6;
+  .spinner { width: 28px; height: 28px; border: 3px solid #1e3860; border-top-color: #3b82f6;
              border-radius: 50%; animation: spin .7s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .sv { font-size: 1.9rem; font-weight: 800; line-height: 1; }
-  .sl { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #64748b; }
-  .ss { font-size: .73rem; color: #94a3b8; margin-top: .2rem; }
-  .pos { color: #16a34a; } .neg { color: #dc2626; }
+  .sv { font-size: 1.9rem; font-weight: 800; line-height: 1; color: #e2e8f0; }
+  .sl { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #7fa3c8; }
+  .ss { font-size: .73rem; color: #7fa3c8; margin-top: .2rem; }
+  .pos { color: #4ade80; } .neg { color: #f87171; }
   .hbar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-  .hbar-label { font-size: .75rem; color: #374151; font-weight: 500; width: 110px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .hbar-track { flex: 1; height: 16px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
+  .hbar-label { font-size: .75rem; color: #c8ddf0; font-weight: 500; width: 110px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hbar-track { flex: 1; height: 16px; background: #1e3860; border-radius: 4px; overflow: hidden; }
   .hbar-fill  { height: 100%; border-radius: 4px; transition: width .6s ease; }
-  .hbar-val   { font-size: .73rem; color: #475569; width: 52px; text-align: right; flex-shrink: 0; }
-  .hbar-sub   { font-size: .65rem; color: #94a3b8; width: 32px; text-align: right; flex-shrink: 0; }
+  .hbar-val   { font-size: .73rem; color: #a8c4e0; width: 52px; text-align: right; flex-shrink: 0; }
+  .hbar-sub   { font-size: .65rem; color: #7fa3c8; width: 32px; text-align: right; flex-shrink: 0; }
   .dim-btn { font-size: .72rem; font-weight: 600; padding: .3rem .75rem; border-radius: 6px;
-             border: 1px solid #e2e8f0; background: #f8fafc; color: #64748b; cursor: pointer; transition: all .15s; }
-  .dim-btn:hover { border-color: #3b82f6; color: #3b82f6; }
+             border: 1px solid #1e3860; background: #0f2040; color: #a8c4e0; cursor: pointer; transition: all .15s; }
+  .dim-btn:hover { border-color: #3b82f6; color: #60a5fa; }
   .dim-btn.active-dim { background: #3b82f6; border-color: #3b82f6; color: #fff; }
 </style>
 </head>"""
@@ -128,14 +128,14 @@ function hbar(label, value, maxVal, fillColor, valStr, subStr) {
 def _page(title, subtitle, body_html, init_js):
     return f"""{_HEAD.replace('{title}', title)}
 <body>
-<header class="bg-gradient-to-r from-green-700 via-green-800 to-indigo-900 text-white">
+<header class="bg-gradient-to-r from-[#071422] to-[#0d2860] shadow-xl">
   <div class="max-w-7xl mx-auto px-5 py-4 flex items-center gap-5">
-    <a href="/dashboard" class="text-green-200 hover:text-white text-sm font-medium transition-colors shrink-0">&#8592; Dashboard</a>
+    <a href="/dashboard" class="text-[#a8c4e0] hover:text-white text-sm font-medium transition-colors shrink-0">&#8592; Dashboard</a>
     <div class="flex-1 min-w-0">
-      <h1 class="text-xl font-bold">{title}</h1>
-      <p class="text-green-200 text-xs mt-0.5">{subtitle}</p>
+      <h1 class="text-xl font-bold text-white">{title}</h1>
+      <p class="text-[#7fa3c8] text-xs mt-0.5">{subtitle}</p>
     </div>
-    <span id="ts" class="text-green-300 text-xs shrink-0"></span>
+    <span id="ts" class="text-[#7fa3c8] text-xs shrink-0"></span>
   </div>
 </header>
 <main class="max-w-7xl mx-auto px-4 py-6">
@@ -159,16 +159,16 @@ _FUM_BODY = """
 <div id="hero" class="grid grid-cols-2 sm:grid-cols-4 gap-4"></div>
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
   <div class="card">
-    <h2 class="font-semibold text-sm text-gray-700 mb-4">Issuers by FUM</h2>
+    <h2 class="font-semibold text-sm text-slate-300 mb-4">Issuers by FUM</h2>
     <div id="issuer-bars"></div>
   </div>
   <div class="card">
-    <h2 class="font-semibold text-sm text-gray-700 mb-4">Asset Classes by FUM</h2>
+    <h2 class="font-semibold text-sm text-slate-300 mb-4">Asset Classes by FUM</h2>
     <div class="relative" style="height:260px"><canvas id="chart-ac"></canvas></div>
   </div>
 </div>
 <div class="card">
-  <h2 class="font-semibold text-sm text-gray-700 mb-3">Top ETFs by FUM</h2>
+  <h2 class="font-semibold text-sm text-slate-300 mb-3">Top ETFs by FUM</h2>
   <div class="overflow-x-auto"><table>
     <thead><tr>
       <th>#</th><th>Code</th><th>Name</th><th>Issuer</th><th>Asset Class</th>
@@ -178,11 +178,11 @@ _FUM_BODY = """
   </table></div>
 </div>
 <div class="card">
-  <h2 class="font-semibold text-sm text-gray-700 mb-4">Top 5 ETFs by FUM — per Asset Class</h2>
+  <h2 class="font-semibold text-sm text-slate-300 mb-4">Top 5 ETFs by FUM — per Asset Class</h2>
   <div id="per-class" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
 </div>
 <div class="card">
-  <h2 class="font-semibold text-sm text-gray-700 mb-4">Top 5 ETFs by FUM — per Issuer</h2>
+  <h2 class="font-semibold text-sm text-slate-300 mb-4">Top 5 ETFs by FUM — per Issuer</h2>
   <div id="per-issuer" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
 </div>
 """
@@ -217,31 +217,31 @@ async function init() {
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' ' + fmtFum(ctx.parsed.y) + '  (' + ac[ctx.dataIndex].pct + '%)' } } },
-      scales: { x: { ticks: { font: { size: 10 } } }, y: { ticks: { callback: v => fmtFum(v), font: { size: 10 } }, grid: { color: '#f1f5f9' } } },
+      scales: { x: { ticks: { font: { size: 10 } } }, y: { ticks: { callback: v => fmtFum(v), font: { size: 10 } }, grid: { color: '#1e3860' } } },
     },
   });
 
   // Top ETFs table
   const topMax = d.top_etfs[0]?.fum || 1;
   document.getElementById('fum-table').innerHTML = d.top_etfs.map((e, i) => `<tr>
-    <td class="text-gray-400 tabular-nums">${i + 1}</td>
+    <td class="text-slate-500 tabular-nums">${i + 1}</td>
     <td class="font-bold text-green-600">${e.code}</td>
-    <td class="text-gray-600 max-w-xs" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.name}">${e.name}</td>
-    <td class="text-gray-500">${e.issuer || '—'}</td>
+    <td class="text-slate-300 max-w-xs" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.name}">${e.name}</td>
+    <td class="text-slate-400">${e.issuer || '—'}</td>
     <td><span class="badge" style="background:${acColor(e.asset_class)}22;color:${acColor(e.asset_class)}">${e.asset_class || '—'}</span></td>
     <td class="text-right font-semibold tabular-nums">${fmtFum(e.fum)}</td>
-    <td class="text-right text-gray-500 tabular-nums">${e.pct}%</td>
+    <td class="text-right text-slate-400 tabular-nums">${e.pct}%</td>
     <td><div class="bar-track"><div class="bar-fill bg-green-400" style="width:${Math.min(e.fum / topMax * 100, 100).toFixed(1)}%"></div></div></td>
   </tr>`).join('');
 
   // Per class mini tables
-  const classCard = (ac_name, etfs) => `<div class="border border-gray-100 rounded-lg p-3">
+  const classCard = (ac_name, etfs) => `<div class="border border-[#1e3860] rounded-lg p-3 bg-[#0d1c35]">
     <div class="text-xs font-bold uppercase mb-2" style="color:${acColor(ac_name)}">${ac_name}</div>
-    ${etfs.map((e, i) => `<div class="flex items-center gap-2 py-1 ${i < etfs.length - 1 ? 'border-b border-gray-50' : ''}">
-      <span class="text-gray-300 text-xs w-3 tabular-nums">${i + 1}</span>
+    ${etfs.map((e, i) => `<div class="flex items-center gap-2 py-1 ${i < etfs.length - 1 ? 'border-b border-[#1a3050]' : ''}">
+      <span class="text-slate-500 text-xs w-3 tabular-nums">${i + 1}</span>
       <span class="font-bold text-green-600 text-xs w-10">${e.code}</span>
-      <span class="flex-1 text-xs text-gray-500 truncate" title="${e.name}">${e.name}</span>
-      <span class="text-xs font-semibold text-gray-700 ml-1 tabular-nums">${fmtFum(e.fum)}</span>
+      <span class="flex-1 text-xs text-slate-400 truncate" title="${e.name}">${e.name}</span>
+      <span class="text-xs font-semibold text-slate-300 ml-1 tabular-nums">${fmtFum(e.fum)}</span>
     </div>`).join('')}
   </div>`;
 
@@ -249,13 +249,13 @@ async function init() {
     Object.entries(d.top_per_asset_class).map(([ac_name, etfs]) => classCard(ac_name, etfs)).join('');
 
   document.getElementById('per-issuer').innerHTML =
-    Object.entries(d.top_per_issuer).map(([iss_name, etfs]) => `<div class="border border-gray-100 rounded-lg p-3">
+    Object.entries(d.top_per_issuer).map(([iss_name, etfs]) => `<div class="border border-[#1e3860] rounded-lg p-3 bg-[#0d1c35]">
       <div class="text-xs font-bold uppercase mb-2" style="color:${issColor(iss_name)}">${iss_name}</div>
-      ${etfs.map((e, i) => `<div class="flex items-center gap-2 py-1 ${i < etfs.length - 1 ? 'border-b border-gray-50' : ''}">
-        <span class="text-gray-300 text-xs w-3 tabular-nums">${i + 1}</span>
+      ${etfs.map((e, i) => `<div class="flex items-center gap-2 py-1 ${i < etfs.length - 1 ? 'border-b border-[#1a3050]' : ''}">
+        <span class="text-slate-500 text-xs w-3 tabular-nums">${i + 1}</span>
         <span class="font-bold text-green-600 text-xs w-10">${e.code}</span>
-        <span class="flex-1 text-xs text-gray-500 truncate" title="${e.name}">${e.name}</span>
-        <span class="text-xs font-semibold text-gray-700 ml-1 tabular-nums">${fmtFum(e.fum)}</span>
+        <span class="flex-1 text-xs text-slate-400 truncate" title="${e.name}">${e.name}</span>
+        <span class="text-xs font-semibold text-slate-300 ml-1 tabular-nums">${fmtFum(e.fum)}</span>
       </div>`).join('')}
     </div>`).join('');
 
@@ -281,7 +281,7 @@ _LISTINGS_BODY = """
 <!-- Year chart with filters -->
 <div class="card">
   <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-    <h2 class="font-semibold text-sm text-gray-700">ETFs Listed by Year</h2>
+    <h2 class="font-semibold text-sm text-slate-300">ETFs Listed by Year</h2>
     <div id="dim-tabs" class="flex flex-wrap gap-1">
       <button data-dim="all"          class="dim-btn active-dim">All</button>
       <button data-dim="exchange"     class="dim-btn">Exchange</button>
@@ -295,15 +295,15 @@ _LISTINGS_BODY = """
 
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
   <div class="card">
-    <h2 class="font-semibold text-sm text-gray-700 mb-3">Most Recent Listings</h2>
+    <h2 class="font-semibold text-sm text-slate-300 mb-3">Most Recent Listings</h2>
     <div class="overflow-x-auto"><table>
       <thead><tr><th>Code</th><th>Name</th><th>Issuer</th><th>Inception</th></tr></thead>
       <tbody id="tbl-recent"></tbody>
     </table></div>
   </div>
   <div class="card">
-    <h2 class="font-semibold text-sm text-gray-700 mb-1">Longest Running ETFs</h2>
-    <p class="text-xs text-gray-400 mb-3">STW and SFY were Australia's first ETFs, both listed on 27 August 2001.</p>
+    <h2 class="font-semibold text-sm text-slate-300 mb-1">Longest Running ETFs</h2>
+    <p class="text-xs text-slate-500 mb-3">STW and SFY were Australia's first ETFs, both listed on 27 August 2001.</p>
     <div class="overflow-x-auto"><table>
       <thead><tr><th>Code</th><th>Name</th><th>Issuer</th><th>Inception</th><th></th></tr></thead>
       <tbody id="tbl-oldest"></tbody>
@@ -313,19 +313,19 @@ _LISTINGS_BODY = """
 
 <div class="grid grid-cols-1 lg:grid-cols-4 gap-5">
   <div class="card">
-    <h2 class="font-semibold text-sm text-gray-700 mb-4">By Issuer</h2>
+    <h2 class="font-semibold text-sm text-slate-300 mb-4">By Issuer</h2>
     <div id="bars-issuer"></div>
   </div>
   <div class="card">
-    <h2 class="font-semibold text-sm text-gray-700 mb-4">By Asset Class</h2>
+    <h2 class="font-semibold text-sm text-slate-300 mb-4">By Asset Class</h2>
     <div id="bars-asset"></div>
   </div>
   <div class="card">
-    <h2 class="font-semibold text-sm text-gray-700 mb-4">By Exchange</h2>
+    <h2 class="font-semibold text-sm text-slate-300 mb-4">By Exchange</h2>
     <div id="bars-exchange"></div>
   </div>
   <div class="card">
-    <h2 class="font-semibold text-sm text-gray-700 mb-4">By Investment Style</h2>
+    <h2 class="font-semibold text-sm text-slate-300 mb-4">By Investment Style</h2>
     <div id="bars-fundtype"></div>
   </div>
 </div>
@@ -449,7 +449,7 @@ function renderYearChart() {
       },
       scales: {
         x: { stacked: true, ticks: { font: { size: 10 } }, grid: { display: false } },
-        y: { stacked: true, ticks: { font: { size: 10 }, stepSize: 5 }, grid: { color: '#f1f5f9' } },
+        y: { stacked: true, ticks: { font: { size: 10 }, stepSize: 5 }, grid: { color: '#1e3860' } },
       },
     },
   });
@@ -468,9 +468,9 @@ function renderTables() {
     const badge = note ? `<span class="badge ${note.cls}">${note.label}</span>` : '';
     return `<tr>
       <td class="font-bold text-green-600">${e.code}</td>
-      <td class="text-gray-600" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.name||''}">${e.name||'—'}</td>
-      <td class="text-gray-500">${e.issuer||'—'}</td>
-      <td class="text-gray-400 tabular-nums text-xs">${e.inception_date||'—'}</td>
+      <td class="text-slate-300" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.name||''}">${e.name||'—'}</td>
+      <td class="text-slate-400">${e.issuer||'—'}</td>
+      <td class="text-slate-500 tabular-nums text-xs">${e.inception_date||'—'}</td>
       <td>${badge}</td>
     </tr>`;
   };
@@ -513,24 +513,24 @@ _RETURNS_BODY = """
 <div id="hero" class="grid grid-cols-2 sm:grid-cols-4 gap-4"></div>
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
   <div class="card">
-    <h2 class="font-semibold text-sm text-gray-700 mb-4">1Y Return Distribution</h2>
+    <h2 class="font-semibold text-sm text-slate-300 mb-4">1Y Return Distribution</h2>
     <div class="relative" style="height:220px"><canvas id="chart-dist"></canvas></div>
   </div>
   <div class="card">
-    <h2 class="font-semibold text-sm text-gray-700 mb-4">Average 1Y Return — by Asset Class</h2>
+    <h2 class="font-semibold text-sm text-slate-300 mb-4">Average 1Y Return — by Asset Class</h2>
     <div id="bars-ac"></div>
   </div>
 </div>
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
   <div class="card">
-    <h2 class="font-semibold text-sm text-gray-700 mb-3">Top Performers — 1Y Return</h2>
+    <h2 class="font-semibold text-sm text-slate-300 mb-3">Top Performers — 1Y Return</h2>
     <div class="overflow-x-auto"><table>
       <thead><tr><th>#</th><th>Code</th><th>Name</th><th>Issuer</th><th class="text-right">1Y</th><th class="text-right">3Y</th><th class="text-right">5Y</th><th class="text-right">FUM</th></tr></thead>
       <tbody id="tbl-top"></tbody>
     </table></div>
   </div>
   <div class="card">
-    <h2 class="font-semibold text-sm text-gray-700 mb-3">Worst Performers — 1Y Return</h2>
+    <h2 class="font-semibold text-sm text-slate-300 mb-3">Worst Performers — 1Y Return</h2>
     <div class="overflow-x-auto"><table>
       <thead><tr><th>#</th><th>Code</th><th>Name</th><th>Issuer</th><th class="text-right">1Y</th><th class="text-right">3Y</th><th class="text-right">5Y</th><th class="text-right">FUM</th></tr></thead>
       <tbody id="tbl-bot"></tbody>
@@ -538,7 +538,7 @@ _RETURNS_BODY = """
   </div>
 </div>
 <div class="card">
-  <h2 class="font-semibold text-sm text-gray-700 mb-4">Average 1Y Return — by Issuer</h2>
+  <h2 class="font-semibold text-sm text-slate-300 mb-4">Average 1Y Return — by Issuer</h2>
   <div id="bars-issuer"></div>
 </div>
 """
@@ -573,7 +573,7 @@ async function init() {
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' ' + ctx.parsed.y + ' ETFs' } } },
-      scales: { x: { ticks: { font: { size: 9 }, maxRotation: 45 } }, y: { ticks: { font: { size: 10 }, stepSize: 5 }, grid: { color: '#f1f5f9' } } },
+      scales: { x: { ticks: { font: { size: 9 }, maxRotation: 45 } }, y: { ticks: { font: { size: 10 }, stepSize: 5 }, grid: { color: '#1e3860' } } },
     },
   });
 
@@ -589,14 +589,14 @@ async function init() {
     .join('');
 
   const perfRow = (e, i) => `<tr>
-    <td class="text-gray-400 tabular-nums">${i + 1}</td>
+    <td class="text-slate-500 tabular-nums">${i + 1}</td>
     <td class="font-bold text-green-600">${e.code}</td>
-    <td class="text-gray-600" style="max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.name}">${e.name}</td>
-    <td class="text-gray-500 text-xs">${e.issuer || '—'}</td>
+    <td class="text-slate-300" style="max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.name}">${e.name}</td>
+    <td class="text-slate-400 text-xs">${e.issuer || '—'}</td>
     <td class="text-right font-semibold ${pcls(e.return_1y)} tabular-nums">${pct(e.return_1y, 1)}</td>
-    <td class="text-right text-gray-500 tabular-nums">${pct(e.return_3y, 1)}</td>
-    <td class="text-right text-gray-500 tabular-nums">${pct(e.return_5y, 1)}</td>
-    <td class="text-right text-gray-400 tabular-nums text-xs">${fmtFum(e.fund_size_aud_millions)}</td>
+    <td class="text-right text-slate-400 tabular-nums">${pct(e.return_3y, 1)}</td>
+    <td class="text-right text-slate-400 tabular-nums">${pct(e.return_5y, 1)}</td>
+    <td class="text-right text-slate-500 tabular-nums text-xs">${fmtFum(e.fund_size_aud_millions)}</td>
   </tr>`;
   document.getElementById('tbl-top').innerHTML = d.top_performers.map(perfRow).join('');
   document.getElementById('tbl-bot').innerHTML = d.bottom_performers.map(perfRow).join('');
@@ -632,25 +632,25 @@ _EXPENSE_BODY = """
 <div id="hero" class="grid grid-cols-2 sm:grid-cols-4 gap-4"></div>
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
   <div class="card">
-    <h2 class="font-semibold text-sm text-gray-700 mb-4">MER Distribution</h2>
+    <h2 class="font-semibold text-sm text-slate-300 mb-4">MER Distribution</h2>
     <div class="relative" style="height:220px"><canvas id="chart-dist"></canvas></div>
   </div>
   <div class="card">
-    <h2 class="font-semibold text-sm text-gray-700 mb-1">Average MER — by Asset Class</h2>
-    <p class="text-xs text-gray-400 mb-3">Simple avg · FUM-weighted avg per class</p>
+    <h2 class="font-semibold text-sm text-slate-300 mb-1">Average MER — by Asset Class</h2>
+    <p class="text-xs text-slate-500 mb-3">Simple avg · FUM-weighted avg per class</p>
     <div id="bars-ac"></div>
   </div>
 </div>
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
   <div class="card">
-    <h2 class="font-semibold text-sm text-gray-700 mb-3">Cheapest ETFs</h2>
+    <h2 class="font-semibold text-sm text-slate-300 mb-3">Cheapest ETFs</h2>
     <div class="overflow-x-auto"><table>
       <thead><tr><th>#</th><th>Code</th><th>Name</th><th>Issuer</th><th class="text-right">MER</th><th class="text-right">FUM</th></tr></thead>
       <tbody id="tbl-cheap"></tbody>
     </table></div>
   </div>
   <div class="card">
-    <h2 class="font-semibold text-sm text-gray-700 mb-3">Most Expensive ETFs</h2>
+    <h2 class="font-semibold text-sm text-slate-300 mb-3">Most Expensive ETFs</h2>
     <div class="overflow-x-auto"><table>
       <thead><tr><th>#</th><th>Code</th><th>Name</th><th>Issuer</th><th class="text-right">MER</th><th class="text-right">FUM</th></tr></thead>
       <tbody id="tbl-exp"></tbody>
@@ -658,8 +658,8 @@ _EXPENSE_BODY = """
   </div>
 </div>
 <div class="card">
-  <h2 class="font-semibold text-sm text-gray-700 mb-1">MER by Issuer — Simple vs FUM-Weighted</h2>
-  <p class="text-xs text-gray-400 mb-4">FUM-weighted MER reflects what investors actually pay on average, weighted by fund size.</p>
+  <h2 class="font-semibold text-sm text-slate-300 mb-1">MER by Issuer — Simple vs FUM-Weighted</h2>
+  <p class="text-xs text-slate-500 mb-4">FUM-weighted MER reflects what investors actually pay on average, weighted by fund size.</p>
   <div class="overflow-x-auto">
     <table>
       <thead><tr>
@@ -672,7 +672,7 @@ _EXPENSE_BODY = """
   </div>
 </div>
 <div class="card">
-  <h2 class="font-semibold text-sm text-gray-700 mb-4">FUM-Weighted MER — by Issuer</h2>
+  <h2 class="font-semibold text-sm text-slate-300 mb-4">FUM-Weighted MER — by Issuer</h2>
   <div class="relative" style="height:300px"><canvas id="chart-issuer"></canvas></div>
 </div>
 """
@@ -701,7 +701,7 @@ async function init() {
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' ' + ctx.parsed.y + ' ETFs' } } },
-      scales: { x: { ticks: { font: { size: 10 }, maxRotation: 30 } }, y: { ticks: { font: { size: 10 }, stepSize: 10 }, grid: { color: '#f1f5f9' } } },
+      scales: { x: { ticks: { font: { size: 10 }, maxRotation: 30 } }, y: { ticks: { font: { size: 10 }, stepSize: 10 }, grid: { color: '#1e3860' } } },
     },
   });
 
@@ -710,8 +710,8 @@ async function init() {
   document.getElementById('bars-ac').innerHTML = d.by_asset_class.map(r => `
     <div class="mb-3">
       <div class="flex items-center justify-between mb-0.5">
-        <span class="text-xs font-medium text-gray-700" style="min-width:150px">${r.asset_class}</span>
-        <span class="text-xs text-gray-400 tabular-nums">${mer(r.avg_mer)} avg · <span class="font-semibold text-gray-600">${mer(r.fum_weighted_mer)}</span> wtd</span>
+        <span class="text-xs font-medium text-slate-300" style="min-width:150px">${r.asset_class}</span>
+        <span class="text-xs text-slate-500 tabular-nums">${mer(r.avg_mer)} avg · <span class="font-semibold text-slate-300">${mer(r.fum_weighted_mer)}</span> wtd</span>
       </div>
       <div class="flex gap-1">
         <div class="bar-track flex-1" title="Simple avg: ${mer(r.avg_mer)}">
@@ -725,12 +725,12 @@ async function init() {
 
   // Cheapest / priciest tables
   const merRow = (e, i) => `<tr>
-    <td class="text-gray-400 tabular-nums">${i + 1}</td>
+    <td class="text-slate-500 tabular-nums">${i + 1}</td>
     <td class="font-bold text-green-600">${e.code}</td>
-    <td class="text-gray-600" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.name}">${e.name}</td>
-    <td class="text-gray-500 text-xs">${e.issuer || '—'}</td>
+    <td class="text-slate-300" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.name}">${e.name}</td>
+    <td class="text-slate-400 text-xs">${e.issuer || '—'}</td>
     <td class="text-right font-semibold tabular-nums">${mer(e.effective_mer)}</td>
-    <td class="text-right text-gray-400 tabular-nums text-xs">${fmtFum(e.fund_size_aud_millions)}</td>
+    <td class="text-right text-slate-500 tabular-nums text-xs">${fmtFum(e.fund_size_aud_millions)}</td>
   </tr>`;
   document.getElementById('tbl-cheap').innerHTML = d.cheapest.map(merRow).join('');
   document.getElementById('tbl-exp').innerHTML = d.most_expensive.map(merRow).join('');
@@ -740,16 +740,16 @@ async function init() {
   const fwMax = Math.max(...issSorted.map(r => r.fum_weighted_mer || 0));
   document.getElementById('tbl-issuers').innerHTML = issSorted.map(r => `<tr>
     <td class="font-semibold text-sm" style="color:${issColor(r.issuer)}">${r.issuer}</td>
-    <td class="text-right tabular-nums text-gray-500">${r.etf_count}</td>
-    <td class="text-right tabular-nums text-gray-500">${mer(r.avg_mer)}</td>
+    <td class="text-right tabular-nums text-slate-400">${r.etf_count}</td>
+    <td class="text-right tabular-nums text-slate-400">${mer(r.avg_mer)}</td>
     <td class="text-right tabular-nums font-semibold">${mer(r.fum_weighted_mer)}</td>
-    <td class="text-right tabular-nums text-gray-400 text-xs">${fmtFum(r.total_fum)}</td>
+    <td class="text-right tabular-nums text-slate-500 text-xs">${fmtFum(r.total_fum)}</td>
     <td>
       <div class="flex items-center gap-1">
         <div class="bar-track flex-1">
           <div class="bar-fill" style="width:${fwMax > 0 ? ((r.fum_weighted_mer||0)/fwMax*100).toFixed(1) : 0}%;background:${issColor(r.issuer)}"></div>
         </div>
-        <span class="text-xs text-gray-400 tabular-nums w-10 text-right">${mer(r.fum_weighted_mer)}</span>
+        <span class="text-xs text-slate-500 tabular-nums w-10 text-right">${mer(r.fum_weighted_mer)}</span>
       </div>
     </td>
   </tr>`).join('');
@@ -773,7 +773,7 @@ async function init() {
       },
       scales: {
         x: { ticks: { font: { size: 10 }, maxRotation: 40 } },
-        y: { ticks: { font: { size: 10 }, callback: v => v.toFixed(2) + '%' }, grid: { color: '#f1f5f9' }, beginAtZero: true },
+        y: { ticks: { font: { size: 10 }, callback: v => v.toFixed(2) + '%' }, grid: { color: '#1e3860' }, beginAtZero: true },
       },
     },
   });
@@ -798,16 +798,16 @@ _ISSUERS_BODY = """
 <div id="hero" class="grid grid-cols-2 sm:grid-cols-4 gap-4"></div>
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
   <div class="card">
-    <h2 class="font-semibold text-sm text-gray-700 mb-4">Market Share by FUM</h2>
+    <h2 class="font-semibold text-sm text-slate-300 mb-4">Market Share by FUM</h2>
     <div class="relative" style="height:280px"><canvas id="chart-share"></canvas></div>
   </div>
   <div class="card">
-    <h2 class="font-semibold text-sm text-gray-700 mb-4">ETF Count by Issuer</h2>
+    <h2 class="font-semibold text-sm text-slate-300 mb-4">ETF Count by Issuer</h2>
     <div id="bars-count"></div>
   </div>
 </div>
 <div class="card overflow-x-auto">
-  <h2 class="font-semibold text-sm text-gray-700 mb-3">Issuer Comparison</h2>
+  <h2 class="font-semibold text-sm text-slate-300 mb-3">Issuer Comparison</h2>
   <table>
     <thead><tr>
       <th>#</th><th>Issuer</th><th class="text-right">FUM</th><th class="text-right">Mkt Share</th>
@@ -818,7 +818,7 @@ _ISSUERS_BODY = """
   </table>
 </div>
 <div class="card">
-  <h2 class="font-semibold text-sm text-gray-700 mb-4">Asset Class Mix — by Issuer</h2>
+  <h2 class="font-semibold text-sm text-slate-300 mb-4">Asset Class Mix — by Issuer</h2>
   <div id="mix-chart" class="space-y-3"></div>
 </div>
 """
@@ -867,19 +867,19 @@ async function init() {
   document.getElementById('tbl-issuers').innerHTML = d.issuers.map((r, i) => {
     const primaryAC = Object.entries(r.asset_classes || {}).sort((a, b) => b[1] - a[1])[0]?.[0] || '—';
     return `<tr>
-      <td class="text-gray-400 tabular-nums">${i + 1}</td>
+      <td class="text-slate-500 tabular-nums">${i + 1}</td>
       <td class="font-semibold" style="color:${issColor(r.issuer)}">${r.issuer}</td>
       <td class="text-right font-semibold tabular-nums">${fmtFum(r.total_fum)}</td>
       <td class="text-right tabular-nums">
         <div class="flex items-center justify-end gap-1">
           <div class="bar-track w-12"><div class="bar-fill" style="width:${r.market_share_pct}%;background:${issColor(r.issuer)}"></div></div>
-          <span class="text-gray-500">${r.market_share_pct}%</span>
+          <span class="text-slate-400">${r.market_share_pct}%</span>
         </div>
       </td>
       <td class="text-right tabular-nums">${r.etf_count}</td>
       <td class="text-right tabular-nums">${mer(r.avg_mer)}</td>
       <td class="text-right font-semibold ${pcls(r.avg_return_1y)} tabular-nums">${pct(r.avg_return_1y, 1)}</td>
-      <td class="font-bold text-green-600 text-xs">${r.top_etf?.code || '—'}<span class="text-gray-400 font-normal ml-1">${fmtFum(r.top_etf?.fund_size_aud_millions)}</span></td>
+      <td class="font-bold text-green-600 text-xs">${r.top_etf?.code || '—'}<span class="text-slate-500 font-normal ml-1">${fmtFum(r.top_etf?.fund_size_aud_millions)}</span></td>
       <td><span class="badge" style="background:${acColor(primaryAC)}22;color:${acColor(primaryAC)}">${primaryAC}</span></td>
     </tr>`;
   }).join('');
@@ -893,9 +893,9 @@ async function init() {
       .map(([ac, cnt]) => `<div title="${ac}: ${cnt}" style="width:${(cnt/total*100).toFixed(1)}%;background:${acColor(ac)};height:100%;display:inline-block"></div>`)
       .join('');
     return `<div class="flex items-center gap-3">
-      <span class="text-xs font-medium text-gray-700 w-24 shrink-0 truncate">${r.issuer}</span>
-      <div class="flex-1 h-5 rounded overflow-hidden bg-gray-100 flex">${segments}</div>
-      <span class="text-xs text-gray-400 w-12 text-right">${r.etf_count} ETFs</span>
+      <span class="text-xs font-medium text-slate-300 w-24 shrink-0 truncate">${r.issuer}</span>
+      <div class="flex-1 h-5 rounded overflow-hidden bg-[#1e3860] flex">${segments}</div>
+      <span class="text-xs text-slate-500 w-12 text-right">${r.etf_count} ETFs</span>
     </div>`;
   }).join('');
 
@@ -923,13 +923,13 @@ _NAV_BODY = """
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
   <div class="card lg:col-span-2">
     <div class="flex items-center justify-between mb-3">
-      <h2 class="font-semibold text-sm text-gray-700">Market-wide Premium/Discount — Last 90 Days</h2>
-      <span class="text-xs text-gray-400">Average across all ETFs with NAV data</span>
+      <h2 class="font-semibold text-sm text-slate-300">Market-wide Premium/Discount — Last 90 Days</h2>
+      <span class="text-xs text-slate-500">Average across all ETFs with NAV data</span>
     </div>
     <div class="relative" style="height:220px"><canvas id="chart-hist"></canvas></div>
   </div>
   <div class="card">
-    <h2 class="font-semibold text-sm text-gray-700 mb-3">Today's Distribution</h2>
+    <h2 class="font-semibold text-sm text-slate-300 mb-3">Today's Distribution</h2>
     <div class="relative" style="height:220px"><canvas id="chart-dist"></canvas></div>
   </div>
 </div>
@@ -937,11 +937,11 @@ _NAV_BODY = """
 <!-- By asset class + by issuer -->
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
   <div class="card">
-    <h2 class="font-semibold text-sm text-gray-700 mb-3">Avg Premium/Discount by Asset Class</h2>
+    <h2 class="font-semibold text-sm text-slate-300 mb-3">Avg Premium/Discount by Asset Class</h2>
     <div id="ac-bars"></div>
   </div>
   <div class="card">
-    <h2 class="font-semibold text-sm text-gray-700 mb-3">Avg Premium/Discount by Issuer</h2>
+    <h2 class="font-semibold text-sm text-slate-300 mb-3">Avg Premium/Discount by Issuer</h2>
     <div id="iss-bars"></div>
   </div>
 </div>
@@ -949,17 +949,17 @@ _NAV_BODY = """
 <!-- Historical explorer for individual ETF -->
 <div class="card">
   <div class="flex flex-wrap items-center gap-3 mb-4">
-    <h2 class="font-semibold text-sm text-gray-700">Historical Premium/Discount Explorer</h2>
-    <select id="etf-picker" class="border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm bg-gray-50 focus:ring-2 focus:ring-green-200 outline-none min-w-[200px]">
+    <h2 class="font-semibold text-sm text-slate-300">Historical Premium/Discount Explorer</h2>
+    <select id="etf-picker" class="border border-[#1e3860] rounded-lg px-2.5 py-1.5 text-sm bg-[#0d1c35] text-slate-200 focus:ring-2 focus:ring-blue-800 outline-none min-w-[200px]">
       <option value="">— select an ETF —</option>
     </select>
-    <select id="period-picker" class="border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm bg-gray-50 focus:ring-2 focus:ring-green-200 outline-none">
+    <select id="period-picker" class="border border-[#1e3860] rounded-lg px-2.5 py-1.5 text-sm bg-[#0d1c35] text-slate-200 focus:ring-2 focus:ring-blue-800 outline-none">
       <option value="3m">3 months</option>
       <option value="1y" selected>1 year</option>
       <option value="3y">3 years</option>
       <option value="all">All time</option>
     </select>
-    <span id="etf-stats" class="text-xs text-gray-400"></span>
+    <span id="etf-stats" class="text-xs text-slate-500"></span>
   </div>
   <div class="relative" style="height:260px"><canvas id="chart-etf"></canvas></div>
 </div>
@@ -967,11 +967,11 @@ _NAV_BODY = """
 <!-- Today's full snapshot table -->
 <div class="card">
   <div class="flex items-center justify-between mb-3">
-    <h2 class="font-semibold text-sm text-gray-700">Today's Snapshot — All ETFs</h2>
+    <h2 class="font-semibold text-sm text-slate-300">Today's Snapshot — All ETFs</h2>
     <div class="flex items-center gap-2">
       <input id="snap-search" type="text" placeholder="Filter by code or name…"
-             class="border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm bg-gray-50 focus:ring-2 focus:ring-green-200 outline-none w-52">
-      <select id="snap-sort" class="border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm bg-gray-50 focus:ring-2 focus:ring-green-200 outline-none">
+             class="border border-[#1e3860] rounded-lg px-2.5 py-1.5 text-sm bg-[#0d1c35] text-slate-200 focus:ring-2 focus:ring-blue-800 outline-none w-52">
+      <select id="snap-sort" class="border border-[#1e3860] rounded-lg px-2.5 py-1.5 text-sm bg-[#0d1c35] text-slate-200 focus:ring-2 focus:ring-blue-800 outline-none">
         <option value="pd-desc">Largest premium first</option>
         <option value="pd-asc">Largest discount first</option>
         <option value="fum-desc">FUM (largest first)</option>
@@ -1033,7 +1033,7 @@ function pdCls(v) {
   if (v == null) return '';
   if (v > 0.05) return 'pos';
   if (v < -0.05) return 'neg';
-  return 'text-gray-500';
+  return 'text-slate-400';
 }
 function pdBar(v, maxAbs) {
   if (v == null) return '';
@@ -1113,7 +1113,7 @@ function renderHistChart() {
         x: { ticks: { maxTicksLimit: 8, font: { size: 10 } }, grid: { display: false } },
         y: {
           ticks: { font: { size: 10 }, callback: v => fmtPd(v) },
-          grid: { color: '#f1f5f9' },
+          grid: { color: '#1e3860' },
         }
       }
     }
@@ -1150,7 +1150,7 @@ function renderDistChart() {
                                 label: ctx => ctx.parsed.y + ' ETFs' } } },
       scales: {
         x: { ticks: { font: { size: 9 }, maxRotation: 45 }, grid: { display: false } },
-        y: { ticks: { font: { size: 10 }, stepSize: 1 }, grid: { color: '#f1f5f9' } }
+        y: { ticks: { font: { size: 10 }, stepSize: 1 }, grid: { color: '#1e3860' } }
       }
     }
   });
@@ -1158,14 +1158,14 @@ function renderDistChart() {
 
 function renderAcBars() {
   const rows = _data.by_asset_class;
-  if (!rows.length) { document.getElementById('ac-bars').innerHTML = '<p class="text-xs text-gray-400">No data</p>'; return; }
+  if (!rows.length) { document.getElementById('ac-bars').innerHTML = '<p class="text-xs text-slate-500">No data</p>'; return; }
   const maxAbs = Math.max(...rows.map(r => Math.abs(r.avg_pd || 0)));
   document.getElementById('ac-bars').innerHTML = rows.map(r => {
     const v = r.avg_pd;
     const pct = maxAbs > 0 ? (Math.abs(v) / maxAbs * 100).toFixed(1) : 0;
     const col = v >= 0 ? '#16a34a' : '#dc2626';
     return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
-      <span style="font-size:.73rem;color:#374151;width:160px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.asset_class}">${r.asset_class || 'Unknown'}</span>
+      <span style="font-size:.73rem;color:#c8ddf0;width:160px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.asset_class}">${r.asset_class || 'Unknown'}</span>
       <div style="flex:1;height:14px;background:#f1f5f9;border-radius:4px;overflow:hidden">
         <div style="width:${pct}%;height:100%;background:${col};border-radius:4px"></div>
       </div>
@@ -1177,14 +1177,14 @@ function renderAcBars() {
 
 function renderIssBars() {
   const rows = _data.by_issuer.filter(r => r.count >= 2).slice(0, 15);
-  if (!rows.length) { document.getElementById('iss-bars').innerHTML = '<p class="text-xs text-gray-400">No data</p>'; return; }
+  if (!rows.length) { document.getElementById('iss-bars').innerHTML = '<p class="text-xs text-slate-500">No data</p>'; return; }
   const maxAbs = Math.max(...rows.map(r => Math.abs(r.avg_pd || 0)));
   document.getElementById('iss-bars').innerHTML = rows.map(r => {
     const v = r.avg_pd;
     const pct = maxAbs > 0 ? (Math.abs(v) / maxAbs * 100).toFixed(1) : 0;
     const col = v >= 0 ? '#16a34a' : '#dc2626';
     return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
-      <span style="font-size:.73rem;color:#374151;width:120px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.issuer}">${r.issuer}</span>
+      <span style="font-size:.73rem;color:#c8ddf0;width:120px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.issuer}">${r.issuer}</span>
       <div style="flex:1;height:14px;background:#f1f5f9;border-radius:4px;overflow:hidden">
         <div style="width:${pct}%;height:100%;background:${col};border-radius:4px"></div>
       </div>
@@ -1262,14 +1262,14 @@ async function loadEtfHistory() {
           callbacks: { label: ctx => ` ${ctx.dataset.label}: ${fmtPd(ctx.parsed.y)}` }
         },
         annotation: {
-          annotations: { zero: { type: 'line', yMin: 0, yMax: 0, borderColor: '#94a3b8', borderWidth: 1, borderDash: [4,4] } }
+          annotations: { zero: { type: 'line', yMin: 0, yMax: 0, borderColor: '#3b5280', borderWidth: 1, borderDash: [4,4] } }
         }
       },
       scales: {
         x: { ticks: { maxTicksLimit: 10, font: { size: 10 } }, grid: { display: false } },
         y: {
           ticks: { font: { size: 10 }, callback: v => fmtPd(v) },
-          grid: { color: '#f1f5f9' }
+          grid: { color: '#1e3860' }
         }
       }
     }
@@ -1293,11 +1293,11 @@ function renderSnapTable() {
     const v = r.premium_discount_pct;
     const maxAbs = 1.0;
     const pct = v != null ? Math.min(Math.abs(v) / maxAbs * 100, 100).toFixed(1) : 0;
-    const col = v != null ? (v >= 0 ? '#16a34a' : '#dc2626') : '#94a3b8';
+    const col = v != null ? (v >= 0 ? '#4ade80' : '#f87171') : '#7fa3c8';
     return `<tr>
       <td><span style="font-weight:700;font-family:monospace">${r.code}</span></td>
       <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.name||''}">${r.name||'—'}</td>
-      <td style="color:#64748b">${r.issuer||'—'}</td>
+      <td style="color:#a8c4e0">${r.issuer||'—'}</td>
       <td>${r.asset_class||'—'}</td>
       <td style="text-align:right;font-family:monospace">${r.nav != null ? '$'+r.nav.toFixed(4) : '—'}</td>
       <td style="text-align:right;font-family:monospace">${r.close_price != null ? '$'+r.close_price.toFixed(4) : '—'}</td>
@@ -1354,8 +1354,8 @@ _UPCOMING_BODY = """
 <div class="card mb-5">
   <div class="flex items-center justify-between mb-4">
     <div>
-      <h2 class="text-base font-bold text-gray-800">Coming Soon</h2>
-      <p class="text-xs text-gray-400 mt-0.5">
+      <h2 class="text-base font-bold text-slate-200">Coming Soon</h2>
+      <p class="text-xs text-slate-500 mt-0.5">
         Sourced from ASIC Offer Notice Board — PDS lodgements with 7-day exposure period complete.
         Expected dates are approximate; actual listing may vary.
       </p>
@@ -1366,20 +1366,20 @@ _UPCOMING_BODY = """
     </a>
   </div>
   <div id="upcoming-cards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-    <p class="text-sm text-gray-400 col-span-3">Loading…</p>
+    <p class="text-sm text-slate-500 col-span-3">Loading…</p>
   </div>
 </div>
 
 <!-- Recently Listed -->
 <div class="card">
   <div class="flex items-center justify-between mb-3">
-    <h2 class="text-base font-bold text-gray-800">Recently Listed <span class="text-gray-400 font-normal text-sm">(last 90 days)</span></h2>
+    <h2 class="text-base font-bold text-slate-200">Recently Listed <span class="text-slate-500 font-normal text-sm">(last 90 days)</span></h2>
     <div class="flex items-center gap-2">
       <input id="recent-q" type="text" placeholder="Search…"
              oninput="renderRecent()"
-             class="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs w-40 bg-gray-50">
+             class="border border-[#1e3860] rounded-lg px-2.5 py-1.5 text-xs w-40 bg-[#0d1c35] text-slate-200">
       <select id="recent-exchange" onchange="renderRecent()"
-              class="border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-gray-50">
+              class="border border-[#1e3860] rounded-lg px-2 py-1.5 text-xs bg-[#0d1c35] text-slate-200">
         <option value="">All exchanges</option>
         <option value="ASX">ASX</option>
         <option value="CXA">Cboe</option>
@@ -1396,7 +1396,7 @@ _UPCOMING_BODY = """
     </thead>
     <tbody id="recent-table"></tbody>
   </table>
-  <p id="recent-empty" class="text-sm text-gray-400 text-center py-6 hidden">No recent listings found.</p>
+  <p id="recent-empty" class="text-sm text-slate-500 text-center py-6 hidden">No recent listings found.</p>
 </div>
 """
 
@@ -1440,7 +1440,7 @@ function renderUpcoming() {
   const up = (_upData.upcoming || []);
   const container = document.getElementById('upcoming-cards');
   if (!up.length) {
-    container.innerHTML = '<p class="text-sm text-gray-400 col-span-3 py-4">No upcoming listings found. Run the upcoming listings scraper to populate.</p>';
+    container.innerHTML = '<p class="text-sm text-slate-500 col-span-3 py-4">No upcoming listings found. Run the upcoming listings scraper to populate.</p>';
     return;
   }
   container.innerHTML = up.map(r => {
@@ -1458,8 +1458,8 @@ function renderUpcoming() {
     <div style="border:1px solid #e2e8f0;border-radius:10px;padding:1rem;background:#fff">
       <div class="flex items-start justify-between gap-2 mb-2">
         <div class="flex-1 min-w-0">
-          <div style="font-weight:700;font-size:.82rem;line-height:1.3;color:#1e293b">${r.name || '—'}</div>
-          <div style="font-size:.7rem;color:#64748b;margin-top:.2rem">${r.issuer || '—'}</div>
+          <div style="font-weight:700;font-size:.82rem;line-height:1.3;color:#e2e8f0">${r.name || '—'}</div>
+          <div style="font-size:.7rem;color:#7fa3c8;margin-top:.2rem">${r.issuer || '—'}</div>
         </div>
         <div class="flex flex-col items-end gap-1 shrink-0">
           ${exchangeBadge(r.exchange)}
@@ -1508,7 +1508,7 @@ function renderRecent() {
         ${daysAgo !== null ? newBadge(daysAgo) : ''}
       </td>
       <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.name||''}">${r.name||'—'}</td>
-      <td style="color:#64748b;font-size:.75rem">${r.issuer||'—'}</td>
+      <td style="color:#a8c4e0;font-size:.75rem">${r.issuer||'—'}</td>
       <td>${r.asset_class||'—'}</td>
       <td style="white-space:nowrap"><span style="font-family:monospace">${dateStr}</span><br><span style="font-size:.65rem;color:#94a3b8">${daysStr}</span></td>
       <td style="text-align:right;font-family:monospace">${mer}</td>
