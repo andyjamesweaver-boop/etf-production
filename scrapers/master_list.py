@@ -66,6 +66,71 @@ def build_master_list(db_path=None) -> int:
         GROUP BY etf_code, sector
     ''')
 
+    # ── Sync units_on_issue from etp_monthly ──────────────────────────────────
+    # For every ETF, take the most-recent etp_monthly row and propagate
+    # total_units → etfs.units_on_issue where it is currently missing.
+    # Also fill fund_size_aud_millions from chess_mc where FUM is absent.
+    conn.execute('''
+        UPDATE etfs
+        SET units_on_issue = (
+            SELECT CAST(m.total_units AS INTEGER)
+            FROM etp_monthly m
+            WHERE m.code = etfs.code
+              AND m.total_units IS NOT NULL
+            ORDER BY m.date DESC
+            LIMIT 1
+        )
+        WHERE units_on_issue IS NULL
+          AND EXISTS (
+            SELECT 1 FROM etp_monthly m
+            WHERE m.code = etfs.code AND m.total_units IS NOT NULL
+          )
+    ''')
+    conn.execute('''
+        UPDATE etfs
+        SET fund_size_aud_millions = ROUND((
+            SELECT m.chess_mc / 1000000.0
+            FROM etp_monthly m
+            WHERE m.code = etfs.code
+              AND m.chess_mc IS NOT NULL
+            ORDER BY m.date DESC
+            LIMIT 1
+        ), 2)
+        WHERE fund_size_aud_millions IS NULL
+          AND EXISTS (
+            SELECT 1 FROM etp_monthly m
+            WHERE m.code = etfs.code AND m.chess_mc IS NOT NULL
+          )
+    ''')
+    synced = conn.execute(
+        "SELECT COUNT(*) FROM etfs WHERE units_on_issue IS NOT NULL"
+    ).fetchone()[0]
+    logger.info(f"Master list: {synced} ETFs have units_on_issue after etp_monthly sync")
+
+    # ── Estimate units for ETFs still missing (CXA / newer listings) ─────────
+    # Derive units_on_issue = fund_size_aud_millions * 1e6 / current_price
+    # for any ETF that still has no units but has both FUM and a price.
+    conn.execute('''
+        UPDATE etfs
+        SET units_on_issue = CAST(
+            ROUND(fund_size_aud_millions * 1000000.0 / current_price, 0) AS INTEGER
+        )
+        WHERE units_on_issue IS NULL
+          AND fund_size_aud_millions IS NOT NULL
+          AND current_price IS NOT NULL
+          AND current_price > 0
+    ''')
+    estimated = conn.execute('''
+        SELECT COUNT(*) FROM etfs
+        WHERE units_on_issue IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM etp_monthly m
+            WHERE m.code = etfs.code AND m.total_units IS NOT NULL
+          )
+          AND fund_size_aud_millions IS NOT NULL
+    ''').fetchone()[0]
+    logger.info(f"Master list: {estimated} ETFs got estimated units_on_issue from FUM/price")
+
     # Update issuer stats
     update_issuer_stats(conn)
 
