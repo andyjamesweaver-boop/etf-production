@@ -5,6 +5,115 @@ Each article is a dict with: slug, title, subtitle, date, category, summary, bod
 
 ARTICLES = [
 
+    # ── Weekly Wrap ────────────────────────────────────────────────────────────
+
+    {
+        "slug": "weekly-wrap-16-march-2026",
+        "title": "Weekly Wrap: Gold Miners Retreat, Asia Rallies",
+        "subtitle": "The market fell 0.81% in the week to 16 March. Gold miners gave back double digits while Asian equities outperformed. Bear ETFs had their best week in months.",
+        "date": "2026-03-20",
+        "category": "Market Trends",
+        "summary": "The Australian ETF market fell 0.81% in the week to 16 March 2026, as a sharp commodity selloff dominated headlines. Gold miners — which have been among the best performers over the past two years — gave back 10–12% in a single week. Offsetting that, Asian equities were broadly positive, with South Korean and China tech ETFs leading. Fixed income barely moved. Inverse ETFs rose. The week reinforced a familiar pattern: after extraordinary runs, mean reversion tends to be fast.",
+        "body": """
+<h2>Overview</h2>
+<p>The Australian ETF market fell <strong>0.81%</strong> on an equal-weighted basis in the week to 16 March 2026, with 396 ETFs included in the calculation. The result masked a sharp divergence between asset classes: commodities fell 4.8%, Australian equities fell 1.4%, and international equities fell 0.7%, while cash, digital assets, and alternatives were marginally positive. Fixed income was the relative safe haven, declining just 0.2%.</p>
+
+<p>The week's story was told in two acts. In the first, gold miners — products that had been among the strongest performers across the prior twelve months — gave back substantial ground in a single session-cluster, with MNRS and GDX both losing more than 11%. In the second, Asia-Pacific equities attracted buying interest, with South Korea, China tech, and broader Asia ex-Japan all advancing meaningfully.</p>
+
+<div class="chart-box">
+  <h3>Weekly Return by Asset Class — Week to 16 March 2026</h3>
+  <canvas id="chart-ac-weekly" height="160"></canvas>
+  <script>
+  (function() {
+    const labels = ['Cash','Digital Assets','Alternatives','Fixed Income','Thematic','Property','Diversified','Intl Equities','Aust Equities','Commodities'];
+    const data   = [+0.1,+1.2,+0.1,-0.2,-0.5,-0.4,-0.6,-0.7,-1.4,-4.8];
+    const colors = data.map(v => v >= 0 ? '#4ade8080' : '#f8717180');
+    const borders = data.map(v => v >= 0 ? '#4ade80' : '#f87171');
+    new Chart(document.getElementById('chart-ac-weekly').getContext('2d'), {
+      type: 'bar',
+      data: { labels, datasets: [{ label: 'Return %', data, backgroundColor: colors, borderColor: borders, borderWidth: 1, borderRadius: 3, borderSkipped: false }] },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.x.toFixed(1) + '%' } } },
+        scales: {
+          x: { ticks: { font: { size: 10 }, callback: v => v + '%' }, grid: { color: '#1e3860' } },
+          y: { ticks: { font: { size: 10 } }, grid: { display: false } }
+        }
+      }
+    });
+  })();
+  </script>
+</div>
+
+<h2>The Commodity Selloff: Gold Miners' Sharpest Week in Months</h2>
+<p>Gold miners had the worst week across the entire ETF market. VanEck's GDX (Global Gold Miners) fell <strong>11.3%</strong> and BetaShares' MNRS (Global Gold Miners Currency Hedged) fell <strong>11.0%</strong>. Silver miners were worse: Global X's SLVM dropped <strong>12.2%</strong> and BetaShares' XMET (Global Uranium and Copper Miners) fell <strong>10.8%</strong>. Uranium also sold off, with URNM declining 7.2%.</p>
+
+<p>Context matters here. GDX has returned <strong>+137.9%</strong> over the trailing twelve months. MNRS has returned <strong>+189.9%</strong>. SLVM launched in January 2026 and has already drawn $31M in assets. These are products that have attracted significant inflows precisely because of their performance, which makes the week's selloff interpretable as profit-taking rather than a fundamental reversal — though the two are not mutually exclusive.</p>
+
+<p>Physical gold ETFs also fell, but far less sharply. GOLD (Global X) and QAU (BetaShares) both declined around 5%, consistent with underlying gold price weakness. The amplified miner losses reflect the operating leverage inherent in mining equities: when gold falls, miner margins compress faster than the metal price, driving equity selloffs that exceed the commodity move.</p>
+
+<p>WIRE (Global X Global Infrastructure & Utilities), which has a significant exposure to copper-intensive electrification infrastructure, also fell 7.8%. Copper prices weakened on the week amid renewed concern about global industrial demand, particularly from Europe.</p>
+
+<div class="chart-box">
+  <h3>Worst Performers — Week to 16 March (FUM ≥ $10M)</h3>
+  <canvas id="chart-bottom" height="160"></canvas>
+  <script>
+  (function() {
+    const labels = ['SLVM','GDX','MNRS','XMET','GMTL','WIRE','URNM','ETPMAG','ATOM','QAU'];
+    const data   = [-12.2,-11.3,-11.0,-10.8,-8.6,-7.8,-7.2,-7.0,-5.7,-5.0];
+    new Chart(document.getElementById('chart-bottom').getContext('2d'), {
+      type: 'bar',
+      data: { labels, datasets: [{ label: 'Return %', data, backgroundColor: '#f8717166', borderColor: '#f87171', borderWidth: 1, borderRadius: 3, borderSkipped: false }] },
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.y.toFixed(1) + '%' } } },
+        scales: {
+          x: { ticks: { font: { size: 10 } }, grid: { display: false } },
+          y: { ticks: { font: { size: 10 }, callback: v => v + '%' }, grid: { color: '#1e3860' } }
+        }
+      }
+    });
+  })();
+  </script>
+</div>
+
+<h2>Asian Equities: The Week's Clear Outperformer</h2>
+<p>While commodities sold off, Asian equities were the standout positive theme. iShares' IKO (MSCI South Korea ETF) led all ETFs with FUM above $10M, rising <strong>+5.8%</strong> on the week. South Korea's equity market has been a beneficiary of renewed investor interest in AI hardware and semiconductor exposure, with Samsung Electronics and SK Hynix representing significant weights in the benchmark.</p>
+
+<p>BetaShares' ASIA (Asia Technology Tigers) rose <strong>+3.5%</strong>, and iShares' IAA (Asia 50) gained <strong>+2.7%</strong>. Both are products with meaningful China and Taiwan technology exposure. Global X's DRGN (China Tech) added 2.4%. The pattern suggests rotation from US tech — which had a relatively modest week — toward Asian technology names.</p>
+
+<p>Vanguard's VAE (FTSE Asia ex Japan) gained 1.3% and Platinum's PAXX (Platinum Asia Fund) added 1.2%. The Asia ex-Japan category collectively outperformed global developed markets by a meaningful margin. For investors who have been waiting for a sustained Asian equity outperformance cycle, the week provided encouraging data — though one week is insufficient to call a trend.</p>
+
+<h2>Broad Equity Benchmarks: Modest Declines Across the Board</h2>
+<p>The large Australian and global equity benchmarks declined modestly. VAS (Vanguard Australian Shares, $22.5B) fell <strong>1.43%</strong>, A200 (BetaShares, $9.1B) fell <strong>1.30%</strong>, and STW (SPDR, $6.2B) fell <strong>1.35%</strong>, all consistent with weakness in ASX200 large caps driven partly by resource sector exposure. VHY (Vanguard High Yield, $6.8B) was the exception, rising <strong>+0.27%</strong>, benefiting from defensive yield-seeking in an uncertain week.</p>
+
+<p>On the global side, IVV (iShares S&amp;P 500, $12.2B) fell <strong>0.59%</strong> and NDQ (BetaShares Nasdaq 100, $7.1B) declined just <strong>0.21%</strong> — the Nasdaq's relative resilience suggesting technology continued to hold ground even as sentiment was broadly cautious. VGS (Vanguard Global Shares, $13.9B) fell 0.63%. QUAL (VanEck Quality Factor, $7.7B) fell 1.16%, its quality-factor screen not providing meaningful protection in this week's environment.</p>
+
+<h2>Fixed Income: The Quiet Achiever</h2>
+<p>Fixed income was remarkably stable. VBND (Vanguard Global Aggregate Bond, $3.9B) fell just 0.07%, as did VAF (Vanguard Australian Fixed Interest, $3.4B). Floating rate and hybrid products were marginally positive: QPON (BetaShares Senior Floating Rate, $1.9B) gained 0.11% and HBRD (BetaShares Hybrids, $2.6B) gained 0.10%. AAA (BetaShares Cash Plus, $5.0B) rose 0.06% as cash yields continued to accrue.</p>
+
+<p>The near-zero movement in fixed income is notable in context. With commodities down sharply and equities under pressure, bonds functioned as expected — neither selling off in a risk-off move nor rallying as a flight-to-quality asset. This is consistent with a market interpreting the week as sector rotation rather than systemic concern.</p>
+
+<h2>Inverse and Bear ETFs: A Good Week for Hedgers</h2>
+<p>Investors who held inverse products were rewarded. BBOZ (BetaShares Australian Equities Strong Bear) rose <strong>+3.3%</strong> and BBUS (US Equities Strong Bear) gained <strong>+2.3%</strong>, both reflecting the underlying index declines. SNAS (Global X Ultra Short Nasdaq 100) gained 1.5%. OOO (BetaShares Crude Oil, which tracks crude oil futures) added 2.5% as energy prices moved against the broader commodity trend.</p>
+
+<p>The geared long products experienced the inverse: GEAR (BetaShares Geared Australian Equities) fell 3.1%, GGUS (BetaShares Geared US Equity) fell 2.4%, and LEVR (First Sentier Geared Australian Share) fell 4.3%. These products amplify market moves in both directions, and this week that amplification cut against holders.</p>
+
+<h2>New Products: Vanguard's Ultra-Low-Cost S&P 500 ETFs Find Early Traction</h2>
+<p>Three products listed on 4 March are now in their first weeks of trading. Vanguard's <strong>V500</strong> (S&amp;P 500, MER 0.07%) has already attracted $24M in assets, and its hedged sibling <strong>V5AH</strong> (MER 0.09%) has gathered $5M. These are among the cheapest S&amp;P 500 products available to Australian retail investors — V500 undercuts IVV's 0.04% MER only marginally, but the Vanguard brand and in-specie creation structure make it a natural fit for existing Vanguard investors diversifying their portfolios.</p>
+
+<p>VanEck's <strong>MONY</strong> (Cash Plus Active, MER 0.15%), which listed on 4 February, has now crossed $100M in assets — a notable milestone for a cash-management product in its first six weeks. The fund targets returns above the RBA cash rate, sitting between AAA (pure cash) and HBRD (hybrid credit) on the risk spectrum.</p>
+
+<h2>NAV Premium/Discount</h2>
+<p>The market-wide average premium/discount to NAV was <strong>-1.07%</strong> as of 20 March, with 57 of 318 ETFs trading at a premium. The broad discount reflects the lag between NAV calculations (typically struck at market close) and intraday price movements — particularly pronounced for products with underlying assets in different time zones. For investors in diversified equity products, the discount is unlikely to be economically significant at these levels.</p>
+
+<h2>What to Watch</h2>
+<p>The week's sharp commodity reversal will draw attention to whether the gold miners selloff represents a temporary correction within a continuing bull trend, or the beginning of a more sustained mean reversion. GDX has returned 138% over twelve months; a 10–15% correction is modest in that context. The more important signal will come from gold price direction — if the metal stabilises above $3,000/oz, miner equities are likely to recover quickly.</p>
+
+<p>The Asia outperformance theme is worth monitoring. If China stimulus expectations accelerate and AI semiconductor demand remains elevated, products like ASIA, IAA, and IKO could sustain gains that have been intermittent rather than persistent over the past year.</p>
+
+<p>Fixed income investors will be watching the Reserve Bank of Australia's next communication carefully. With cash ETFs like AAA returning approximately 3.9% annually and investment-grade credit (CRED) at 5%, the fixed income carry trade remains attractively priced relative to equity volatility.</p>
+""",
+    },
+
     # ── Thematic / Performance Articles ───────────────────────────────────────
 
     {
