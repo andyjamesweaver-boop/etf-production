@@ -1830,6 +1830,8 @@ async function init() {
   });
 
   renderAssetLens();
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('page').classList.remove('hidden');
 }
 
 // ─────────────────────────────────────────────────────────────────────────

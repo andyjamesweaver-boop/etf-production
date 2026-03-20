@@ -3267,7 +3267,7 @@ async function loadFilters() {
 /* ======================================================= overview stats */
 async function loadOverview() {
   const m = await api('/api/v1/market/overview');
-  document.getElementById('c-fum').textContent = fmtFum(m.chess_fum_millions ?? m.total_fum_millions);
+  document.getElementById('c-fum').textContent = fmtFum(m.total_fum_millions);
   if (m.largest_etf) {
     document.getElementById('c-largest-etf').textContent =
       m.largest_etf.code + ' ' + fmtFum(m.largest_etf.fund_size_aud_millions);
@@ -3310,7 +3310,7 @@ async function loadOverview() {
   } catch (_) {}
   const now = new Date().toLocaleTimeString();
   document.getElementById('subtitle').textContent =
-    `${(m.total_etfs || 0).toLocaleString()} ETFs · ${fmtFum(m.chess_fum_millions ?? m.total_fum_millions)} CHESS FUM · ${now}`;
+    `${(m.total_etfs || 0).toLocaleString()} ETFs · ${fmtFum(m.total_fum_millions)} total FUM · ${now}`;
   document.getElementById('last-refresh').textContent = 'Live · ' + now;
 }
 
