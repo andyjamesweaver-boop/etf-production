@@ -265,8 +265,8 @@ async function init() {
 """
 
 PAGE_FUM = _page(
-    'FUM Analysis',
-    'Total funds under management across Australian-listed ETFs by issuer, asset class, and individual fund',
+    'Market Size',
+    'Total market AUM, by asset class, by issuer, and largest funds',
     _FUM_BODY,
     _FUM_JS,
 )
@@ -329,6 +329,24 @@ _LISTINGS_BODY = """
     <div id="bars-fundtype"></div>
   </div>
 </div>
+
+<!-- Upcoming & recent new issues -->
+<div class="card">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="font-semibold text-sm text-slate-300">Upcoming & Recent Issues</h2>
+    <a href="/insights/upcoming" class="text-xs text-blue-400 hover:text-blue-300">Full new listings view ›</a>
+  </div>
+  <div id="listings-upcoming" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+    <p class="text-sm text-slate-500">Loading…</p>
+  </div>
+  <h3 class="font-semibold text-xs text-slate-400 uppercase tracking-wider mb-3 mt-2">Recently Listed (30 days)</h3>
+  <div class="overflow-x-auto">
+    <table>
+      <thead><tr><th>Code</th><th>Fund Name</th><th>Issuer</th><th>Asset Class</th><th>Listed</th><th style="text-align:right">MER</th></tr></thead>
+      <tbody id="listings-recent-new"></tbody>
+    </table>
+  </div>
+</div>
 """
 
 _LISTINGS_PALETTE = """
@@ -384,6 +402,41 @@ async function init() {
   renderYearChart();
   renderTables();
   renderBars();
+
+  // Fetch upcoming data for the new section
+  try {
+    const up = await api('/api/v1/insights/upcoming');
+    const upcoming = (up.upcoming || []).slice(0, 6);
+    const upEl = document.getElementById('listings-upcoming');
+    if (upcoming.length) {
+      upEl.innerHTML = upcoming.map(u => `
+        <div class="border border-[#1e3860] rounded-lg p-3 bg-[#0d1c35]">
+          <div class="flex items-center justify-between mb-1">
+            <span class="font-bold text-blue-400 text-sm">${u.code || '—'}</span>
+            <span class="text-xs text-indigo-400 font-semibold">Coming Soon</span>
+          </div>
+          <div class="text-xs text-slate-300 font-medium leading-snug mb-1">${u.name || '—'}</div>
+          <div class="text-xs text-slate-500">${u.issuer || ''}</div>
+          ${u.expected_date ? `<div class="text-xs text-slate-500 mt-1">Expected: ${u.expected_date}</div>` : ''}
+        </div>`).join('');
+    } else {
+      upEl.innerHTML = '<p class="text-sm text-slate-500 col-span-3">No upcoming listings at this time.</p>';
+    }
+    // Recently listed (last 30 days)
+    const recent30 = (up.recent || []).filter(r => {
+      if (!r.inception_date) return false;
+      const d = new Date(r.inception_date);
+      return (Date.now() - d.getTime()) < 30 * 86400 * 1000;
+    }).slice(0, 15);
+    document.getElementById('listings-recent-new').innerHTML = recent30.map(r => `<tr>
+      <td class="font-bold text-blue-400">${r.code}</td>
+      <td class="text-slate-300" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.name||'—'}</td>
+      <td class="text-slate-400 text-xs">${r.issuer||'—'}</td>
+      <td class="text-slate-400 text-xs">${r.asset_class||'—'}</td>
+      <td class="text-slate-500 tabular-nums text-xs">${r.inception_date||'—'}</td>
+      <td class="text-right text-slate-400 tabular-nums text-xs">${r.management_fee ? r.management_fee.toFixed(2)+'%' : '—'}</td>
+    </tr>`).join('') || '<tr><td colspan="6" class="text-center text-slate-500 py-4">No listings in last 30 days</td></tr>';
+  } catch(_) {}
 }
 
 function renderYearChart() {
@@ -500,7 +553,7 @@ function renderBars() {
 
 PAGE_LISTINGS = _page(
     'ETF Listings',
-    'History of Australian ETF listings — by year, issuer, asset class, and exchange',
+    'Historical listings, recent additions, and upcoming ETFs',
     _LISTINGS_BODY,
     _LISTINGS_JS,
 )
@@ -618,8 +671,8 @@ async function init() {
 """
 
 PAGE_RETURNS = _page(
-    'Returns Analysis',
-    'Performance across the Australian ETF market — distribution, top/bottom performers, by asset class and issuer',
+    'Performance',
+    'Market returns by ETF, asset class, and issuer',
     _RETURNS_BODY,
     _RETURNS_JS,
 )
@@ -630,6 +683,21 @@ PAGE_RETURNS = _page(
 # ---------------------------------------------------------------------------
 _EXPENSE_BODY = """
 <div id="hero" class="grid grid-cols-2 sm:grid-cols-4 gap-4"></div>
+<!-- NAV prem/disc summary -->
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-4" id="cost-hero"></div>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+  <div class="card">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="font-semibold text-sm text-slate-300">Market Premium/Discount (90 days)</h2>
+      <a href="/insights/nav" class="text-xs text-blue-400 hover:text-blue-300">Full NAV analysis ›</a>
+    </div>
+    <div class="relative" style="height:180px"><canvas id="cost-nav-chart"></canvas></div>
+  </div>
+  <div class="card">
+    <h2 class="font-semibold text-sm text-slate-300 mb-3">Today's Spread Distribution</h2>
+    <div class="relative" style="height:180px"><canvas id="cost-nav-dist"></canvas></div>
+  </div>
+</div>
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
   <div class="card">
     <h2 class="font-semibold text-sm text-slate-300 mb-4">MER Distribution</h2>
@@ -681,6 +749,36 @@ _EXPENSE_JS = """
 async function init() {
   const d = await api('/api/v1/insights/expense');
   document.getElementById('ts').textContent = new Date().toLocaleTimeString('en-AU');
+
+  // Fetch NAV data for prem/disc section
+  try {
+    const nav = await api('/api/v1/insights/nav');
+    // cost-hero
+    const avgPd = nav.avg_premium_discount ?? 0;
+    const pdCls = avgPd >= 0 ? 'text-green-400' : 'text-red-400';
+    document.getElementById('cost-hero').innerHTML = [
+      ['Market Avg MER', (d.avg_mer||0).toFixed(2)+'%', 'simple average'],
+      ['FUM-Wtd MER', (d.fum_weighted_mer||0).toFixed(2)+'%', 'cost per $1 invested'],
+      ['Avg Prem/Disc', (avgPd>=0?'+':'')+avgPd.toFixed(2)+'%', 'vs NAV today'],
+      ['ETFs at Premium', (nav.pct_at_premium||0).toFixed(0)+'%', 'of market by FUM'],
+    ].map(([l,v,s]) => `<div class="card"><div class="sl">${l}</div><div class="sv ${l.includes('Prem') ? pdCls : ''}">${v}</div><div class="ss">${s}</div></div>`).join('');
+    // nav trend chart (line)
+    const navDates = (nav.history||[]).map(r=>r.date);
+    const navVals  = (nav.history||[]).map(r=>r.avg_pd);
+    new Chart(document.getElementById('cost-nav-chart').getContext('2d'), {
+      type:'line',
+      data:{labels:navDates,datasets:[{label:'Avg Prem/Disc %',data:navVals,borderColor:'#3b82f6',backgroundColor:'#3b82f620',fill:true,tension:0.3,pointRadius:0,borderWidth:2}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.y.toFixed(3)+'%'}}},scales:{x:{ticks:{maxTicksLimit:6,font:{size:10}},grid:{display:false}},y:{ticks:{font:{size:10},callback:v=>v.toFixed(2)+'%'},grid:{color:'#1e3860'}}}},
+    });
+    // distribution chart (bar)
+    const distLabels = (nav.distribution||[]).map(r=>r.bucket);
+    const distData   = (nav.distribution||[]).map(r=>r.count);
+    new Chart(document.getElementById('cost-nav-dist').getContext('2d'), {
+      type:'bar',
+      data:{labels:distLabels,datasets:[{label:'ETFs',data:distData,backgroundColor:'#3b82f680',borderRadius:3}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:9}}},y:{ticks:{font:{size:10},stepSize:5},grid:{color:'#1e3860'}}}},
+    });
+  } catch(_) {}
 
   const cheapest = d.cheapest[0];
   const priciest = d.most_expensive[0];
@@ -784,8 +882,8 @@ async function init() {
 """
 
 PAGE_EXPENSE = _page(
-    'Cost Analysis',
-    'Management expense ratios across the Australian ETF market — by fund, asset class, and issuer',
+    'Costs & Efficiency',
+    'Management fees, FUM-weighted MER, and trading spreads',
     _EXPENSE_BODY,
     _EXPENSE_JS,
 )
@@ -906,7 +1004,7 @@ async function init() {
 
 PAGE_ISSUERS = _page(
     'Issuer Analysis',
-    'Fund manager comparison — market share, ETF count, fees, returns, and asset class mix',
+    'Market share, fund counts, and performance by ETF issuer',
     _ISSUERS_BODY,
     _ISSUERS_JS,
 )

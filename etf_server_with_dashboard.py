@@ -557,6 +557,60 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
                 "GROUP BY asset_class ORDER BY total_fum DESC"
             ).fetchall()
 
+            largest_etf_row = conn.execute(
+                "SELECT code, name, fund_size_aud_millions FROM etfs "
+                "WHERE fund_size_aud_millions IS NOT NULL "
+                "ORDER BY fund_size_aud_millions DESC LIMIT 1"
+            ).fetchone()
+
+            largest_issuer_fum_row = conn.execute(
+                "SELECT issuer as name, SUM(fund_size_aud_millions) as total_fum "
+                "FROM etfs WHERE fund_size_aud_millions IS NOT NULL AND issuer IS NOT NULL "
+                "GROUP BY issuer ORDER BY total_fum DESC LIMIT 1"
+            ).fetchone()
+
+            total_fum_val = stats['total_fum_millions'] or 1
+            largest_issuer_fum = None
+            if largest_issuer_fum_row:
+                share = round((largest_issuer_fum_row['total_fum'] / total_fum_val) * 100, 1)
+                largest_issuer_fum = {
+                    'name': largest_issuer_fum_row['name'],
+                    'total_fum': largest_issuer_fum_row['total_fum'],
+                    'market_share_pct': share,
+                }
+
+            most_etfs_issuer_row = conn.execute(
+                "SELECT issuer as name, COUNT(*) as etf_count FROM etfs "
+                "WHERE issuer IS NOT NULL GROUP BY issuer ORDER BY etf_count DESC LIMIT 1"
+            ).fetchone()
+
+            fum_weighted_mer_row = conn.execute(
+                "SELECT SUM(fund_size_aud_millions * COALESCE(expense_ratio, management_fee)) / "
+                "SUM(fund_size_aud_millions) as fwm FROM etfs "
+                "WHERE fund_size_aud_millions > 0 "
+                "AND COALESCE(expense_ratio, management_fee) > 0"
+            ).fetchone()
+
+            try:
+                upcoming_count_row = conn.execute(
+                    "SELECT COUNT(*) FROM upcoming_listings"
+                ).fetchone()
+                upcoming_count = upcoming_count_row[0] if upcoming_count_row else 0
+            except Exception:
+                upcoming_count = 0
+
+            exchange_counts = conn.execute(
+                "SELECT exchange, COUNT(*) as cnt FROM etfs "
+                "WHERE exchange IS NOT NULL GROUP BY exchange"
+            ).fetchall()
+            asx_count = 0
+            cxa_count = 0
+            for row in exchange_counts:
+                if row['exchange'] and row['exchange'].upper() == 'ASX':
+                    asx_count = row['cnt']
+                elif row['exchange'] and row['exchange'].upper() == 'CXA':
+                    cxa_count = row['cnt']
+
             self.send_json({
                 'total_fum_millions': stats['total_fum_millions'],
                 'chess_fum_millions': stats['chess_fum_millions'],
@@ -566,6 +620,13 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
                 'top_performer': dict(top) if top else None,
                 'avg_premium_discount': avg_pd_row[0] if avg_pd_row else None,
                 'categories': [dict(c) for c in cats],
+                'largest_etf': dict(largest_etf_row) if largest_etf_row else None,
+                'largest_issuer_fum': largest_issuer_fum,
+                'most_etfs_issuer': dict(most_etfs_issuer_row) if most_etfs_issuer_row else None,
+                'fum_weighted_mer': round(fum_weighted_mer_row['fwm'], 3) if fum_weighted_mer_row and fum_weighted_mer_row['fwm'] else None,
+                'upcoming_count': upcoming_count,
+                'asx_count': asx_count,
+                'cxa_count': cxa_count,
                 'last_updated': datetime.now().isoformat(),
             })
         except Exception as e:
@@ -2100,47 +2161,82 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
 <main class="max-w-[1400px] mx-auto px-5 py-5">
 
   <!-- ── Stat cards ── -->
-  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 mb-5">
-    <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer" onclick="goCard('fum')" title="CHESS FUM = units on issue × last price. View FUM breakdown by asset class.">
-      <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">CHESS FUM</p>
-      <p id="c-fum" class="text-2xl font-bold text-gray-900 mt-1 leading-tight">—</p>
-      <p class="text-gray-400 text-xs mt-0.5 flex items-center justify-between">Total <span id="c-fum-total" class="tabular-nums">—</span> <span class="text-slate-300">›</span></p>
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
+
+    <!-- Tile 1: Market Size -->
+    <div class="stat-card bg-[#0f2040] rounded-xl border border-[#1e3860] p-5 cursor-pointer" onclick="goCard('fum')">
+      <p class="text-xs font-semibold uppercase tracking-wider" style="color:#7fa3c8">MARKET SIZE</p>
+      <p id="c-fum" class="text-2xl font-bold text-white mt-1 leading-tight">—</p>
+      <hr class="border-[#1e3860] my-2">
+      <div class="flex items-center justify-between text-xs" style="color:#a8c4e0">
+        <span>Largest ETF</span>
+        <span id="c-largest-etf" class="tabular-nums font-medium">—</span>
+      </div>
+      <div class="flex items-center justify-between text-xs mt-2" style="color:#7fa3c8">
+        <span id="c-largest-issuer">—</span>
+        <span>›</span>
+      </div>
     </div>
-    <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer" onclick="goCard('count')" title="Browse all ETFs sorted by size">
-      <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">ETFs Listed</p>
-      <p id="c-count" class="text-2xl font-bold text-gray-900 mt-1 leading-tight">—</p>
-      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">all exchanges <span class="text-slate-300">›</span></p>
+
+    <!-- Tile 2: Listings -->
+    <div class="stat-card bg-[#0f2040] rounded-xl border border-[#1e3860] p-5 cursor-pointer" onclick="goCard('listings')">
+      <p class="text-xs font-semibold uppercase tracking-wider" style="color:#7fa3c8">LISTINGS</p>
+      <p id="c-count" class="text-2xl font-bold text-white mt-1 leading-tight">—</p>
+      <hr class="border-[#1e3860] my-2">
+      <div class="flex items-center justify-between text-xs" style="color:#a8c4e0">
+        <span id="c-upcoming-count">—</span>
+        <span>coming soon</span>
+      </div>
+      <div class="flex items-center justify-between text-xs mt-2" style="color:#7fa3c8">
+        <span id="c-exchange-split">—</span>
+        <span>›</span>
+      </div>
     </div>
-    <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer" onclick="goCard('return')" title="See top performing ETFs">
-      <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Avg 1Y Return</p>
+
+    <!-- Tile 3: Performance -->
+    <div class="stat-card bg-[#0f2040] rounded-xl border border-[#1e3860] p-5 cursor-pointer" onclick="goCard('returns')">
+      <p class="text-xs font-semibold uppercase tracking-wider" style="color:#7fa3c8">PERFORMANCE</p>
       <p id="c-ret" class="text-2xl font-bold mt-1 leading-tight">—</p>
-      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">market average <span class="text-slate-300">›</span></p>
+      <hr class="border-[#1e3860] my-2">
+      <div class="flex items-center justify-between text-xs" style="color:#a8c4e0">
+        <span>Best:</span>
+        <span id="c-top" class="font-bold text-blue-400 tabular-nums">—</span>
+      </div>
+      <div class="flex items-center justify-between text-xs mt-2" style="color:#7fa3c8">
+        <span>market avg 1Y return</span>
+        <span>›</span>
+      </div>
     </div>
-    <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer" onclick="goCard('expense')" title="See lowest cost ETFs">
-      <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Avg Expense</p>
-      <p id="c-exp" class="text-2xl font-bold text-gray-900 mt-1 leading-tight">—</p>
-      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">management fee <span class="text-slate-300">›</span></p>
+
+    <!-- Tile 4: Costs -->
+    <div class="stat-card bg-[#0f2040] rounded-xl border border-[#1e3860] p-5 cursor-pointer" onclick="goCard('expense')">
+      <p class="text-xs font-semibold uppercase tracking-wider" style="color:#7fa3c8">COSTS</p>
+      <p id="c-exp" class="text-2xl font-bold text-white mt-1 leading-tight">—</p>
+      <hr class="border-[#1e3860] my-2">
+      <div class="flex items-center justify-between text-xs" style="color:#a8c4e0">
+        <span>Avg spread</span>
+        <span id="c-nav" class="tabular-nums font-medium">—</span>
+      </div>
+      <div class="flex items-center justify-between text-xs mt-2" style="color:#7fa3c8">
+        <span>fee + implicit trading cost</span>
+        <span>›</span>
+      </div>
     </div>
-    <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer" onclick="goCard('top')" title="Open top performer detail">
-      <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Top Performer</p>
-      <p id="c-top" class="text-2xl font-bold text-blue-600 mt-1 leading-tight">—</p>
-      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">best 1Y return <span class="text-slate-300">›</span></p>
+
+    <!-- Tile 5: Issuers -->
+    <div class="stat-card bg-[#0f2040] rounded-xl border border-[#1e3860] p-5 cursor-pointer" onclick="goCard('issuers')">
+      <p class="text-xs font-semibold uppercase tracking-wider" style="color:#7fa3c8">ISSUERS</p>
+      <p id="c-issuers" class="text-2xl font-bold text-white mt-1 leading-tight">—</p>
+      <hr class="border-[#1e3860] my-2">
+      <div class="flex items-center justify-between text-xs" style="color:#a8c4e0">
+        <span id="c-most-fum-issuer">—</span>
+      </div>
+      <div class="flex items-center justify-between text-xs mt-2" style="color:#7fa3c8">
+        <span id="c-most-etfs-issuer">—</span>
+        <span>›</span>
+      </div>
     </div>
-    <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer" onclick="goCard('issuers')" title="View issuer market share">
-      <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Issuers</p>
-      <p id="c-issuers" class="text-2xl font-bold text-gray-900 mt-1 leading-tight">—</p>
-      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">fund managers <span class="text-slate-300">›</span></p>
-    </div>
-    <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer" onclick="goCard('nav')" title="Premium / Discount to NAV analysis">
-      <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Prem / Disc</p>
-      <p id="c-nav" class="text-2xl font-bold text-gray-900 mt-1 leading-tight">—</p>
-      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">vs NAV <span class="text-slate-300">›</span></p>
-    </div>
-    <div class="stat-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer" onclick="goCard('upcoming')" title="Upcoming & recently listed ETFs">
-      <p class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Coming Soon</p>
-      <p id="c-upcoming" class="text-2xl font-bold text-indigo-600 mt-1 leading-tight">—</p>
-      <p class="text-gray-400 text-xs mt-1 flex items-center justify-between">new listings <span class="text-slate-300">›</span></p>
-    </div>
+
   </div>
 
   <!-- ── Articles carousel ── -->
@@ -3005,29 +3101,45 @@ async function loadFilters() {
 async function loadOverview() {
   const m = await api('/api/v1/market/overview');
   document.getElementById('c-fum').textContent = fmtFum(m.chess_fum_millions ?? m.total_fum_millions);
-  document.getElementById('c-fum-total').textContent = fmtFum(m.total_fum_millions);
+  if (m.largest_etf) {
+    document.getElementById('c-largest-etf').textContent =
+      m.largest_etf.code + ' ' + fmtFum(m.largest_etf.fund_size_aud_millions);
+  }
+  if (m.largest_issuer_fum) {
+    document.getElementById('c-largest-issuer').textContent =
+      m.largest_issuer_fum.name + ' ' + m.largest_issuer_fum.market_share_pct + '%';
+  }
   document.getElementById('c-count').textContent = (m.total_etfs || 0).toLocaleString();
+  document.getElementById('c-exchange-split').textContent =
+    'ASX ' + (m.asx_count || '—') + ' · CXA ' + (m.cxa_count || '—');
   const ret = document.getElementById('c-ret');
   ret.textContent = pct(m.avg_return_1y);
   ret.className = 'text-2xl font-bold mt-1 leading-tight ' + pctCls(m.avg_return_1y);
-  document.getElementById('c-exp').textContent =
-    (m.avg_expense_ratio || 0).toFixed(2) + '%';
   if (m.top_performer) {
     document.getElementById('c-top').textContent =
       m.top_performer.code + ' ' + pct(m.top_performer.return_1y);
     topPerformerCode = m.top_performer.code;
   }
+  document.getElementById('c-exp').textContent =
+    (m.fum_weighted_mer || m.avg_expense_ratio || 0).toFixed(2) + '%';
   if (m.avg_premium_discount != null) {
     const navEl = document.getElementById('c-nav');
     const v = m.avg_premium_discount;
     navEl.textContent = (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
-    navEl.className = 'text-2xl font-bold mt-1 leading-tight ' + (v >= 0 ? 'text-green-600' : 'text-red-500');
+  }
+  if (m.largest_issuer_fum) {
+    document.getElementById('c-most-fum-issuer').textContent =
+      m.largest_issuer_fum.name + ' ' + fmtFum(m.largest_issuer_fum.total_fum);
+  }
+  if (m.most_etfs_issuer) {
+    document.getElementById('c-most-etfs-issuer').textContent =
+      m.most_etfs_issuer.name + ' ' + m.most_etfs_issuer.etf_count + ' ETFs';
   }
   // Upcoming listings stat card (best-effort, non-blocking)
   try {
     const up = await api('/api/v1/insights/upcoming');
     const n = (up.stats || {}).upcoming_count || 0;
-    document.getElementById('c-upcoming').textContent = n > 0 ? n : '—';
+    document.getElementById('c-upcoming-count').textContent = n > 0 ? n : '—';
   } catch (_) {}
   const now = new Date().toLocaleTimeString();
   document.getElementById('subtitle').textContent =
@@ -3039,13 +3151,16 @@ async function loadOverview() {
 function goCard(type) {
   switch (type) {
     case 'fum':      window.location.href = '/insights/fum';      break;
+    case 'listings': window.location.href = '/insights/listings';  break;
+    case 'returns':  window.location.href = '/insights/returns';   break;
+    case 'expense':  window.location.href = '/insights/expense';   break;
+    case 'issuers':  window.location.href = '/insights/issuers';   break;
+    // legacy aliases
     case 'count':    window.location.href = '/insights/listings';  break;
     case 'return':   window.location.href = '/insights/returns';   break;
-    case 'expense':  window.location.href = '/insights/expense';   break;
     case 'top':      window.location.href = '/insights/returns';   break;
-    case 'issuers':  window.location.href = '/insights/issuers';   break;
-    case 'nav':      window.location.href = '/insights/nav';       break;
-    case 'upcoming': window.location.href = '/insights/upcoming';  break;
+    case 'nav':      window.location.href = '/insights/expense';   break;
+    case 'upcoming': window.location.href = '/insights/listings';  break;
   }
 }
 
