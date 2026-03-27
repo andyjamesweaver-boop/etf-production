@@ -242,6 +242,12 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
             category = self._str(qs, 'category')  # alias
             benchmark = self._str(qs, 'benchmark')
             fund_type = self._str(qs, 'fund_type')
+            max_fee      = self._str(qs, 'max_fee')
+            min_fum      = self._str(qs, 'min_fum')
+            min_ret_1y   = self._str(qs, 'min_return_1y')
+            max_ret_1y   = self._str(qs, 'max_return_1y')
+            min_yield    = self._str(qs, 'min_yield')
+            fx_hedged    = self._str(qs, 'fx_hedged')
 
             if exchange:
                 where.append("exchange = ?"); params.append(exchange.upper())
@@ -253,6 +259,23 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
                 where.append("benchmark LIKE ?"); params.append(f'%{benchmark}%')
             if fund_type:
                 where.append("fund_type = ?"); params.append(fund_type)
+            if max_fee is not None:
+                try: where.append("expense_ratio <= ?"); params.append(float(max_fee))
+                except (ValueError, TypeError): pass
+            if min_fum is not None:
+                try: where.append("fund_size_aud_millions >= ?"); params.append(float(min_fum))
+                except (ValueError, TypeError): pass
+            if min_ret_1y is not None:
+                try: where.append("return_1y >= ?"); params.append(float(min_ret_1y))
+                except (ValueError, TypeError): pass
+            if max_ret_1y is not None:
+                try: where.append("return_1y <= ?"); params.append(float(max_ret_1y))
+                except (ValueError, TypeError): pass
+            if min_yield is not None:
+                try: where.append("distribution_yield >= ?"); params.append(float(min_yield))
+                except (ValueError, TypeError): pass
+            if fx_hedged and fx_hedged.lower() in ('1', 'true', 'yes'):
+                where.append("fx_hedged = 1")
 
             sort_field_map = {
                 'fum':       ('fund_size_aud_millions', 'DESC'),
@@ -2435,8 +2458,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
   <!-- ── Main nav tabs ── -->
   <div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-5 px-5">
     <div class="flex gap-8 text-sm overflow-x-auto">
-      <button class="main-tab active" data-view="list">ETF List</button>
-      <button class="main-tab" data-view="screener">Screener</button>
+      <button class="main-tab active" data-view="screener">Screener</button>
       <button class="main-tab" data-view="compare">Compare</button>
       <button class="main-tab" data-view="holdings">Holdings Search</button>
       <button class="main-tab" data-view="analytics">Analytics</button>
@@ -2456,8 +2478,8 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
     </div>
   </div>
 
-  <!-- ══════════════════════════════ VIEW: ETF List ══════════════════════════════ -->
-  <div id="view-list">
+  <!-- ══════════════════════════════ VIEW: Screener ══════════════════════════════ -->
+  <div id="view-screener">
 
   <!-- ── Filter sidebar + table ── -->
   <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-5">
@@ -2537,6 +2559,38 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
               </label>
             </div>
           </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Max Management Fee: <span id="f-fee-val" class="font-semibold text-gray-700">2.00%</span></label>
+            <input id="f-max-fee" type="range" min="0" max="2" step="0.05" value="2"
+                   class="w-full accent-blue-600">
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Min Fund Size (AUD M)</label>
+            <input id="f-min-fum" type="number" min="0" placeholder="e.g. 100"
+                   class="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm bg-gray-50
+                          focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">1Y Return (%)</label>
+            <div class="flex gap-2">
+              <input id="f-ret-min" type="number" placeholder="Min"
+                     class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-gray-50
+                            focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
+              <input id="f-ret-max" type="number" placeholder="Max"
+                     class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-gray-50
+                            focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Min Distribution Yield (%)</label>
+            <input id="f-min-yield" type="number" min="0" placeholder="e.g. 3"
+                   class="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm bg-gray-50
+                          focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
+          </div>
+          <label class="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+            <input id="f-hedged" type="checkbox" class="accent-blue-600">
+            FX Hedged only
+          </label>
           <button id="btn-reset"
                   class="w-full border border-gray-200 rounded-lg py-2 text-sm text-gray-500
                          hover:bg-gray-50 hover:text-gray-700 transition-colors">
@@ -2551,8 +2605,15 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
     <div class="lg:col-span-3">
       <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-          <h3 class="font-semibold text-gray-700">ETF List</h3>
-          <span id="result-count" class="text-xs text-gray-400"></span>
+          <h3 class="font-semibold text-gray-700">Screener</h3>
+          <div class="flex items-center gap-3">
+            <span id="result-count" class="text-xs text-gray-400"></span>
+            <button id="sc-export"
+                    class="flex items-center gap-1 px-3 py-1.5 border border-gray-200 rounded-lg
+                           text-xs text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors">
+              &#8595; CSV
+            </button>
+          </div>
         </div>
         <div class="overflow-x-auto" style="max-height:520px;overflow-y:auto">
           <table class="w-full">
@@ -2561,9 +2622,10 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
               <tr>
                 <th class="px-3 py-2.5 text-left w-8 cursor-pointer select-none hover:text-gray-700" data-sort="rank">#</th>
                 <th class="px-3 py-2.5 text-left cursor-pointer select-none hover:text-gray-700" style="min-width:260px" data-sort="code">ETF</th>
-                <th class="px-3 py-2.5 text-left select-none text-gray-400" style="width:80px;max-width:80px">Class</th>
+                <th class="px-3 py-2.5 text-center select-none" style="width:90px">Class</th>
                 <th class="px-3 py-2.5 text-right cursor-pointer select-none hover:text-gray-700" data-sort="price">Price</th>
-                <th class="px-3 py-2.5 text-right cursor-pointer select-none hover:text-gray-700" data-sort="fum">FUM</th>
+                <th class="px-3 py-2.5 text-right cursor-pointer select-none hover:text-gray-700" data-sort="fum">Total FUM</th>
+                <th class="px-3 py-2.5 text-right select-none text-gray-500">CHESS FUM</th>
                 <th class="px-3 py-2.5 text-right cursor-pointer select-none hover:text-gray-700" data-sort="return_1y">1Y Rtn</th>
                 <th class="px-3 py-2.5 text-right cursor-pointer select-none hover:text-gray-700" data-sort="yield">Yield</th>
                 <th class="px-3 py-2.5 text-right cursor-pointer select-none hover:text-gray-700 col-3y hidden" data-sort="return_3y">3Y Rtn</th>
@@ -2638,128 +2700,6 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
     </div>
   </div>
 
-  </div><!-- /view-list -->
-
-  <!-- ══════════════════════════════ VIEW: Screener ══════════════════════════════ -->
-  <div id="view-screener" class="hidden">
-    <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
-
-      <!-- Screener filters sidebar -->
-      <aside class="lg:col-span-1">
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sticky top-4 space-y-4">
-          <div class="flex items-center justify-between">
-            <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Screener Filters</h3>
-            <button id="sc-clear"
-                    class="text-xs text-blue-600 hover:underline">Clear All</button>
-          </div>
-
-          <!-- Exchange toggles -->
-          <div>
-            <p class="text-xs text-gray-500 mb-1.5">Exchange</p>
-            <div class="flex gap-1.5">
-              <button class="sc-exch active flex-1 py-1 rounded-lg border text-xs font-medium
-                             bg-blue-600 text-white border-blue-600" data-exch="">All</button>
-              <button class="sc-exch flex-1 py-1 rounded-lg border text-xs font-medium
-                             text-gray-600 border-gray-200 hover:border-blue-400" data-exch="ASX">ASX</button>
-              <button class="sc-exch flex-1 py-1 rounded-lg border text-xs font-medium
-                             text-gray-600 border-gray-200 hover:border-blue-400" data-exch="CXA">CXA</button>
-            </div>
-          </div>
-
-          <!-- Asset class checklist -->
-          <div>
-            <p class="text-xs text-gray-500 mb-1.5">Asset Class</p>
-            <div id="sc-asset-list" class="sc-check-list space-y-0.5 border border-gray-100 rounded-lg p-2"></div>
-          </div>
-
-          <!-- Issuer checklist -->
-          <div>
-            <p class="text-xs text-gray-500 mb-1.5">Issuer</p>
-            <div id="sc-issuer-list" class="sc-check-list space-y-0.5 border border-gray-100 rounded-lg p-2"></div>
-          </div>
-
-          <!-- Max fee slider -->
-          <div>
-            <p class="text-xs text-gray-500 mb-1.5">Max Management Fee: <span id="sc-fee-val" class="font-semibold text-gray-700">2.00%</span></p>
-            <input id="sc-fee" type="range" min="0" max="2" step="0.05" value="2"
-                   class="w-full accent-blue-600">
-          </div>
-
-          <!-- Min FUM -->
-          <div>
-            <p class="text-xs text-gray-500 mb-1">Min Fund Size (AUD M)</p>
-            <input id="sc-fum" type="number" min="0" placeholder="e.g. 100"
-                   class="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm bg-gray-50
-                          focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
-          </div>
-
-          <!-- 1Y Return range -->
-          <div>
-            <p class="text-xs text-gray-500 mb-1">1Y Return (%)</p>
-            <div class="flex gap-2">
-              <input id="sc-ret-min" type="number" placeholder="Min"
-                     class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-gray-50
-                            focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
-              <input id="sc-ret-max" type="number" placeholder="Max"
-                     class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-gray-50
-                            focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
-            </div>
-          </div>
-
-          <!-- Min yield -->
-          <div>
-            <p class="text-xs text-gray-500 mb-1">Min Distribution Yield (%)</p>
-            <input id="sc-yield" type="number" min="0" placeholder="e.g. 3"
-                   class="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm bg-gray-50
-                          focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
-          </div>
-
-          <!-- FX hedged -->
-          <label class="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
-            <input id="sc-hedged" type="checkbox" class="accent-blue-600">
-            FX Hedged only
-          </label>
-
-          <p id="sc-count" class="pt-2 border-t text-xs text-gray-400"></p>
-        </div>
-      </aside>
-
-      <!-- Screener results -->
-      <div class="lg:col-span-3">
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-            <h3 class="font-semibold text-gray-700">Screener Results</h3>
-            <div class="flex items-center gap-3">
-              <span id="sc-result-count" class="text-xs text-gray-400"></span>
-              <button id="sc-export"
-                      class="flex items-center gap-1 px-3 py-1.5 border border-gray-200 rounded-lg
-                             text-xs text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors">
-                &#8595; CSV
-              </button>
-            </div>
-          </div>
-          <div class="overflow-x-auto" style="max-height:600px;overflow-y:auto">
-            <table class="w-full">
-              <thead class="bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wide"
-                     style="position:sticky;top:0;z-index:5">
-                <tr>
-                  <th class="px-3 py-2.5 text-left">ETF</th>
-                  <th class="px-3 py-2.5 text-left">Class</th>
-                  <th class="px-3 py-2.5 text-left">Issuer</th>
-                  <th class="px-3 py-2.5 text-right">Price</th>
-                  <th class="px-3 py-2.5 text-right">FUM</th>
-                  <th class="px-3 py-2.5 text-right">1Y Rtn</th>
-                  <th class="px-3 py-2.5 text-right">Yield</th>
-                  <th class="px-3 py-2.5 text-right">MER</th>
-                </tr>
-              </thead>
-              <tbody id="screener-table" class="text-sm divide-y divide-gray-50"></tbody>
-            </table>
-          </div>
-          <div id="sc-empty" class="hidden py-16 text-center text-gray-400 text-sm">No ETFs match the current filters.</div>
-        </div>
-      </div>
-    </div>
   </div><!-- /view-screener -->
 
   <!-- ══════════════════════════════ VIEW: Compare ══════════════════════════════ -->
@@ -3333,6 +3273,7 @@ function goCard(type) {
 }
 
 /* ======================================================= table */
+let lastTableData = [];
 async function loadTable() {
   const params = new URLSearchParams();
   const ex   = document.getElementById('f-exchange').value;
@@ -3340,11 +3281,23 @@ async function loadTable() {
   const ac   = document.getElementById('f-asset').value;
   const ft   = document.getElementById('f-type').value;
   const bm   = document.getElementById('f-benchmark').value.trim();
+  const maxFee  = parseFloat(document.getElementById('f-max-fee').value);
+  const minFum  = document.getElementById('f-min-fum').value.trim();
+  const retMin  = document.getElementById('f-ret-min').value.trim();
+  const retMax  = document.getElementById('f-ret-max').value.trim();
+  const minYld  = document.getElementById('f-min-yield').value.trim();
+  const hedged  = document.getElementById('f-hedged').checked;
   if (ex)  params.set('exchange',    ex);
   if (iss) params.set('issuer',      iss);
   if (ac)  params.set('asset_class', ac);
   if (ft)  params.set('fund_type',   ft);
   if (bm)  params.set('benchmark',   bm);
+  if (maxFee < 2) params.set('max_fee', maxFee);
+  if (minFum)  params.set('min_fum',       minFum);
+  if (retMin)  params.set('min_return_1y', retMin);
+  if (retMax)  params.set('max_return_1y', retMax);
+  if (minYld)  params.set('min_yield',     minYld);
+  if (hedged)  params.set('fx_hedged',     '1');
   params.set('sort_by',  tableSortKey);
   params.set('sort_dir', tableSortDir);
   params.set('limit',    pageSize);
@@ -3393,8 +3346,13 @@ function renderTable(etfs, total) {
   document.getElementById('result-count-sidebar').textContent = label + ' matching';
 
   const tbody = document.getElementById('etf-table');
+  lastTableData = etfs;
   tbody.innerHTML = etfs.map(e => {
     const sel = e.code === selectedCode ? 'row-selected' : '';
+    const chess = chessFum(e);
+    const chessTip = chess != null
+      ? 'CHESS FUM = ' + (e.units_on_issue ? e.units_on_issue.toLocaleString() + ' units' : '') + ' × $' + (e.current_price || '?')
+      : 'Units on issue not available';
     return `<tr class="cursor-pointer ${sel}" data-code="${e.code}">
       <td class="px-3 py-2.5 text-gray-300 font-mono text-xs">${e.rank_by_fum || '—'}</td>
       <td class="px-3 py-2.5" style="min-width:260px">
@@ -3402,12 +3360,15 @@ function renderTable(etfs, total) {
         <div class="text-xs text-gray-400 truncate" style="max-width:240px" title="${e.name || ''}">${e.name || ''}</div>
         ${e.benchmark ? `<div class="text-xs text-indigo-400 truncate" style="max-width:240px" title="${e.benchmark}">&#8594; ${e.benchmark}</div>` : ''}
       </td>
-      <td class="px-3 py-2.5" style="width:80px;max-width:80px">${acChip(e.asset_class)}</td>
+      <td class="px-3 py-2.5 text-center" style="width:90px">${acChip(e.asset_class)}</td>
       <td class="px-3 py-2.5 text-right font-mono">
         <span class="dated" title="Price · ${fmtTs(e.last_updated)}">${money(e.current_price)}</span>
       </td>
-      <td class="px-3 py-2.5 text-right">
-        ${fumDisplay(e)}
+      <td class="px-3 py-2.5 text-right tabular-nums" title="Total FUM · ASX Monthly Report">
+        ${fmtFum(e.fund_size_aud_millions)}
+      </td>
+      <td class="px-3 py-2.5 text-right tabular-nums text-indigo-500" title="${chessTip}">
+        ${chess != null ? fmtFum(chess) : '<span class="text-gray-300">—</span>'}
       </td>
       <td class="px-3 py-2.5 text-right font-semibold ${pctCls(e.return_1y)}">
         <span class="dated" title="1Y Return · ASX Monthly Report · ${fmtTs(tsFor('asx_report'))}">${pct(e.return_1y)}</span>
@@ -4275,9 +4236,31 @@ document.getElementById('f-sort').addEventListener('change', function () {
   page = 0;
   loadTable();
 });
+// Fee slider
+const feeSlider = document.getElementById('f-max-fee');
+const feeVal    = document.getElementById('f-fee-val');
+feeSlider.addEventListener('input', () => {
+  feeVal.textContent = parseFloat(feeSlider.value).toFixed(2) + '%';
+  page = 0; loadTable();
+});
+// Numeric range inputs
+let numTimer;
+['f-min-fum', 'f-ret-min', 'f-ret-max', 'f-min-yield'].forEach(id => {
+  document.getElementById(id).addEventListener('input', () => {
+    clearTimeout(numTimer);
+    numTimer = setTimeout(() => { page = 0; loadTable(); }, 350);
+  });
+});
+// Hedged checkbox
+document.getElementById('f-hedged').addEventListener('change', () => { page = 0; loadTable(); });
+
 document.getElementById('btn-reset').addEventListener('click', () => {
   ['f-exchange', 'f-issuer', 'f-asset', 'f-type'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('f-benchmark').value = '';
+  document.getElementById('f-max-fee').value = 2;
+  document.getElementById('f-fee-val').textContent = '2.00%';
+  ['f-min-fum', 'f-ret-min', 'f-ret-max', 'f-min-yield'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-hedged').checked = false;
   tableSortKey = 'rank';
   tableSortDir = 'asc';
   page = 0;
@@ -4350,7 +4333,7 @@ async function loadAnalytics() {
           const label = catData[els[0].index]?.asset_class;
           if (!label) return;
           // Navigate to list view filtered by this asset class
-          document.querySelector('.main-tab[data-view=list]').click();
+          document.querySelector('.main-tab[data-view=screener]').click();
           setTimeout(() => {
             // Set the sort to FUM and apply asset class text filter
             const search = document.getElementById('search');
@@ -4500,7 +4483,7 @@ async function loadAnalytics() {
           const row = flowRows[els[0].index];
           if (row) {
             showDetail(row.code);
-            document.querySelector('.main-tab[data-view=list]').click();
+            document.querySelector('.main-tab[data-view=screener]').click();
           }
         },
         plugins: {
@@ -4619,7 +4602,7 @@ setInterval(() => {
 }, 120000);
 
 /* ======================================================= main view tabs */
-const VIEWS = ['list', 'screener', 'compare', 'holdings', 'analytics', 'history'];
+const VIEWS = ['screener', 'compare', 'holdings', 'analytics', 'history'];
 document.querySelectorAll('.main-tab').forEach(btn => {
   btn.addEventListener('click', () => {
     const v = btn.dataset.view;
@@ -4627,188 +4610,11 @@ document.querySelectorAll('.main-tab').forEach(btn => {
     btn.classList.add('active');
     VIEWS.forEach(id => document.getElementById('view-' + id).classList.add('hidden'));
     document.getElementById('view-' + v).classList.remove('hidden');
-    if (v === 'screener'  && !screenerLoaded)  initScreener();
     if (v === 'compare'   && !compareLoaded)   initCompare();
     if (v === 'analytics' && !analyticsLoaded) initAnalytics();
     if (v === 'history'   && !historyLoaded)   initHistory();
   });
 });
-
-/* ============================================================ SCREENER */
-let screenerLoaded = false;
-let scLastData = [];
-const scFilters = {
-  exchange: '', assetClasses: new Set(), issuers: new Set(),
-  maxFee: 2, minFum: '', minRet: '', maxRet: '', minYield: '', hedged: false,
-};
-let scTimer;
-
-async function initScreener() {
-  screenerLoaded = true;
-  // Populate checklists from already-loaded filter data
-  const [cats, issuers] = await Promise.all([
-    api('/api/v1/categories'),
-    api('/api/v1/issuers'),
-  ]);
-
-  const assetEl = document.getElementById('sc-asset-list');
-  (cats.categories || []).forEach(c => {
-    const id = 'sca-' + c.asset_class.replace(/\W/g, '_');
-    const label = document.createElement('label');
-    label.innerHTML = `<input type="checkbox" id="${id}" value="${c.asset_class}" class="sc-ac accent-blue-600">
-      <span class="truncate">${c.asset_class} <span class="text-gray-400">(${c.etf_count})</span></span>`;
-    label.querySelector('input').addEventListener('change', e => {
-      if (e.target.checked) scFilters.assetClasses.add(e.target.value);
-      else scFilters.assetClasses.delete(e.target.value);
-      scDebounceFetch();
-    });
-    assetEl.appendChild(label);
-  });
-
-  const issuerEl = document.getElementById('sc-issuer-list');
-  (issuers.issuers || []).forEach(i => {
-    const id = 'sci-' + i.name.replace(/\W/g, '_');
-    const label = document.createElement('label');
-    label.innerHTML = `<input type="checkbox" id="${id}" value="${i.name}" class="sc-is accent-blue-600">
-      <span class="truncate">${i.name} <span class="text-gray-400">(${i.etf_count})</span></span>`;
-    label.querySelector('input').addEventListener('change', e => {
-      if (e.target.checked) scFilters.issuers.add(e.target.value);
-      else scFilters.issuers.delete(e.target.value);
-      scDebounceFetch();
-    });
-    issuerEl.appendChild(label);
-  });
-
-  // Wire exchange toggles
-  document.querySelectorAll('.sc-exch').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.sc-exch').forEach(b => {
-        b.classList.remove('active', 'bg-blue-600', 'text-white', 'border-blue-600');
-        b.classList.add('text-gray-600', 'border-gray-200');
-      });
-      btn.classList.add('active', 'bg-blue-600', 'text-white', 'border-blue-600');
-      btn.classList.remove('text-gray-600', 'border-gray-200');
-      scFilters.exchange = btn.dataset.exch;
-      scDebounceFetch();
-    });
-  });
-
-  // Fee slider
-  const feeSlider = document.getElementById('sc-fee');
-  const feeVal = document.getElementById('sc-fee-val');
-  feeSlider.addEventListener('input', () => {
-    scFilters.maxFee = parseFloat(feeSlider.value);
-    feeVal.textContent = scFilters.maxFee.toFixed(2) + '%';
-    scDebounceFetch();
-  });
-
-  // Numeric inputs
-  const scInputs = {
-    'sc-fum': 'minFum', 'sc-ret-min': 'minRet',
-    'sc-ret-max': 'maxRet', 'sc-yield': 'minYield',
-  };
-  Object.entries(scInputs).forEach(([id, key]) => {
-    document.getElementById(id).addEventListener('input', e => {
-      scFilters[key] = e.target.value;
-      scDebounceFetch();
-    });
-  });
-
-  // Hedged checkbox
-  document.getElementById('sc-hedged').addEventListener('change', e => {
-    scFilters.hedged = e.target.checked;
-    scDebounceFetch();
-  });
-
-  // Clear all
-  document.getElementById('sc-clear').addEventListener('click', () => {
-    scFilters.exchange = ''; scFilters.assetClasses.clear(); scFilters.issuers.clear();
-    scFilters.maxFee = 2; scFilters.minFum = '';
-    scFilters.minRet = ''; scFilters.maxRet = '';
-    scFilters.minYield = ''; scFilters.hedged = false;
-    document.getElementById('sc-fee').value = 2;
-    document.getElementById('sc-fee-val').textContent = '2.00%';
-    ['sc-fum','sc-ret-min','sc-ret-max','sc-yield'].forEach(id =>
-      document.getElementById(id).value = '');
-    document.getElementById('sc-hedged').checked = false;
-    document.querySelectorAll('#sc-asset-list input, #sc-issuer-list input').forEach(cb =>
-      cb.checked = false);
-    document.querySelectorAll('.sc-exch').forEach(b => {
-      b.classList.remove('active','bg-blue-600','text-white','border-blue-600');
-      b.classList.add('text-gray-600','border-gray-200');
-    });
-    document.querySelector('.sc-exch[data-exch=""]').classList.add(
-      'active','bg-blue-600','text-white','border-blue-600');
-    scFetch();
-  });
-
-  scFetch();
-}
-
-function scDebounceFetch() {
-  clearTimeout(scTimer);
-  scTimer = setTimeout(scFetch, 300);
-}
-
-async function scFetch() {
-  const p = new URLSearchParams();
-  if (scFilters.exchange) p.set('exchange', scFilters.exchange);
-  if (scFilters.assetClasses.size === 1)
-    p.set('asset_class', [...scFilters.assetClasses][0]);
-  if (scFilters.issuers.size === 1)
-    p.set('issuer', [...scFilters.issuers][0]);
-  if (scFilters.maxFee < 2) p.set('max_fee', scFilters.maxFee);
-  if (scFilters.minFum)  p.set('min_fum',       scFilters.minFum);
-  if (scFilters.minRet)  p.set('min_return_1y',  scFilters.minRet);
-  if (scFilters.maxRet)  p.set('max_return_1y',  scFilters.maxRet);
-  if (scFilters.minYield) p.set('min_yield',     scFilters.minYield);
-  if (scFilters.hedged)  p.set('fx_hedged',      '1');
-
-  const d = await api('/api/v1/screener?' + p);
-  const data = d.data || [];
-
-  // Client-side multi-filter for multiple asset classes / issuers
-  let rows = data;
-  if (scFilters.assetClasses.size > 1)
-    rows = rows.filter(e => scFilters.assetClasses.has(e.asset_class));
-  if (scFilters.issuers.size > 1)
-    rows = rows.filter(e => scFilters.issuers.has(e.issuer));
-
-  scLastData = rows;
-  document.getElementById('sc-count').textContent =
-    rows.length + ' ETF' + (rows.length !== 1 ? 's' : '') + ' matching';
-  document.getElementById('sc-result-count').textContent =
-    rows.length.toLocaleString() + ' results';
-
-  const tbody = document.getElementById('screener-table');
-  const emptyEl = document.getElementById('sc-empty');
-  if (!rows.length) {
-    tbody.innerHTML = '';
-    emptyEl.classList.remove('hidden');
-  } else {
-    emptyEl.classList.add('hidden');
-    tbody.innerHTML = rows.map(e => `
-      <tr class="cursor-pointer" data-code="${e.code}"
-          onclick="showDetail('${e.code}');document.querySelector('.main-tab[data-view=list]').click()">
-        <td class="px-3 py-2.5">
-          <div class="font-bold text-gray-900">${e.code}</div>
-          <div class="text-xs text-gray-400 truncate max-w-[160px]">${e.name || ''}</div>
-          ${e.benchmark ? `<div class="text-xs text-indigo-400 truncate max-w-[160px]" title="${e.benchmark}">&#8594; ${e.benchmark}</div>` : ''}
-        </td>
-        <td class="px-3 py-2.5">${acChip(e.asset_class)}</td>
-        <td class="px-3 py-2.5 text-xs text-gray-500 max-w-[100px] truncate">${e.issuer || '—'}</td>
-        <td class="px-3 py-2.5 text-right font-mono">${money(e.current_price)}</td>
-        <td class="px-3 py-2.5 text-right" title="${fumTip(e)}">${fmtFum(calcFum(e))}</td>
-        <td class="px-3 py-2.5 text-right font-semibold ${pctCls(e.return_1y)}">${pct(e.return_1y)}</td>
-        <td class="px-3 py-2.5 text-right text-gray-600">
-          ${e.distribution_yield != null ? e.distribution_yield.toFixed(1) + '%' : '—'}
-        </td>
-        <td class="px-3 py-2.5 text-right text-gray-400">
-          ${e.expense_ratio != null ? e.expense_ratio.toFixed(2) + '%' : '—'}
-        </td>
-      </tr>`).join('');
-  }
-}
 
 /* ============================================================ COMPARE */
 let compareLoaded = false;
@@ -5225,7 +5031,7 @@ async function hsFetch() {
   tblWrap.classList.remove('hidden');
   const maxW = Math.max(...d.results.map(r => r.weight_pct || 0));
   document.getElementById('holdings-table').innerHTML = d.results.map(r => `
-    <tr class="cursor-pointer" onclick="showDetail('${r.etf_code}');document.querySelector('.main-tab[data-view=list]').click()">
+    <tr class="cursor-pointer" onclick="showDetail('${r.etf_code}');document.querySelector('.main-tab[data-view=screener]').click()">
       <td class="px-3 py-2.5 font-bold text-blue-700">${r.etf_code}</td>
       <td class="px-3 py-2.5 text-gray-600 max-w-[160px] truncate text-xs">${r.etf_name || ''}</td>
       <td class="px-3 py-2.5 font-medium text-gray-800 max-w-[180px] truncate">${r.holding_name || ''}</td>
@@ -5258,7 +5064,7 @@ async function initAnalytics() {
 
   function leaderRow(code, name, valueHtml, rank) {
     return `<div class="px-4 py-2.5 flex items-center gap-3 hover:bg-slate-50 cursor-pointer"
-         onclick="showDetail('${code}');document.querySelector('.main-tab[data-view=list]').click()">
+         onclick="showDetail('${code}');document.querySelector('.main-tab[data-view=screener]').click()">
       <span class="text-gray-300 font-mono text-xs w-5 text-right shrink-0">${rank}</span>
       <div class="flex-1 min-w-0">
         <div class="font-bold text-gray-900 text-sm">${code}</div>
@@ -5296,7 +5102,7 @@ async function initAnalytics() {
     const col   = dir === 'in' ? issuerColor(r.issuer) : '#ef4444';
     const barW  = (Math.abs(r.fund_flow_1m || 0) / maxFlow * 100).toFixed(1);
     return `<div class="flex items-center gap-2 cursor-pointer hover:bg-slate-50 px-2 py-1.5 rounded group"
-         onclick="showDetail('${r.code}');document.querySelector('.main-tab[data-view=list]').click()">
+         onclick="showDetail('${r.code}');document.querySelector('.main-tab[data-view=screener]').click()">
       <div class="min-w-0 w-24 shrink-0">
         <div class="font-bold text-gray-900 text-xs">${r.code}</div>
         <div class="text-[10px] text-gray-400 truncate">${r.issuer || ''}</div>
@@ -5689,7 +5495,7 @@ async function loadHistFlows(months) {
       const col = dir === 'in' ? '#3b82f6' : '#ef4444';
       const w = (Math.abs(r.flow_m||0) / maxF * 100).toFixed(1);
       return `<div class="flex items-center gap-2 py-1.5 hover:bg-slate-50 rounded cursor-pointer px-1"
-           onclick="showDetail('${r.code}');document.querySelector('.main-tab[data-view=list]').click()">
+           onclick="showDetail('${r.code}');document.querySelector('.main-tab[data-view=screener]').click()">
         <div class="w-16 shrink-0">
           <div class="font-bold text-xs text-gray-900">${r.code}</div>
           <div class="text-[10px] text-gray-400 truncate">${r.issuer||''}</div>
@@ -5851,19 +5657,21 @@ async function initHistory() {
 
 /* ============================================================ CSV EXPORT */
 function scExportCSV() {
-  if (!scLastData.length) return;
-  const headers = ['Code','Name','Asset Class','Issuer','Price (AUD)','FUM (AUD M)',
+  if (!lastTableData.length) return;
+  const headers = ['Code','Name','Asset Class','Issuer','Price (AUD)','Total FUM (AUD M)','CHESS FUM (AUD M)',
                    '1Y Return (%)','Yield (%)','MER (%)'];
   const escape = v => '"' + String(v || '').replace(/"/g, '""') + '"';
   const csvRows = [headers.join(',')];
-  scLastData.forEach(e => {
+  lastTableData.forEach(e => {
+    const chess = chessFum(e);
     csvRows.push([
       e.code,
       escape(e.name),
       escape(e.asset_class),
       escape(e.issuer),
       e.current_price         != null ? e.current_price.toFixed(2)          : '',
-      calcFum(e) != null ? calcFum(e).toFixed(1) : '',
+      e.fund_size_aud_millions != null ? e.fund_size_aud_millions.toFixed(1) : '',
+      chess                   != null ? chess.toFixed(1)                    : '',
       e.return_1y             != null ? e.return_1y.toFixed(2)              : '',
       e.distribution_yield    != null ? e.distribution_yield.toFixed(2)     : '',
       e.expense_ratio         != null ? e.expense_ratio.toFixed(2)          : '',
