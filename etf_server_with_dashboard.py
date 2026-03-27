@@ -97,7 +97,8 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
             '/api/v1/screener': lambda: self.handle_screener(qs),
             '/api/v1/compare':         lambda: self.handle_compare(qs),
             '/api/v1/compare/overlap': lambda: self.handle_compare_overlap(qs),
-            '/api/v1/holdings/search': lambda: self.handle_holdings_search(qs),
+            '/api/v1/holdings/search':         lambda: self.handle_holdings_search(qs),
+            '/api/v1/holdings/concentration':  self.handle_holdings_concentration,
             # History API
             '/api/v1/history/industry':      self.handle_history_industry,
             '/api/v1/history/issuers':       self.handle_history_issuers,
@@ -1407,6 +1408,58 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
                 'etf_count': len(etf_codes),
                 'etfs': etf_codes,
                 'results': [dict(r) for r in rows],
+            })
+        except Exception as e:
+            self.send_json({'error': str(e)}, 500)
+        finally:
+            conn.close()
+
+    # ----- Holdings concentration -----
+    def handle_holdings_concentration(self):
+        conn = get_db()
+        try:
+            rows = conn.execute("""
+                WITH base AS (
+                    SELECT
+                        h.etf_code,
+                        e.name      AS etf_name,
+                        e.asset_class,
+                        e.issuer,
+                        COUNT(*)    AS holding_count,
+                        COUNT(DISTINCT CASE WHEN h.country IS NOT NULL AND h.country != ''
+                                            THEN h.country END) AS country_count,
+                        COUNT(DISTINCT CASE WHEN h.sector  IS NOT NULL AND h.sector  != ''
+                                            THEN h.sector  END) AS sector_count,
+                        (SELECT COALESCE(SUM(w), 0) FROM (
+                            SELECT weight_pct AS w FROM etf_holdings
+                            WHERE etf_code = h.etf_code AND weight_pct IS NOT NULL
+                            ORDER BY weight_pct DESC LIMIT 10
+                        ) t) AS top10_conc
+                    FROM etf_holdings h
+                    JOIN etfs e ON e.code = h.etf_code
+                    GROUP BY h.etf_code, e.name, e.asset_class, e.issuer
+                )
+                SELECT * FROM base WHERE holding_count >= 5
+            """).fetchall()
+            data = [dict(r) for r in rows]
+
+            def topN(key, asc, n=8):
+                f = [d for d in data if d.get(key) is not None]
+                return sorted(f, key=lambda x: x[key], reverse=not asc)[:n]
+
+            self.send_json({
+                'by_count': {
+                    'most_concentrated': topN('holding_count', asc=True),
+                    'most_diversified':  topN('holding_count', asc=False),
+                },
+                'by_geography': {
+                    'most_concentrated': topN('country_count', asc=True),
+                    'most_diversified':  topN('country_count', asc=False),
+                },
+                'by_sector': {
+                    'most_concentrated': topN('sector_count', asc=True),
+                    'most_diversified':  topN('sector_count', asc=False),
+                },
             })
         except Exception as e:
             self.send_json({'error': str(e)}, 500)
@@ -2790,6 +2843,35 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
 
   <!-- ══════════════════════════════ VIEW: Holdings Search ══════════════════════ -->
   <div id="view-holdings" class="hidden">
+
+    <!-- ── Concentration widget ── -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-4">
+      <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+        <div>
+          <h3 class="font-semibold text-gray-700">Portfolio Concentration</h3>
+          <p class="text-xs text-gray-400 mt-0.5">Most and least concentrated ETFs by holdings, geography and GICS sector</p>
+        </div>
+        <div class="flex gap-1 bg-gray-100 rounded-lg p-1">
+          <button class="conc-tab-btn px-3 py-1.5 text-xs rounded-md font-medium bg-white text-blue-700 shadow-sm" data-conc="count">Holdings Count</button>
+          <button class="conc-tab-btn px-3 py-1.5 text-xs rounded-md font-medium text-gray-500 hover:text-gray-700" data-conc="geo">Geography</button>
+          <button class="conc-tab-btn px-3 py-1.5 text-xs rounded-md font-medium text-gray-500 hover:text-gray-700" data-conc="sector">GICS Sectors</button>
+        </div>
+      </div>
+      <div id="conc-loading" class="py-8 text-center text-gray-400 text-sm">Loading concentration data…</div>
+      <div id="conc-content" class="hidden">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <div class="text-xs font-semibold text-orange-600 uppercase tracking-wide px-4 py-2 bg-orange-50 rounded-t-lg border border-orange-100 border-b-0">Most Concentrated</div>
+            <div id="conc-left" class="border border-gray-100 rounded-b-lg overflow-hidden"></div>
+          </div>
+          <div>
+            <div class="text-xs font-semibold text-green-700 uppercase tracking-wide px-4 py-2 bg-green-50 rounded-t-lg border border-green-100 border-b-0">Most Diversified</div>
+            <div id="conc-right" class="border border-gray-100 rounded-b-lg overflow-hidden"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Search bar -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-4">
       <h3 class="font-semibold text-gray-700 mb-3">Holdings Search</h3>
@@ -4413,6 +4495,7 @@ document.querySelectorAll('.main-tab').forEach(btn => {
     VIEWS.forEach(id => document.getElementById('view-' + id).classList.add('hidden'));
     document.getElementById('view-' + v).classList.remove('hidden');
     if (v === 'compare'   && !compareLoaded)   initCompare();
+    if (v === 'holdings'  && !holdingsLoaded)  initHoldingsConcentration();
     if (v === 'issuers'   && !issuersLoaded)   initIssuers();
     if (v === 'analytics' && !analyticsLoaded) initAnalytics();
   });
@@ -4420,6 +4503,7 @@ document.querySelectorAll('.main-tab').forEach(btn => {
 
 /* ============================================================ COMPARE */
 let compareLoaded = false;
+let holdingsLoaded = false;
 let analyticsLoaded = false;
 let issuersLoaded = false;
 let historyLoaded = false;
@@ -4854,6 +4938,74 @@ async function hsFetch() {
       <td class="px-3 py-2.5 text-xs text-gray-500 max-w-[120px] truncate">${r.sector || '—'}</td>
       <td class="px-3 py-2.5">${acChip(r.asset_class)}</td>
     </tr>`).join('');
+}
+
+/* ============================================================ HOLDINGS CONCENTRATION */
+let _concData = null;
+let _concTab  = 'count';
+
+document.getElementById('view-holdings').addEventListener('click', e => {
+  const btn = e.target.closest('.conc-tab-btn');
+  if (!btn) return;
+  _concTab = btn.dataset.conc;
+  document.querySelectorAll('.conc-tab-btn').forEach(b => {
+    const active = b.dataset.conc === _concTab;
+    b.className = 'conc-tab-btn px-3 py-1.5 text-xs rounded-md font-medium'
+      + (active ? ' bg-white text-blue-700 shadow-sm' : ' text-gray-500 hover:text-gray-700');
+  });
+  renderConcentration();
+});
+
+async function initHoldingsConcentration() {
+  holdingsLoaded = true;
+  const data = await api('/api/v1/holdings/concentration');
+  _concData = data;
+  document.getElementById('conc-loading').classList.add('hidden');
+  document.getElementById('conc-content').classList.remove('hidden');
+  renderConcentration();
+}
+
+function renderConcentration() {
+  if (!_concData) return;
+  const sectionMap = { count: _concData.by_count, geo: _concData.by_geography, sector: _concData.by_sector };
+  const section = sectionMap[_concTab] || {};
+  const keyMap  = { count: 'holding_count', geo: 'country_count', sector: 'sector_count' };
+  const lblMap  = { count: 'holdings', geo: 'countries', sector: 'sectors' };
+  const key   = keyMap[_concTab];
+  const label = lblMap[_concTab];
+  renderConcList('conc-left',  section.most_concentrated || [], key, label, 'concentrated');
+  renderConcList('conc-right', section.most_diversified  || [], key, label, 'diversified');
+}
+
+function renderConcList(elId, items, key, label, side) {
+  const el = document.getElementById(elId);
+  if (!items.length) { el.innerHTML = '<p class="text-gray-400 text-xs p-4">No data</p>'; return; }
+  const max = Math.max(...items.map(d => d[key] || 0)) || 1;
+  el.innerHTML = items.map((d, i) => {
+    const val  = d[key] || 0;
+    const barW = (val / max * 100).toFixed(1);
+    const sub  = (_concTab === 'count' && d.top10_conc != null)
+      ? `<span class="text-gray-400 text-xs ml-1">· top 10: ${d.top10_conc.toFixed(1)}%</span>` : '';
+    const barClr = side === 'concentrated' ? 'bg-orange-400' : 'bg-green-500';
+    return `<div class="flex items-center gap-2.5 px-4 py-2.5 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0"
+         onclick="showDetail('${d.etf_code}');document.querySelector('.main-tab[data-view=screener]').click()">
+      <span class="text-gray-300 font-mono text-xs w-5 shrink-0 text-right">${i+1}</span>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-1.5 mb-1">
+          <span class="font-bold text-blue-700 text-xs shrink-0">${d.etf_code}</span>
+          <span class="text-gray-500 text-xs truncate">${d.etf_name || ''}</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="flex-1 bg-gray-100 rounded-full h-1.5 overflow-hidden">
+            <div class="h-full rounded-full ${barClr}" style="width:${barW}%"></div>
+          </div>
+          <span class="text-xs font-semibold text-gray-700 shrink-0 w-20 text-right">
+            ${val.toLocaleString()} ${label}${sub}
+          </span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 /* ======================================================= issuers tab */
