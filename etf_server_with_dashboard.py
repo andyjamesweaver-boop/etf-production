@@ -5942,9 +5942,6 @@ def _handle_articles_list(self):
     ]
 
     news_arts   = [a for a in articles if a['category'] in NEWS_CATS]
-    annual_latest = next((a for a in articles if a['slug'] == 'etf-year-review-2025'), None)
-    if annual_latest and annual_latest not in news_arts:
-        news_arts = [annual_latest] + news_arts
     basics_arts = sorted(
         [a for a in articles if a['category'] in BASICS_CATS],
         key=lambda a: BASICS_ORDER.index(a['slug']) if a['slug'] in BASICS_ORDER else 99

@@ -8,6 +8,145 @@ ARTICLES = [
     # ── Weekly Wrap ────────────────────────────────────────────────────────────
 
     {
+        "slug": "weekly-wrap-27-march-2026",
+        "title": "Weekly Wrap: Financials Lead, Crypto Sold Off, Gold Still Dominant",
+        "subtitle": "Australian and international equities held their ground in the month to 27 March while digital assets collapsed 19–27% and gold-linked ETFs extended a remarkable twelve-month run.",
+        "date": "2026-03-27",
+        "category": "Market Trends",
+        "summary": "The Australian ETF market enters late March 2026 with A$329 billion under management and A$53.6 billion in net inflows over the past twelve months. Australian financials and banks had the strongest month across all sectors. Crypto ETFs were the month's clear laggards, down 19–27%. Gold and precious metals dominate one-year performance tables. Passive broad-market products continue to attract the bulk of new money.",
+        "body": """
+<h2>Market at a Glance</h2>
+<p>The Australian ETF industry stands at <strong>A$329 billion</strong> across 479 products — A$318.6B on the ASX and A$10.4B on Cboe Australia. Net inflows over the past twelve months total <strong>A$53.6 billion</strong>, with every major asset class absorbing new money. The market's breadth continues to expand: 479 ETFs from more than 20 issuers now cover everything from vanilla index funds charging 0.03% to complex active structures with full portfolio disclosure on a quarterly lag.</p>
+
+<div class="chart-box">
+  <h3>Total ETF FUM by Asset Class — March 2026</h3>
+  <div style="position:relative;height:260px"><canvas id="chart-fum-ac"></canvas></div>
+</div>
+<script>
+(function() {
+  const labels = ['Intl Equities','Aust Equities','Fixed Income','Property','Commodities','Diversified','Cash','Digital Assets'];
+  const data   = [155.18, 83.68, 42.29, 18.52, 14.39, 7.49, 6.64, 0.67];
+  new Chart(document.getElementById('chart-fum-ac'), {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'FUM (A$B)', data, backgroundColor: '#3b82f680', borderColor: '#3b82f6', borderWidth: 1, borderRadius: 4, borderSkipped: false }] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => 'A$' + c.parsed.y.toFixed(1) + 'B' } } },
+      scales: {
+        x: { ticks: { font: { size: 10 } }, grid: { display: false } },
+        y: { ticks: { font: { size: 10 }, callback: v => 'A$' + v + 'B' }, grid: { color: '#1e3860' } }
+      }
+    }
+  });
+})();
+</script>
+
+<h2>Asset Class Scorecard</h2>
+<p>Property was the strongest asset class over the past month, with an average return of <strong>+5.2%</strong> across 17 ETFs. Australian equities were close behind at <strong>+3.1%</strong>, driven by a rotation into domestic financials and banks. International equities were broadly flat on average (+0.1%), though the range of outcomes was wide — from South Korean ETFs up nearly 20% to US tech products down 7–10%.</p>
+<p>Commodities averaged <strong>–4.3%</strong> for the month, a sharp reversal after a dominant 12-month run that produced average 1-year returns of +71.7%. Silver in particular sold off hard — Global X Physical Silver (ETPMAG) fell 21% in the month despite being up +149% over the year. Digital assets were the worst-performing class, down an average of <strong>–19.5%</strong> for the month.</p>
+
+<div class="chart-box">
+  <h3>Average 1-Month Return by Asset Class</h3>
+  <div style="position:relative;height:240px"><canvas id="chart-ac-1m"></canvas></div>
+</div>
+<script>
+(function() {
+  const labels = ['Property','Aust Equities','Diversified','Fixed Income','Cash','Intl Equities','Commodities','Digital Assets'];
+  const data   = [5.2, 3.1, 0.9, 0.7, 0.3, 0.1, -4.3, -19.5];
+  const colors = data.map(v => v >= 0 ? '#4ade8080' : '#f8717180');
+  const borders = data.map(v => v >= 0 ? '#4ade80' : '#f87171');
+  new Chart(document.getElementById('chart-ac-1m'), {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Avg 1M Return %', data, backgroundColor: colors, borderColor: borders, borderWidth: 1, borderRadius: 3, borderSkipped: false }] },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.x.toFixed(1) + '%' } } },
+      scales: {
+        x: { ticks: { font: { size: 10 }, callback: v => v + '%' }, grid: { color: '#1e3860' } },
+        y: { ticks: { font: { size: 10 } }, grid: { display: false } }
+      }
+    }
+  });
+})();
+</script>
+
+<h2>The Month's Winners: Financials, Banks and Korea</h2>
+<p>Australian banks and financials had their strongest month in recent memory. VanEck Australian Banks ETF (MVB) and Betashares Australian Financials Sector ETF (QFN) both gained <strong>+10.5%</strong>, with the underlying move driven by resilient earnings, a steepening yield curve, and ongoing buyback activity across the major banks. Infrastructure also performed: Magellan Infrastructure (MICH) added +9.0% and ClearBridge Global Infrastructure Value Hedged (CIVH) — now a $1.1B fund — rose +9.0%.</p>
+<p>The single biggest mover among ETFs with meaningful size was <strong>iShares MSCI South Korea ETF (IKO)</strong>, up <strong>+18.5%</strong> for the month and an extraordinary +148% over the past year. South Korea's equity market has benefited from a combination of semiconductor demand, Samsung and SK Hynix upgrades, and improving domestic sentiment. Betashares' currency-hedged Japan fund (HJPN) also had a strong month at +11.4%, building on a +55% one-year return.</p>
+<p>Gold miners extended their run. Betashares Global Gold Miners (MNRS) added +10.0% for the month — on top of a +188% one-year return — cementing its position as the best-performing product in the market over twelve months. VanEck Gold Miners (GDX, +155.6% over 1Y) and Global X Physical Gold (GOLD, +58% over 1Y) remain at the top of the performance tables.</p>
+
+<div class="chart-box">
+  <h3>Best Performers — Month to 27 March 2026 (selected large funds)</h3>
+  <div style="position:relative;height:220px"><canvas id="chart-top-1m"></canvas></div>
+</div>
+<script>
+(function() {
+  const labels = ['IKO','HJPN','QFN','MVB','MNRS','CIVH','MICH','QRE'];
+  const data   = [18.5, 11.4, 10.5, 10.5, 10.0, 9.0, 9.0, 9.0];
+  new Chart(document.getElementById('chart-top-1m'), {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Return %', data, backgroundColor: '#4ade8066', borderColor: '#4ade80', borderWidth: 1, borderRadius: 3, borderSkipped: false }] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => '+' + c.parsed.y.toFixed(1) + '%' } } },
+      scales: {
+        x: { ticks: { font: { size: 10 } }, grid: { display: false } },
+        y: { ticks: { font: { size: 10 }, callback: v => v + '%' }, grid: { color: '#1e3860' } }
+      }
+    }
+  });
+})();
+</script>
+
+<h2>The Month's Losers: Crypto Rout and Tech Weakness</h2>
+<p>Cryptocurrency ETFs were the month's clear underperformers. Ethereum products led the declines: Monochrome Ethereum (IETH) fell <strong>–27.3%</strong>, Global X 21Shares Ethereum (EETH) fell <strong>–26.8%</strong>, and Betashares Ethereum (QETH) fell <strong>–26.8%</strong>. Bitcoin ETFs were similarly bruised, with VanEck Bitcoin (VBTC, –19.7%), Global X Bitcoin (EBTC, –19.5%) and Monochrome Bitcoin (IBTC, –19.2%) all down close to 20% in the month. Across the 1-year period, the digital assets category has returned an average of <strong>–26%</strong>.</p>
+<p>US technology ETFs were also weak. Betashares Global Cybersecurity (HACK, –10.2% for the month) is now down <strong>–15.6%</strong> over the past year, the worst 1-year performance among large-cap ETFs in the market. Global X FANG+ (FANG) fell –7.0% for the month, dragging its 1-year return to just +0.3%. Hyperion Global Growth (HYGG, –5.7%) and Betashares Global Sustainability Leaders (ETHI, –2.4%) also remain in negative territory for the year.</p>
+<p>Silver's sharp reversal deserves attention. Global X Physical Silver (ETPMAG) is <strong>–21.0%</strong> for the month after being the best-performing large-cap ETF over the preceding twelve months (+149%). The pullback reflects silver's dual nature as both an industrial metal and a monetary asset — when industrial demand concerns emerge simultaneously with a reassessment of precious metals positioning, the correction can be fast and deep. The product still holds A$1.9B in FUM, suggesting investors have not panicked.</p>
+
+<h2>Fund Flows: Passive Core Dominates, Magellan Bleeds</h2>
+<p>Monthly net inflows were broad-based and healthy. International equities attracted the largest share at <strong>+A$1.85B</strong>, followed by Australian equities (+A$1.2B), fixed income (+A$1.0B), and property (+A$146M). Even digital assets saw positive net flows of +A$30M despite terrible performance, likely from systematic accumulation strategies.</p>
+<p>The headline inflow of the month went to <strong>Vanguard MSCI Index International Shares (VGS)</strong> at +A$503M, confirming its status as the market's primary vehicle for international equities exposure. The rest of the top-five inflows read like a roll call of the market's largest passive products: IOZ (+A$236M), VAS (+A$210M), A200 (+A$208M), QUAL (+A$168M).</p>
+<p>The standout outlier was <strong>VanEck Cash Plus (MONY)</strong>, which absorbed +A$100M in its first full period — matching its total FUM and suggesting strong initial demand for the product's active yield-enhancement approach to cash management.</p>
+<p>The biggest outflow story remains <strong>Magellan Global Fund Open Class (MGOC)</strong>, which shed <strong>–A$209M</strong> for the month and <strong>–A$1.2B</strong> over the past twelve months. MGOC is down –5.5% over one year against an international equities peer average of +20.7%. That 26 percentage-point gap has persisted long enough that it is now clearly driving sustained redemptions rather than short-term tactical flows. MGOC FUM has fallen to A$5.1B, roughly a third of its 2021 peak.</p>
+
+<div class="chart-box">
+  <h3>Top Monthly Fund Inflows — March 2026</h3>
+  <div style="position:relative;height:220px"><canvas id="chart-flows"></canvas></div>
+</div>
+<script>
+(function() {
+  const labels = ['VGS','IOZ','VAS','A200','QUAL','VHY','ATEC','VEU','CRED','MONY'];
+  const data   = [503, 236, 210, 208, 168, 119, 117, 109, 106, 100];
+  new Chart(document.getElementById('chart-flows'), {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'A$M', data, backgroundColor: '#3b82f666', borderColor: '#3b82f6', borderWidth: 1, borderRadius: 3, borderSkipped: false }] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => '+A$' + c.parsed.y + 'M' } } },
+      scales: {
+        x: { ticks: { font: { size: 10 } }, grid: { display: false } },
+        y: { ticks: { font: { size: 10 }, callback: v => 'A$' + v + 'M' }, grid: { color: '#1e3860' } }
+      }
+    }
+  });
+})();
+</script>
+
+<h2>12-Month Review: The Year That Gold Won</h2>
+<p>Looking back over twelve months, the dominant theme is clear: gold and gold-adjacent assets delivered returns that most equity investors would have been happy with over a decade. MNRS (+188%), GDX (+156%), Global X Physical Silver ETPMAG (+149%), WIRE copper miners (+121%), QAU gold bullion (+77%), and GOLD (+58%) all sit at the top of the performance tables. The common thread is the macro backdrop of persistent central bank gold accumulation, dollar debasement concerns, and growing demand for physical metal as financial infrastructure in an increasingly multipolar world.</p>
+<p>International equities averaged <strong>+20.7%</strong> over the year — driven by US-heavy broad market funds. Australian equities averaged +19.3%. Fixed income averaged +3.6%, roughly in line with yield levels. Digital assets averaged <strong>–26%</strong>, making them the worst-performing asset class over the period despite several short-term spikes.</p>
+
+<h2>12-Month Flow Leaders</h2>
+<p>Over the past year, <strong>A$53.6 billion</strong> in net new money flowed into Australian ETFs. The concentration at the top is striking: VGS (+A$3.17B), VAS (+A$2.96B), A200 (+A$1.96B) and VHY (+A$1.73B) together accounted for nearly A$10B — roughly 19% of total industry flows. Betashares Global Shares (BGBL, +A$1.49B), Vanguard Global Aggregate Bond Hedged (VBND, +A$1.47B) and VanEck Subordinated Debt (SUBD, +A$1.13B) round out a top-seven that is overwhelmingly passive and broad-market.</p>
+<p>The message from flows is consistent: Australian investors are systematically building diversified, low-cost portfolios. The four-fund combination of VAS, VGS, VHY and a bond fund now commands tens of billions in assets and continues to grow at a rate that suggests it has become the default portfolio structure for a generation of self-directed investors.</p>
+
+<h2>Issuer Landscape</h2>
+<p>Vanguard remains the market leader with <strong>A$89.5B</strong> in FUM across 37 products, ahead of Betashares (A$63.3B, 102 products) and iShares (A$54.2B, 56 products). The top three issuers together hold A$207B — 63% of the market — and all three have continued to gain share in the past twelve months. Dimensional (A$18.0B across 6 funds) continues to punch well above its product count, while Global X (A$16.1B) has benefited disproportionately from the precious metals rally.</p>
+<p>The industry continues to launch new products at pace, particularly in the active and thematic spaces. The Cboe Australia exchange now hosts 40 ETFs with A$10.4B in combined FUM, including several active fixed income and equity strategies that disclose holdings on a quarterly basis.</p>
+
+<h2>What to Watch</h2>
+<p>Several dynamics are worth monitoring heading into the next quarter. First, whether the pullback in precious metals commodities continues or proves temporary — the 12-month performance tables are dominated by gold-linked products and any sustained reversal would reshape the performance narrative. Second, whether US technology ETFs recover from their recent underperformance, or whether the rotation into defensives, financials and international value continues. Third, whether Magellan MGOC outflows stabilise — at A$5.1B, the fund remains large enough that continued redemptions could be a source of ongoing selling pressure.</p>
+<p>On the structural side, the fee war continues to ratchet down costs for investors. Several large-cap equity ETFs now charge under 0.10%, and the Australian market is approaching parity with the world's lowest-cost markets. For long-term investors, the compounding benefit of this is substantial.</p>
+""",
+    },
+
+    {
         "slug": "weekly-wrap-16-march-2026",
         "title": "Weekly Wrap: Gold Miners Retreat, Asia Rallies",
         "subtitle": "The market fell 0.81% in the week to 16 March. Gold miners gave back double digits while Asian equities outperformed. Bear ETFs had their best week in months.",
