@@ -3252,6 +3252,12 @@ _MAGELLAN_FUND_PAGES = {
 _AASF_REPORTS_PAGE = 'https://www.magellangroup.com.au/funds/airlie-australian-share-fund/reports/'
 
 
+_MAGELLAN_SKIP_NAMES = frozenset({
+    'total', 'total equity position', 'total liquidity',
+    'total securities', 'total portfolio', 'total investments',
+})
+
+
 def _parse_magellan_holdings_pdf(content: bytes) -> list[dict]:
     """
     Parse a Magellan quarterly portfolio holdings PDF.
@@ -3283,6 +3289,9 @@ def _parse_magellan_holdings_pdf(content: bytes) -> list[dict]:
                         name = str(row[name_col] or '').strip()
                         if not name:
                             continue
+                        # Skip subtotal / aggregate rows
+                        if name.lower() in _MAGELLAN_SKIP_NAMES:
+                            continue
                         weight = _safe_float(row[weight_col]) if weight_col is not None and len(row) > weight_col else None
                         holdings.append({'name': name, 'ticker': None, 'weight_pct': weight})
                     continue
@@ -3293,9 +3302,10 @@ def _parse_magellan_holdings_pdf(content: bytes) -> list[dict]:
             for m in re.finditer(r'([A-Z][^\d\n]+?)\s+(\d+\.\d+)\s*%', text):
                 name = m.group(1).strip()
                 weight = _safe_float(m.group(2))
-                # Skip header lines
+                # Skip header lines and aggregate rows
                 if name and weight and not any(skip in name.lower() for skip in
-                                               ['security', 'weight', 'fund', 'portfolio', 'listing', 'quarter']):
+                                               ['security', 'weight', 'fund', 'portfolio', 'listing', 'quarter']) \
+                        and name.lower() not in _MAGELLAN_SKIP_NAMES:
                     holdings.append({'name': name, 'ticker': None, 'weight_pct': weight})
 
     except Exception as e:
@@ -3433,22 +3443,26 @@ def scrape_magellan(db_path=None) -> int:
 # Coolabah
 # ====================================================================
 
-# Maps ASX code → Azure blob path prefix used in their download plugin
-_COOLABAH_FUNDS = {
-    'FIXD': 'FIXD',
-    'FRNS': 'FRNS',
+# Funds that publish a "Top 10 Holdings Report" PDF — these are fetched by
+# scraping the fund page to find the latest dated file link.
+_COOLABAH_TOP10_SLUGS = {
+    'FIXD': 'active-composite-bond-strategy',
+    'FRNS': 'coolabah-short-term-income-fund-managed-fund',
 }
 _COOLABAH_DOWNLOAD_BASE = (
     'https://coolabahcapital.com/wp-content/plugins/helcci_azure_downloader/'
-    'helcci_azure_downloader.php?download={code}/Resources/Material Portfolio Information Report.pdf'
+    'helcci_azure_downloader.php?download={path}'
 )
+_COOLABAH_FUND_PAGE_BASE = 'https://coolabahcapital.com/{slug}/'
 
 
-def _parse_coolabah_portfolio_pdf(content: bytes) -> list[dict]:
+def _parse_coolabah_top10_pdf(content: bytes) -> list[dict]:
     """
-    Parse a Coolabah Material Portfolio Information PDF.
-    Format: simple table with columns Fund, Date, Security, Weight(%)
-    Each row shows an underlying instrument/ETF exposure.
+    Parse a Coolabah 'Top 10 Portfolio Holdings' PDF.
+    Format:
+      Header lines (fund name, date, exchange code, 'Security Weight (%)')
+      Data rows: 'SECURITY_NAME WEIGHT'  — weight is the last numeric token
+      Footer lines (company name, ABN, phone, website)
     """
     try:
         import pdfplumber
@@ -3456,66 +3470,87 @@ def _parse_coolabah_portfolio_pdf(content: bytes) -> list[dict]:
         logger.error('pdfplumber not installed')
         return []
 
+    _SKIP = frozenset({'coolabah', 'abn', '1300', 'info@', 'top 10', 'exchange code',
+                       'security weight', 'portfolio holdings'})
     holdings = []
     try:
         import io as _io
-        pdf = pdfplumber.open(_io.BytesIO(content))
-        for page in pdf.pages:
-            text = page.extract_text() or ''
-            # Parse rows: "CODE DATE SECURITY WEIGHT"
-            # After the header line, each row has: CODE DATE SECURITY WEIGHT(%)
-            # The header is "Fund As At Date Security Weight (%)"
-            in_data = False
-            for line in text.split('\n'):
-                line = line.strip()
-                if 'Security' in line and 'Weight' in line:
-                    in_data = True
-                    continue
-                if not in_data or not line:
-                    continue
-                # Skip footer lines
-                if any(skip in line for skip in ['Coolabah', 'ABN', 'Total weights', '1300']):
-                    continue
-                # Each data row: "CODE DATE SECURITY WEIGHT"
-                # Security is the 3rd token, weight is last
-                parts = line.split()
-                if len(parts) >= 3:
-                    weight = _safe_float(parts[-1])
-                    name = ' '.join(parts[2:-1]) if len(parts) > 3 else parts[-2] if len(parts) == 3 else parts[2]
-                    if name and weight is not None:
-                        holdings.append({'name': name, 'ticker': name, 'weight_pct': weight})
+        with pdfplumber.open(_io.BytesIO(content)) as pdf:
+            for page in pdf.pages:
+                text = page.extract_text() or ''
+                in_data = False
+                for line in text.split('\n'):
+                    line = line.strip()
+                    if not line:
+                        continue
+                    if 'Security' in line and 'Weight' in line:
+                        in_data = True
+                        continue
+                    if not in_data:
+                        continue
+                    if any(skip in line.lower() for skip in _SKIP):
+                        continue
+                    # Last token is the weight; everything before is the security name
+                    parts = line.rsplit(None, 1)
+                    if len(parts) != 2:
+                        continue
+                    name, raw_weight = parts[0].strip(), parts[1]
+                    weight = _safe_float(raw_weight)
+                    if name and weight is not None and weight > 0:
+                        holdings.append({'name': name, 'ticker': None, 'weight_pct': weight})
     except Exception as e:
-        logger.warning(f'Coolabah PDF parse error: {e}')
+        logger.warning(f'Coolabah top-10 PDF parse error: {e}')
     return holdings
 
 
 def scrape_coolabah(db_path=None) -> int:
     """
-    Scrape Coolabah ETF holdings from their Material Portfolio Information PDFs.
-    These show underlying instrument/ETF exposures and weights.
+    Scrape Coolabah ETF holdings from their 'Top 10 Portfolio Holdings' PDFs.
+    The fund page is scraped to discover the latest dated PDF link dynamically.
+    Funds without a top-10 report are skipped (no MPI basket data stored).
     """
+    import urllib.parse as _urlparse
     started = datetime.utcnow()
     source = 'coolabah'
     updated = 0
 
     conn = get_connection(db_path)
 
-    for asx_code, blob_code in _COOLABAH_FUNDS.items():
-        url = _COOLABAH_DOWNLOAD_BASE.format(code=blob_code)
+    for asx_code, slug in _COOLABAH_TOP10_SLUGS.items():
         try:
-            resp = fetch(url, headers={'Referer': 'https://coolabahcapital.com/'})
-            if not resp or resp.status_code != 200:
-                logger.warning(f'Coolabah: no PDF for {asx_code}')
+            # Step 1: scrape fund page to find the latest top-10 holdings PDF path
+            page_url = _COOLABAH_FUND_PAGE_BASE.format(slug=slug)
+            page_resp = fetch(page_url)
+            if not page_resp or page_resp.status_code != 200:
+                logger.warning(f'Coolabah: cannot load fund page for {asx_code}')
                 continue
 
-            holdings = _parse_coolabah_portfolio_pdf(resp.content)
+            matches = re.findall(
+                r'download=([^"\']*Top[^"\']*Holdings[^"\']*\.pdf)',
+                page_resp.text, re.IGNORECASE,
+            )
+            if not matches:
+                logger.warning(f'Coolabah: no Top 10 Holdings PDF link found for {asx_code}')
+                continue
+
+            # Take the first (most recent) match; URL-decode the path
+            pdf_path = _urlparse.unquote(matches[0])
+            pdf_url = _COOLABAH_DOWNLOAD_BASE.format(path=_urlparse.quote(pdf_path))
+
+            # Step 2: download and parse
+            pdf_resp = fetch(pdf_url, headers={'Referer': page_url})
+            if not pdf_resp or pdf_resp.status_code != 200:
+                logger.warning(f'Coolabah: could not download Top 10 PDF for {asx_code}')
+                continue
+
+            holdings = _parse_coolabah_top10_pdf(pdf_resp.content)
             if not holdings:
                 logger.warning(f'Coolabah: no holdings parsed for {asx_code}')
                 continue
 
             upsert_holdings(conn, asx_code, holdings)
             updated += 1
-            logger.info(f'Coolabah: {asx_code} — {len(holdings)} holdings')
+            logger.info(f'Coolabah: {asx_code} — {len(holdings)} holdings (top-10 report)')
 
         except Exception as e:
             logger.warning(f'Coolabah: error scraping {asx_code}: {e}')
