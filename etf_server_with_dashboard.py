@@ -877,7 +877,10 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
             rows = conn.execute("""
                 SELECT date, last_price, market_cap/1e6 AS aum_m,
                        funds_flow/1e6 AS flow_m, return_1y, distribution_yield,
-                       total_units/1e6 AS units_m, spread_pct, mer
+                       total_units/1e6 AS units_m, spread_pct, mer,
+                       chess_units/1e6 AS chess_units_m,
+                       chess_mc/1e6 AS chess_mc_m,
+                       chess_funds_flow/1e6 AS chess_flow_m
                 FROM etp_monthly WHERE code=? ORDER BY date ASC
             """, (code,)).fetchall()
             adm_ym = (info['admission_date'] or '')[:7] if info else ''
@@ -2463,7 +2466,6 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
       <button class="main-tab" data-view="compare">Compare</button>
       <button class="main-tab" data-view="holdings">Holdings Search</button>
       <button class="main-tab" data-view="analytics">Analytics</button>
-      <button class="main-tab" data-view="history">History</button>
       <a href="/articles" class="main-tab flex items-center gap-1" style="text-decoration:none">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
         Articles
@@ -2815,80 +2817,71 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
   <!-- ══════════════════════════════ VIEW: Analytics ══════════════════════════════ -->
   <div id="view-analytics" class="hidden">
 
-    <!-- Leaderboard cards -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-
-      <!-- Top Performers -->
-      <div class="bg-white rounded-xl shadow-sm border border-gray-100">
-        <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-          <h3 class="font-semibold text-gray-700 text-sm">Top Performers</h3>
-          <span class="text-xs text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">1Y Return</span>
-        </div>
-        <div id="an-performers" class="divide-y divide-gray-50">
-          <div class="flex justify-center py-8"><div class="spinner"></div></div>
-        </div>
-      </div>
-
-      <!-- Highest Yield -->
-      <div class="bg-white rounded-xl shadow-sm border border-gray-100">
-        <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-          <h3 class="font-semibold text-gray-700 text-sm">Highest Yield</h3>
-          <span class="text-xs text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">Distribution</span>
-        </div>
-        <div id="an-yield" class="divide-y divide-gray-50">
-          <div class="flex justify-center py-8"><div class="spinner"></div></div>
-        </div>
-      </div>
-
-      <!-- Lowest Cost -->
-      <div class="bg-white rounded-xl shadow-sm border border-gray-100">
-        <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-          <h3 class="font-semibold text-gray-700 text-sm">Lowest Cost</h3>
-          <span class="text-xs text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">MER</span>
-        </div>
-        <div id="an-cheapest" class="divide-y divide-gray-50">
-          <div class="flex justify-center py-8"><div class="spinner"></div></div>
-        </div>
-      </div>
-
-    </div>
-
-    <!-- Fund Flows -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-      <h3 class="font-semibold text-gray-700 text-sm mb-4">Fund Flows — Monthly (1M)</h3>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <p class="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-2">Top Inflows</p>
-          <div id="an-inflows" class="space-y-2">
-            <div class="flex justify-center py-4"><div class="spinner"></div></div>
-          </div>
-        </div>
-        <div>
-          <p class="text-xs font-semibold text-red-500 uppercase tracking-wide mb-2">Top Outflows</p>
-          <div id="an-outflows" class="space-y-2">
-            <div class="flex justify-center py-4"><div class="spinner"></div></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-  </div><!-- /view-analytics -->
-
-  <!-- ══════════════════════════════ VIEW: History ══════════════════════════════ -->
-  <div id="view-history" class="hidden">
-
     <!-- Sub-nav -->
-    <div class="flex gap-2 mb-5 flex-wrap" id="hist-subnav">
-      <button class="hist-sub-btn px-3 py-1.5 text-xs rounded-lg border font-medium bg-blue-600 text-white border-blue-600" data-hsub="industry">Industry Growth</button>
-      <button class="hist-sub-btn px-3 py-1.5 text-xs rounded-lg border font-medium border-gray-200 text-gray-600 hover:border-blue-400" data-hsub="issuers">Issuer Market Share</button>
-      <button class="hist-sub-btn px-3 py-1.5 text-xs rounded-lg border font-medium border-gray-200 text-gray-600 hover:border-blue-400" data-hsub="assetclass">Asset Classes</button>
-      <button class="hist-sub-btn px-3 py-1.5 text-xs rounded-lg border font-medium border-gray-200 text-gray-600 hover:border-blue-400" data-hsub="fund">Fund Lookup</button>
-      <button class="hist-sub-btn px-3 py-1.5 text-xs rounded-lg border font-medium border-gray-200 text-gray-600 hover:border-blue-400" data-hsub="flows">Flows</button>
-      <button class="hist-sub-btn px-3 py-1.5 text-xs rounded-lg border font-medium border-gray-200 text-gray-600 hover:border-blue-400" data-hsub="launches">Launches</button>
+    <div class="flex gap-2 mb-5 flex-wrap" id="an-subnav">
+      <button class="an-sub-btn px-3 py-1.5 text-xs rounded-lg border font-medium bg-blue-600 text-white border-blue-600" data-asub="overview">Overview</button>
+      <button class="an-sub-btn px-3 py-1.5 text-xs rounded-lg border font-medium border-gray-200 text-gray-600 hover:border-blue-400" data-asub="industry">Industry Growth</button>
+      <button class="an-sub-btn px-3 py-1.5 text-xs rounded-lg border font-medium border-gray-200 text-gray-600 hover:border-blue-400" data-asub="issuers">Issuer Market Share</button>
+      <button class="an-sub-btn px-3 py-1.5 text-xs rounded-lg border font-medium border-gray-200 text-gray-600 hover:border-blue-400" data-asub="assetclass">Asset Classes</button>
+      <button class="an-sub-btn px-3 py-1.5 text-xs rounded-lg border font-medium border-gray-200 text-gray-600 hover:border-blue-400" data-asub="fund">Fund Deep Dive</button>
+      <button class="an-sub-btn px-3 py-1.5 text-xs rounded-lg border font-medium border-gray-200 text-gray-600 hover:border-blue-400" data-asub="flows">Flows</button>
+      <button class="an-sub-btn px-3 py-1.5 text-xs rounded-lg border font-medium border-gray-200 text-gray-600 hover:border-blue-400" data-asub="launches">Launches</button>
     </div>
+
+    <!-- ── Overview ── -->
+    <div id="asub-overview">
+      <!-- Leaderboard cards -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100">
+          <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <h3 class="font-semibold text-gray-700 text-sm">Top Performers</h3>
+            <span class="text-xs text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">1Y Return</span>
+          </div>
+          <div id="an-performers" class="divide-y divide-gray-50">
+            <div class="flex justify-center py-8"><div class="spinner"></div></div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100">
+          <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <h3 class="font-semibold text-gray-700 text-sm">Highest Yield</h3>
+            <span class="text-xs text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">Distribution</span>
+          </div>
+          <div id="an-yield" class="divide-y divide-gray-50">
+            <div class="flex justify-center py-8"><div class="spinner"></div></div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100">
+          <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <h3 class="font-semibold text-gray-700 text-sm">Lowest Cost</h3>
+            <span class="text-xs text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">MER</span>
+          </div>
+          <div id="an-cheapest" class="divide-y divide-gray-50">
+            <div class="flex justify-center py-8"><div class="spinner"></div></div>
+          </div>
+        </div>
+      </div>
+      <!-- Fund Flows -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+        <h3 class="font-semibold text-gray-700 text-sm mb-4">Fund Flows — Monthly (1M)</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <p class="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-2">Top Inflows</p>
+            <div id="an-inflows" class="space-y-2">
+              <div class="flex justify-center py-4"><div class="spinner"></div></div>
+            </div>
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-red-500 uppercase tracking-wide mb-2">Top Outflows</p>
+            <div id="an-outflows" class="space-y-2">
+              <div class="flex justify-center py-4"><div class="spinner"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div><!-- /asub-overview -->
 
     <!-- ── Industry Growth ── -->
-    <div id="hsub-industry">
+    <div id="asub-industry" class="hidden">
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <h3 class="font-semibold text-gray-700 text-sm mb-1">Industry AUM ($B)</h3>
@@ -2901,7 +2894,6 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
           <div style="height:260px"><canvas id="hist-industry-count"></canvas></div>
         </div>
       </div>
-      <!-- Anomaly explainer -->
       <div class="flex items-start gap-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 mb-4">
         <div class="mt-0.5 shrink-0">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" class="text-slate-400">
@@ -2924,10 +2916,10 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         <p class="text-xs text-gray-400 mb-3">Calendar-year aggregates</p>
         <div style="height:220px"><canvas id="hist-industry-flows"></canvas></div>
       </div>
-    </div>
+    </div><!-- /asub-industry -->
 
     <!-- ── Issuer Market Share ── -->
-    <div id="hsub-issuers" class="hidden">
+    <div id="asub-issuers" class="hidden">
       <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-4">
         <h3 class="font-semibold text-gray-700 text-sm mb-1">Issuer AUM Over Time ($B)</h3>
         <p class="text-xs text-gray-400 mb-3">Stacked by top 10 issuers · monthly data since Jul 2013</p>
@@ -2937,34 +2929,35 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         <h3 class="font-semibold text-gray-700 text-sm mb-1">Current Issuer Rankings</h3>
         <div id="hist-issuer-table" class="overflow-x-auto"></div>
       </div>
-    </div>
+    </div><!-- /asub-issuers -->
 
     <!-- ── Asset Classes ── -->
-    <div id="hsub-assetclass" class="hidden">
+    <div id="asub-assetclass" class="hidden">
       <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-4">
         <h3 class="font-semibold text-gray-700 text-sm mb-1">Asset Class AUM Over Time ($B)</h3>
         <p class="text-xs text-gray-400 mb-3">Stacked by asset class · monthly data since Jul 2013</p>
         <div style="height:320px"><canvas id="hist-assetclass-stacked"></canvas></div>
       </div>
-    </div>
+    </div><!-- /asub-assetclass -->
 
-    <!-- ── Fund Lookup ── -->
-    <div id="hsub-fund" class="hidden">
+    <!-- ── Fund Deep Dive ── -->
+    <div id="asub-fund" class="hidden">
       <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-4">
-        <div class="flex gap-3 items-center mb-4">
+        <div class="flex gap-3 items-center flex-wrap mb-4">
           <input id="hist-fund-input" type="text" placeholder="Enter ASX code e.g. VAS, NDQ, IVV&hellip;"
             class="border border-gray-200 rounded-lg px-3 py-2 text-sm flex-1 max-w-xs focus:outline-none focus:ring-2 focus:ring-blue-200">
           <button id="hist-fund-btn"
             class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 font-medium">
             Load
           </button>
+          <span class="text-xs text-gray-400">or click any ETF in the Screener to deep-dive here</span>
         </div>
         <div id="hist-fund-result"></div>
       </div>
-    </div>
+    </div><!-- /asub-fund -->
 
     <!-- ── Flows ── -->
-    <div id="hsub-flows" class="hidden">
+    <div id="asub-flows" class="hidden">
       <div class="flex gap-2 mb-4 flex-wrap items-center">
         <span class="text-xs text-gray-500 font-medium">Period:</span>
         <button class="hist-flow-period px-3 py-1 text-xs rounded-lg border font-medium border-gray-200 text-gray-600 hover:border-blue-400" data-months="3">3 months</button>
@@ -2983,10 +2976,10 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
           <div id="hist-flows-out"></div>
         </div>
       </div>
-    </div>
+    </div><!-- /asub-flows -->
 
     <!-- ── Launches ── -->
-    <div id="hsub-launches" class="hidden">
+    <div id="asub-launches" class="hidden">
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <h3 class="font-semibold text-gray-700 text-sm mb-1">ETF Launches by Year</h3>
@@ -2998,9 +2991,9 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
           <div id="hist-launches-issuer"></div>
         </div>
       </div>
-    </div>
+    </div><!-- /asub-launches -->
 
-  </div><!-- /view-history -->
+  </div><!-- /view-analytics -->
 
 </main>
 
@@ -4603,7 +4596,7 @@ setInterval(() => {
 }, 120000);
 
 /* ======================================================= main view tabs */
-const VIEWS = ['screener', 'compare', 'holdings', 'analytics', 'history'];
+const VIEWS = ['screener', 'compare', 'holdings', 'analytics'];
 document.querySelectorAll('.main-tab').forEach(btn => {
   btn.addEventListener('click', () => {
     const v = btn.dataset.view;
@@ -4613,7 +4606,6 @@ document.querySelectorAll('.main-tab').forEach(btn => {
     document.getElementById('view-' + v).classList.remove('hidden');
     if (v === 'compare'   && !compareLoaded)   initCompare();
     if (v === 'analytics' && !analyticsLoaded) initAnalytics();
-    if (v === 'history'   && !historyLoaded)   initHistory();
   });
 });
 
@@ -4623,6 +4615,7 @@ let analyticsLoaded = false;
 let historyLoaded = false;
 let histCharts = {};
 let histSubActive = 'industry';
+let anSubActive = 'overview';
 const cmpSet = new Set();
 let cmpTimer;
 
@@ -5054,8 +5047,54 @@ async function hsFetch() {
 }
 
 /* ============================================================ ANALYTICS */
+/* ============================================================ ANALYTICS */
 async function initAnalytics() {
   analyticsLoaded = true;
+  anSubActive = 'overview';
+
+  /* ── Sub-nav switching ── */
+  document.getElementById('an-subnav').addEventListener('click', async e => {
+    const btn = e.target.closest('[data-asub]');
+    if (!btn) return;
+    const sub = btn.dataset.asub;
+    document.querySelectorAll('.an-sub-btn').forEach(b => {
+      const active = b.dataset.asub === sub;
+      b.className = 'an-sub-btn px-3 py-1.5 text-xs rounded-lg border font-medium ' +
+        (active ? 'bg-blue-600 text-white border-blue-600'
+                : 'border-gray-200 text-gray-600 hover:border-blue-400');
+    });
+    ['overview','industry','issuers','assetclass','fund','flows','launches'].forEach(id => {
+      document.getElementById('asub-' + id).classList.toggle('hidden', id !== sub);
+    });
+    anSubActive = sub;
+    if (sub === 'industry'   && !histCharts['hist-industry-aum'])       await loadHistIndustry();
+    if (sub === 'issuers'    && !histCharts['hist-issuer-stacked'])      await loadHistIssuers();
+    if (sub === 'assetclass' && !histCharts['hist-assetclass-stacked'])  await loadHistAssetClass();
+    if (sub === 'flows'      && !document.getElementById('hist-flows-in').children.length) await loadHistFlows(12);
+    if (sub === 'launches'   && !histCharts['hist-launches-bar'])        await loadHistLaunches();
+  });
+
+  /* ── Fund lookup wiring ── */
+  document.getElementById('hist-fund-btn').addEventListener('click', () => {
+    const code = document.getElementById('hist-fund-input').value.trim();
+    if (code) loadHistFund(code);
+  });
+  document.getElementById('hist-fund-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('hist-fund-btn').click();
+  });
+
+  /* ── Flow period buttons ── */
+  document.querySelectorAll('.hist-flow-period').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.hist-flow-period').forEach(b => {
+        b.className = b.className.replace('bg-blue-600 text-white border-blue-600', 'border-gray-200 text-gray-600 hover:border-blue-400');
+      });
+      btn.className = btn.className.replace('border-gray-200 text-gray-600 hover:border-blue-400', 'bg-blue-600 text-white border-blue-600');
+      loadHistFlows(btn.dataset.months);
+    });
+  });
+
+  /* ── Overview: leaderboard + flows ── */
   const [performers, yieldData, cheapest, flows] = await Promise.all([
     api('/api/v1/analytics/top-performers?limit=15'),
     api('/api/v1/analytics/highest-yield?limit=15'),
@@ -5100,8 +5139,8 @@ async function initAnalytics() {
   const maxFlow = Math.max(...allFlows.map(r => Math.abs(r.fund_flow_1m || 0)), 1);
 
   function flowRow(r, dir) {
-    const col   = dir === 'in' ? issuerColor(r.issuer) : '#ef4444';
-    const barW  = (Math.abs(r.fund_flow_1m || 0) / maxFlow * 100).toFixed(1);
+    const col  = dir === 'in' ? issuerColor(r.issuer) : '#ef4444';
+    const barW = (Math.abs(r.fund_flow_1m || 0) / maxFlow * 100).toFixed(1);
     return `<div class="flex items-center gap-2 cursor-pointer hover:bg-slate-50 px-2 py-1.5 rounded group"
          onclick="showDetail('${r.code}');document.querySelector('.main-tab[data-view=screener]').click()">
       <div class="min-w-0 w-24 shrink-0">
@@ -5538,123 +5577,157 @@ async function loadHistLaunches() {
     </div>`).join('');
 }
 
-async function loadHistFund(code) {
+async function loadHistFund(rawCode) {
+  const code = rawCode.toUpperCase();
   const el = document.getElementById('hist-fund-result');
   el.innerHTML = '<div class="flex justify-center py-8"><div class="spinner"></div></div>';
-  const d = await api('/api/v1/history/etf/' + code.toUpperCase());
+  const d = await api('/api/v1/history/etf/' + code);
   if (d.error || !d.data || !d.data.length) {
-    el.innerHTML = `<p class="text-gray-400 text-sm py-4">No historical data found for ${code.toUpperCase()}.</p>`;
+    el.innerHTML = `<p class="text-gray-400 text-sm py-4">No historical data found for ${code}.</p>`;
     return;
   }
   const rows  = d.data;
   const dates = rows.map(r => r.date);
-  const aums  = rows.map(r => r.aum_m || 0);
-  const flows = rows.map(r => r.flow_m || 0);
-  const rets  = rows.map(r => r.return_1y != null ? +(r.return_1y * 100).toFixed(2) : null);
+  const anomalyFlags = rows.map(r => r.is_anomaly);
+
+  /* ── summary stats ── */
+  const last = rows[rows.length - 1];
+  const first = rows[0];
+  const statItem = (label, value) =>
+    `<div class="text-center px-4 py-2 border-r border-gray-100 last:border-0">
+       <div class="text-xs text-gray-400 mb-0.5">${label}</div>
+       <div class="font-semibold text-gray-800 text-sm">${value}</div>
+     </div>`;
 
   el.innerHTML = `
-    <h3 class="font-semibold text-gray-800 mb-1">${d.code} — ${d.name || ''}</h3>
-    <p class="text-xs text-gray-400 mb-4">${d.issuer || ''} · ${rows.length} months of data</p>
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <div>
-        <p class="text-xs font-medium text-gray-600 mb-1">AUM ($M)</p>
-        <div style="height:200px"><canvas id="hist-fund-aum"></canvas></div>
+    <div class="mb-4">
+      <h3 class="font-semibold text-gray-800 mb-0.5">${d.code} — ${d.name || ''}</h3>
+      <p class="text-xs text-gray-400 mb-3">${d.issuer || ''} · ${rows.length} months of data · from ${first.date} to ${last.date}</p>
+      <div class="flex flex-wrap bg-gray-50 rounded-lg border border-gray-100 overflow-hidden mb-4">
+        ${statItem('Current AUM', last.aum_m != null ? fmtFum(last.aum_m) : '—')}
+        ${statItem('Unit Price', last.last_price != null ? '$' + last.last_price.toFixed(2) : '—')}
+        ${statItem('MER', last.mer != null ? (last.mer * 100).toFixed(2) + '%' : '—')}
+        ${statItem('Bid/Ask Spread', last.spread_pct != null ? last.spread_pct.toFixed(3) + '%' : '—')}
+        ${statItem('CHESS Units', last.chess_units_m != null ? (last.chess_units_m).toFixed(1) + 'M' : '—')}
+        ${statItem('1Y Return', last.return_1y != null ? (last.return_1y * 100).toFixed(1) + '%' : '—')}
+        ${statItem('Yield', last.distribution_yield != null ? (last.distribution_yield * 100).toFixed(1) + '%' : '—')}
       </div>
-      <div>
-        <p class="text-xs font-medium text-gray-600 mb-1">Net Monthly Flows ($M)</p>
-        <div style="height:200px"><canvas id="hist-fund-flows"></canvas></div>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div class="bg-gray-50 rounded-lg p-3">
+        <p class="text-xs font-medium text-gray-500 mb-1">AUM ($M)</p>
+        <div style="height:160px"><canvas id="hf-aum"></canvas></div>
       </div>
-      <div>
-        <p class="text-xs font-medium text-gray-600 mb-1">1Y Total Return (%)</p>
-        <div style="height:200px"><canvas id="hist-fund-ret"></canvas></div>
+      <div class="bg-gray-50 rounded-lg p-3">
+        <p class="text-xs font-medium text-gray-500 mb-1">Unit Price ($)</p>
+        <div style="height:160px"><canvas id="hf-price"></canvas></div>
       </div>
-      <div>
-        <p class="text-xs font-medium text-gray-600 mb-1">Distribution Yield (%)</p>
-        <div style="height:200px"><canvas id="hist-fund-yield"></canvas></div>
+      <div class="bg-gray-50 rounded-lg p-3">
+        <p class="text-xs font-medium text-gray-500 mb-1">Net Monthly Flows ($M)</p>
+        <div style="height:160px"><canvas id="hf-flows"></canvas></div>
+      </div>
+      <div class="bg-gray-50 rounded-lg p-3">
+        <p class="text-xs font-medium text-gray-500 mb-1">CHESS Units on Issue (M)</p>
+        <div style="height:160px"><canvas id="hf-chess"></canvas></div>
+      </div>
+      <div class="bg-gray-50 rounded-lg p-3">
+        <p class="text-xs font-medium text-gray-500 mb-1">CHESS Net Flows ($M)</p>
+        <div style="height:160px"><canvas id="hf-chess-flows"></canvas></div>
+      </div>
+      <div class="bg-gray-50 rounded-lg p-3">
+        <p class="text-xs font-medium text-gray-500 mb-1">1Y Total Return (%)</p>
+        <div style="height:160px"><canvas id="hf-ret"></canvas></div>
+      </div>
+      <div class="bg-gray-50 rounded-lg p-3">
+        <p class="text-xs font-medium text-gray-500 mb-1">Distribution Yield (%)</p>
+        <div style="height:160px"><canvas id="hf-yield"></canvas></div>
+      </div>
+      <div class="bg-gray-50 rounded-lg p-3">
+        <p class="text-xs font-medium text-gray-500 mb-1">MER (%) &amp; Bid/Ask Spread (%)</p>
+        <div style="height:160px"><canvas id="hf-costs"></canvas></div>
       </div>
     </div>`;
 
-  // Draw after DOM is updated
   setTimeout(() => {
-    makeLineChart('hist-fund-aum', dates, [{
-      data: aums, borderColor: '#3b82f6', backgroundColor: '#3b82f620', fill: true,
-      tension: 0.3, pointRadius: 0, borderWidth: 2
+    /* AUM */
+    makeLineChart('hf-aum', dates, [{
+      data: rows.map(r => r.aum_m || 0),
+      borderColor: '#3b82f6', backgroundColor: '#3b82f620', fill: true,
+      tension: 0.3, pointRadius: 0, borderWidth: 2,
     }]);
-    const anomalyFlags = rows.map(r => r.is_anomaly);
-    makeBarChart('hist-fund-flows', dates, [{
+    /* Unit price */
+    makeLineChart('hf-price', dates, [{
+      data: rows.map(r => r.last_price),
+      borderColor: '#8b5cf6', backgroundColor: '#8b5cf620', fill: true,
+      tension: 0.3, pointRadius: 0, borderWidth: 2,
+    }]);
+    /* Net flows bar */
+    const flows = rows.map(r => r.flow_m || 0);
+    makeBarChart('hf-flows', dates, [{
       data: flows,
       backgroundColor: flows.map((v, i) =>
-        anomalyFlags[i] ? '#94a3b880' : (v >= 0 ? '#3b82f680' : '#ef444480')
-      ),
+        anomalyFlags[i] ? '#94a3b880' : (v >= 0 ? '#3b82f680' : '#ef444480')),
       borderColor: flows.map((v, i) =>
-        anomalyFlags[i] ? '#94a3b8' : (v >= 0 ? '#3b82f6' : '#ef4444')
-      ),
-      borderWidth: anomalyFlags.map(a => a ? 1 : 0),
-      borderRadius: 2,
+        anomalyFlags[i] ? '#94a3b8' : (v >= 0 ? '#3b82f6' : '#ef4444')),
+      borderWidth: 1, borderRadius: 2,
     }]);
-    makeLineChart('hist-fund-ret', dates, [{
-      data: rets, borderColor: '#3b82f6', backgroundColor: '#3b82f620', fill: true,
-      tension: 0.3, pointRadius: 0, borderWidth: 2
+    /* CHESS units */
+    makeLineChart('hf-chess', dates, [{
+      data: rows.map(r => r.chess_units_m),
+      borderColor: '#10b981', backgroundColor: '#10b98120', fill: true,
+      tension: 0.3, pointRadius: 0, borderWidth: 2,
     }]);
-    makeLineChart('hist-fund-yield', dates, [{
-      data: rows.map(r => r.distribution_yield != null ? +(r.distribution_yield*100).toFixed(2) : null),
+    /* CHESS net flows bar */
+    const chessFlows = rows.map(r => r.chess_flow_m || 0);
+    makeBarChart('hf-chess-flows', dates, [{
+      data: chessFlows,
+      backgroundColor: chessFlows.map(v => v >= 0 ? '#10b98180' : '#f9731680'),
+      borderColor:     chessFlows.map(v => v >= 0 ? '#10b981'   : '#f97316'),
+      borderWidth: 1, borderRadius: 2,
+    }]);
+    /* 1Y return */
+    makeLineChart('hf-ret', dates, [{
+      data: rows.map(r => r.return_1y != null ? +(r.return_1y * 100).toFixed(2) : null),
       borderColor: '#f59e0b', backgroundColor: '#f59e0b20', fill: true,
-      tension: 0.3, pointRadius: 0, borderWidth: 2
+      tension: 0.3, pointRadius: 0, borderWidth: 2,
+      spanGaps: true,
     }]);
+    /* Dist yield */
+    makeLineChart('hf-yield', dates, [{
+      data: rows.map(r => r.distribution_yield != null ? +(r.distribution_yield * 100).toFixed(2) : null),
+      borderColor: '#ef4444', backgroundColor: '#ef444420', fill: true,
+      tension: 0.3, pointRadius: 0, borderWidth: 2,
+      spanGaps: true,
+    }]);
+    /* MER + spread dual-series */
+    makeLineChart('hf-costs', dates, [
+      {
+        label: 'MER (%)',
+        data: rows.map(r => r.mer != null ? +(r.mer * 100).toFixed(3) : null),
+        borderColor: '#6366f1', backgroundColor: 'transparent', fill: false,
+        tension: 0, pointRadius: 0, borderWidth: 2, spanGaps: true,
+      },
+      {
+        label: 'Spread (%)',
+        data: rows.map(r => r.spread_pct != null ? +r.spread_pct.toFixed(4) : null),
+        borderColor: '#f97316', backgroundColor: 'transparent', fill: false,
+        tension: 0.3, pointRadius: 0, borderWidth: 2, spanGaps: true,
+      },
+    ]);
   }, 50);
 }
 
-async function initHistory() {
-  historyLoaded = true;
-
-  // Sub-nav switching
-  document.getElementById('hist-subnav').addEventListener('click', async e => {
-    const btn = e.target.closest('[data-hsub]');
-    if (!btn) return;
-    const sub = btn.dataset.hsub;
-    document.querySelectorAll('.hist-sub-btn').forEach(b => {
-      const active = b.dataset.hsub === sub;
-      b.className = b.className
-        .replace('bg-blue-600 text-white border-blue-600', 'border-gray-200 text-gray-600 hover:border-blue-400')
-        .replace('border-gray-200 text-gray-600 hover:border-blue-400', 'border-gray-200 text-gray-600 hover:border-blue-400');
-      if (active) {
-        b.className = b.className.replace('border-gray-200 text-gray-600 hover:border-blue-400', 'bg-blue-600 text-white border-blue-600');
-      }
-    });
-    ['industry','issuers','assetclass','fund','flows','launches'].forEach(id => {
-      document.getElementById('hsub-'+id).classList.toggle('hidden', id !== sub);
-    });
-    histSubActive = sub;
-    // Load data for sub-view on first show
-    if (sub === 'issuers'    && !histCharts['hist-issuer-stacked'])   await loadHistIssuers();
-    if (sub === 'assetclass' && !histCharts['hist-assetclass-stacked']) await loadHistAssetClass();
-    if (sub === 'flows'      && !document.getElementById('hist-flows-in').children.length) await loadHistFlows(12);
-    if (sub === 'launches'   && !histCharts['hist-launches-bar'])     await loadHistLaunches();
-  });
-
-  // Fund lookup
-  document.getElementById('hist-fund-btn').addEventListener('click', () => {
-    const code = document.getElementById('hist-fund-input').value.trim();
-    if (code) loadHistFund(code);
-  });
-  document.getElementById('hist-fund-input').addEventListener('keydown', e => {
-    if (e.key === 'Enter') document.getElementById('hist-fund-btn').click();
-  });
-
-  // Flow period buttons
-  document.querySelectorAll('.hist-flow-period').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.hist-flow-period').forEach(b => {
-        b.className = b.className.replace('bg-blue-600 text-white border-blue-600','border-gray-200 text-gray-600 hover:border-blue-400');
-      });
-      btn.className = btn.className.replace('border-gray-200 text-gray-600 hover:border-blue-400','bg-blue-600 text-white border-blue-600');
-      loadHistFlows(btn.dataset.months);
-    });
-  });
-
-  // Load the default sub-view (industry)
-  await loadHistIndustry();
+function deepDiveFund(code) {
+  document.querySelector('.main-tab[data-view=analytics]').click();
+  setTimeout(() => {
+    document.querySelector('[data-asub=fund]').click();
+    setTimeout(() => {
+      document.getElementById('hist-fund-input').value = code;
+      loadHistFund(code);
+    }, 50);
+  }, 50);
 }
+
 
 /* ============================================================ CSV EXPORT */
 function scExportCSV() {
