@@ -535,8 +535,27 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
         conn = get_db()
         try:
             rows = conn.execute(
-                "SELECT name, website, etf_count, total_fum, last_updated "
-                "FROM issuers WHERE etf_count > 0 ORDER BY total_fum DESC"
+                """
+                SELECT
+                    i.name,
+                    i.website,
+                    i.etf_count,
+                    i.total_fum,
+                    i.last_updated,
+                    ROUND(
+                        100.0 * i.total_fum / NULLIF((SELECT SUM(fund_size_aud_millions) FROM etfs WHERE fund_size_aud_millions > 0), 0),
+                        2
+                    ) AS market_share_pct,
+                    (SELECT AVG(management_fee)
+                     FROM etfs e2
+                     WHERE e2.issuer = i.name AND e2.management_fee IS NOT NULL) AS avg_mer,
+                    (SELECT SUM(fund_flow_1m)
+                     FROM etfs e3
+                     WHERE e3.issuer = i.name AND e3.fund_flow_1m IS NOT NULL) AS fund_flow_1m
+                FROM issuers i
+                WHERE i.etf_count > 0
+                ORDER BY i.total_fum DESC
+                """
             ).fetchall()
             self.send_json({'issuers': [dict(r) for r in rows]})
         except Exception as e:
@@ -2497,6 +2516,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
       <button class="main-tab active" data-view="screener">Screener</button>
       <button class="main-tab" data-view="compare">Compare</button>
       <button class="main-tab" data-view="holdings">Holdings Search</button>
+      <button class="main-tab" data-view="issuers">Issuers</button>
       <button class="main-tab" data-view="analytics">Analytics</button>
       <a href="/articles" class="main-tab flex items-center gap-1" style="text-decoration:none">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
@@ -2822,6 +2842,24 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
   </div><!-- /view-holdings -->
 
   <!-- ══════════════════════════════ VIEW: Analytics ══════════════════════════════ -->
+  <!-- ── Issuers tab ── -->
+  <div id="view-issuers" class="hidden">
+    <!-- Summary stats -->
+    <div id="iss-summary" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5"></div>
+    <!-- Search/filter bar -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 px-4 py-3 mb-5 flex items-center gap-3 flex-wrap">
+      <input id="iss-search" type="text" placeholder="Search issuers…"
+             class="border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-gray-50
+                    focus:ring-2 focus:ring-blue-300 outline-none w-52">
+      <label class="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer ml-auto">
+        <input type="checkbox" id="iss-hide-small" class="rounded">
+        Hide issuers with &lt;5 ETFs
+      </label>
+    </div>
+    <!-- Issuer cards grid -->
+    <div id="iss-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+  </div><!-- /view-issuers -->
+
   <div id="view-analytics" class="hidden">
 
     <!-- Sub-nav -->
@@ -4366,7 +4404,7 @@ setInterval(() => {
 }, 120000);
 
 /* ======================================================= main view tabs */
-const VIEWS = ['screener', 'compare', 'holdings', 'analytics'];
+const VIEWS = ['screener', 'compare', 'holdings', 'issuers', 'analytics'];
 document.querySelectorAll('.main-tab').forEach(btn => {
   btn.addEventListener('click', () => {
     const v = btn.dataset.view;
@@ -4375,6 +4413,7 @@ document.querySelectorAll('.main-tab').forEach(btn => {
     VIEWS.forEach(id => document.getElementById('view-' + id).classList.add('hidden'));
     document.getElementById('view-' + v).classList.remove('hidden');
     if (v === 'compare'   && !compareLoaded)   initCompare();
+    if (v === 'issuers'   && !issuersLoaded)   initIssuers();
     if (v === 'analytics' && !analyticsLoaded) initAnalytics();
   });
 });
@@ -4382,6 +4421,7 @@ document.querySelectorAll('.main-tab').forEach(btn => {
 /* ============================================================ COMPARE */
 let compareLoaded = false;
 let analyticsLoaded = false;
+let issuersLoaded = false;
 let historyLoaded = false;
 let histCharts = {};
 let histSubActive = 'industry';
@@ -4816,6 +4856,86 @@ async function hsFetch() {
     </tr>`).join('');
 }
 
+/* ======================================================= issuers tab */
+let _issuersList = null;
+
+async function initIssuers() {
+  issuersLoaded = true;
+  const data = await api('/api/v1/issuers');
+  _issuersList = (data.issuers || []);
+
+  // Summary stats
+  const totalFum = _issuersList.reduce((s, i) => s + (i.total_fum || 0), 0);
+  const totalEtfs = _issuersList.reduce((s, i) => s + (i.etf_count || 0), 0);
+  const totalFlow = _issuersList.reduce((s, i) => s + (i.fund_flow_1m || 0), 0);
+  document.getElementById('iss-summary').innerHTML = [
+    ['Total AUM',     fmtFum(totalFum)],
+    ['Issuers',       _issuersList.length + ' managers'],
+    ['Total ETFs',    totalEtfs + ' products'],
+    ['1M Net Flows',  fmtFum(totalFlow)],
+  ].map(([l, v]) => `
+    <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+      <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">${l}</p>
+      <p class="text-xl font-bold text-gray-900 mt-1">${v}</p>
+    </div>`).join('');
+
+  renderIssuerGrid();
+  document.getElementById('iss-search').addEventListener('input', renderIssuerGrid);
+  document.getElementById('iss-hide-small').addEventListener('change', renderIssuerGrid);
+}
+
+function renderIssuerGrid() {
+  const q = (document.getElementById('iss-search')?.value || '').toLowerCase();
+  const hideSmall = document.getElementById('iss-hide-small')?.checked;
+  const issuers = (_issuersList || []).filter(i =>
+    (!q || (i.name || '').toLowerCase().includes(q)) &&
+    (!hideSmall || (i.etf_count || 0) >= 5)
+  );
+
+  if (!issuers.length) {
+    document.getElementById('iss-grid').innerHTML =
+      '<p class="text-gray-400 text-sm col-span-3 py-8 text-center">No issuers matched</p>';
+    return;
+  }
+
+  document.getElementById('iss-grid').innerHTML = issuers.map(iss => {
+    const slug = slugify(iss.name);
+    const color = issuerColor(iss.name);
+    const flow = iss.fund_flow_1m;
+    const flowStr = flow != null ? fmtFum(flow) : '—';
+    const flowCls = flow > 0 ? 'text-green-600' : flow < 0 ? 'text-red-500' : 'text-gray-400';
+    const share = iss.market_share_pct != null ? iss.market_share_pct.toFixed(1) + '%' : '—';
+    return `
+    <a href="/issuers/${slug}"
+       class="bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md
+              hover:border-blue-200 transition-all p-5 block group">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="w-3 h-8 rounded-sm shrink-0" style="background:${color}"></div>
+        <div class="min-w-0">
+          <h3 class="font-bold text-gray-900 text-sm leading-tight truncate group-hover:text-blue-600 transition-colors">
+            ${iss.name}
+          </h3>
+          <p class="text-xs text-gray-400">${iss.etf_count} ETFs · ${share} market share</p>
+        </div>
+      </div>
+      <div class="grid grid-cols-3 gap-2 text-center">
+        <div>
+          <p class="text-xs text-gray-400">AUM</p>
+          <p class="text-sm font-semibold text-gray-800">${fmtFum(iss.total_fum)}</p>
+        </div>
+        <div>
+          <p class="text-xs text-gray-400">Avg MER</p>
+          <p class="text-sm font-semibold text-gray-800">${iss.avg_mer != null ? Number(iss.avg_mer).toFixed(2) + '%' : '—'}</p>
+        </div>
+        <div>
+          <p class="text-xs text-gray-400">1M Flow</p>
+          <p class="text-sm font-semibold ${flowCls}">${flowStr}</p>
+        </div>
+      </div>
+    </a>`;
+  }).join('');
+}
+
 /* ============================================================ ANALYTICS */
 /* ============================================================ ANALYTICS */
 async function initAnalytics() {
@@ -4915,7 +5035,9 @@ async function initAnalytics() {
          onclick="showDetail('${r.code}');document.querySelector('.main-tab[data-view=screener]').click()">
       <div class="min-w-0 w-24 shrink-0">
         <div class="font-bold text-gray-900 text-xs">${r.code}</div>
-        <div class="text-[10px] text-gray-400 truncate">${r.issuer || ''}</div>
+        <div class="text-[10px] text-gray-400 truncate">
+  ${r.issuer ? `<a href="/issuers/${slugify(r.issuer)}" class="hover:underline">${r.issuer}</a>` : ''}
+</div>
       </div>
       <div class="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
         <div class="h-full rounded-full transition-all" style="background:${col};width:${barW}%"></div>
@@ -5308,7 +5430,9 @@ async function loadHistFlows(months) {
            onclick="showDetail('${r.code}');document.querySelector('.main-tab[data-view=screener]').click()">
         <div class="w-16 shrink-0">
           <div class="font-bold text-xs text-gray-900">${r.code}</div>
-          <div class="text-[10px] text-gray-400 truncate">${r.issuer||''}</div>
+          <div class="text-[10px] text-gray-400 truncate">
+  ${r.issuer ? `<a href="/issuers/${slugify(r.issuer)}" class="hover:underline">${r.issuer}</a>` : ''}
+</div>
         </div>
         <div class="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
           <div class="h-full rounded-full" style="background:${col};width:${w}%"></div>
@@ -5338,7 +5462,7 @@ async function loadHistLaunches() {
   const maxTotal = Math.max(...d.by_issuer.map(r => r.total), 1);
   document.getElementById('hist-launches-issuer').innerHTML = (d.by_issuer || []).map((r, i) => `
     <div class="flex items-center gap-3 py-1.5 border-b border-gray-50 last:border-0">
-      <div class="w-28 text-xs text-gray-700 font-medium truncate shrink-0">${r.issuer}</div>
+      <a href="/issuers/${slugify(r.issuer)}" class="w-28 text-xs text-gray-700 font-medium truncate shrink-0 hover:text-blue-600 hover:underline">${r.issuer}</a>
       <div class="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
         <div class="h-full rounded-full" style="background:${HIST_PALETTE[i%HIST_PALETTE.length]};width:${(r.total/maxTotal*100).toFixed(0)}%"></div>
       </div>
@@ -5372,7 +5496,7 @@ async function loadHistFund(rawCode) {
   el.innerHTML = `
     <div class="mb-4">
       <h3 class="font-semibold text-gray-800 mb-0.5">${d.code} — ${d.name || ''}</h3>
-      <p class="text-xs text-gray-400 mb-3">${d.issuer || ''} · ${rows.length} months of data · from ${first.date} to ${last.date}</p>
+      <p class="text-xs text-gray-400 mb-3">${d.issuer ? `<a href="/issuers/${slugify(d.issuer)}" class="hover:underline hover:text-blue-600">${d.issuer}</a>` : ''} · ${rows.length} months of data · from ${first.date} to ${last.date}</p>
       <div class="flex flex-wrap bg-gray-50 rounded-lg border border-gray-100 overflow-hidden mb-4">
         ${statItem('Current AUM', last.aum_m != null ? fmtFum(last.aum_m) : '—')}
         ${statItem('Unit Price', last.last_price != null ? '$' + last.last_price.toFixed(2) : '—')}

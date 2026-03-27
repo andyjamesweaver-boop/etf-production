@@ -266,7 +266,7 @@ async function init() {
 
   document.getElementById('per-issuer').innerHTML =
     Object.entries(d.top_per_issuer).map(([iss_name, etfs]) => `<div class="border border-[#1e3860] rounded-lg p-3 bg-[#0d1c35]">
-      <div class="text-xs font-bold uppercase mb-2" style="color:${issColor(iss_name)}">${iss_name}</div>
+      <div class="text-xs font-bold uppercase mb-2"><a href="/issuers/${slugify(iss_name)}" style="color:${issColor(iss_name)}" class="hover:underline">${iss_name}</a></div>
       ${etfs.map((e, i) => `<div class="flex items-center gap-2 py-1 ${i < etfs.length - 1 ? 'border-b border-[#1a3050]' : ''}">
         <span class="text-slate-500 text-xs w-3 tabular-nums">${i + 1}</span>
         <span class="font-bold text-green-600 text-xs w-10">${e.code}</span>
@@ -432,7 +432,7 @@ async function init() {
             <span class="text-xs text-indigo-400 font-semibold">Coming Soon</span>
           </div>
           <div class="text-xs text-slate-300 font-medium leading-snug mb-1">${u.name || '—'}</div>
-          <div class="text-xs text-slate-500">${u.issuer || ''}</div>
+          <div class="text-xs text-slate-500">${u.issuer ? `<a href="/issuers/${slugify(u.issuer)}" style="color:inherit" class="hover:underline">${u.issuer}</a>` : ''}</div>
           ${u.expected_date ? `<div class="text-xs text-slate-500 mt-1">Expected: ${u.expected_date}</div>` : ''}
         </div>`).join('');
     } else {
@@ -447,7 +447,7 @@ async function init() {
     document.getElementById('listings-recent-new').innerHTML = recent30.map(r => `<tr>
       <td class="font-bold text-blue-400">${r.code}</td>
       <td class="text-slate-300" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.name||'—'}</td>
-      <td class="text-slate-400 text-xs">${r.issuer||'—'}</td>
+      <td class="text-slate-400 text-xs">${r.issuer ? `<a href="/issuers/${slugify(r.issuer)}" style="color:#a8c4e0" class="hover:underline">${r.issuer}</a>` : '—'}</td>
       <td class="text-slate-400 text-xs">${r.asset_class||'—'}</td>
       <td class="text-slate-500 tabular-nums text-xs">${r.inception_date||'—'}</td>
       <td class="text-right text-slate-400 tabular-nums text-xs">${r.management_fee ? r.management_fee.toFixed(2)+'%' : '—'}</td>
@@ -661,7 +661,7 @@ async function init() {
     <td class="text-slate-500 tabular-nums">${i + 1}</td>
     <td class="font-bold text-green-600">${e.code}</td>
     <td class="text-slate-300" style="max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.name}">${e.name}</td>
-    <td class="text-slate-400 text-xs">${e.issuer || '—'}</td>
+    <td class="text-slate-400 text-xs">${issLink(e.issuer)}</td>
     <td class="text-right font-semibold ${pcls(e.return_1y)} tabular-nums">${pct(e.return_1y, 1)}</td>
     <td class="text-right text-slate-400 tabular-nums">${pct(e.return_3y, 1)}</td>
     <td class="text-right text-slate-400 tabular-nums">${pct(e.return_5y, 1)}</td>
@@ -1007,7 +1007,7 @@ async function init() {
       .map(([ac, cnt]) => `<div title="${ac}: ${cnt}" style="width:${(cnt/total*100).toFixed(1)}%;background:${acColor(ac)};height:100%;display:inline-block"></div>`)
       .join('');
     return `<div class="flex items-center gap-3">
-      <span class="text-xs font-medium text-slate-300 w-24 shrink-0 truncate">${r.issuer}</span>
+      <span class="text-xs font-medium text-slate-300 w-24 shrink-0 truncate"><a href="/issuers/${slugify(r.issuer)}" class="hover:underline" style="color:inherit">${r.issuer}</a></span>
       <div class="flex-1 h-5 rounded overflow-hidden bg-[#1e3860] flex">${segments}</div>
       <span class="text-xs text-slate-500 w-12 text-right">${r.etf_count} ETFs</span>
     </div>`;
@@ -1298,7 +1298,7 @@ function renderIssBars() {
     const pct = maxAbs > 0 ? (Math.abs(v) / maxAbs * 100).toFixed(1) : 0;
     const col = v >= 0 ? '#16a34a' : '#dc2626';
     return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
-      <span style="font-size:.73rem;color:#c8ddf0;width:120px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.issuer}">${r.issuer}</span>
+      <span style="font-size:.73rem;color:#c8ddf0;width:120px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.issuer}"><a href="/issuers/${slugify(r.issuer)}" style="color:inherit" class="hover:underline">${r.issuer}</a></span>
       <div style="flex:1;height:14px;background:#f1f5f9;border-radius:4px;overflow:hidden">
         <div style="width:${pct}%;height:100%;background:${col};border-radius:4px"></div>
       </div>
@@ -1411,7 +1411,7 @@ function renderSnapTable() {
     return `<tr>
       <td><span style="font-weight:700;font-family:monospace">${r.code}</span></td>
       <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.name||''}">${r.name||'—'}</td>
-      <td style="color:#a8c4e0">${r.issuer||'—'}</td>
+      <td style="color:#a8c4e0">${r.issuer ? `<a href="/issuers/${slugify(r.issuer)}" style="color:#7fa3c8" class="hover:underline">${r.issuer}</a>` : '—'}</td>
       <td>${r.asset_class||'—'}</td>
       <td style="text-align:right;font-family:monospace">${r.nav != null ? '$'+r.nav.toFixed(4) : '—'}</td>
       <td style="text-align:right;font-family:monospace">${r.close_price != null ? '$'+r.close_price.toFixed(4) : '—'}</td>
@@ -1622,7 +1622,7 @@ function renderRecent() {
         ${daysAgo !== null ? newBadge(daysAgo) : ''}
       </td>
       <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.name||''}">${r.name||'—'}</td>
-      <td style="color:#a8c4e0;font-size:.75rem">${r.issuer||'—'}</td>
+      <td style="color:#a8c4e0;font-size:.75rem">${r.issuer ? `<a href="/issuers/${slugify(r.issuer)}" style="color:#7fa3c8" class="hover:underline">${r.issuer}</a>` : '—'}</td>
       <td>${r.asset_class||'—'}</td>
       <td style="white-space:nowrap"><span style="font-family:monospace">${dateStr}</span><br><span style="font-size:.65rem;color:#94a3b8">${daysStr}</span></td>
       <td style="text-align:right;font-family:monospace">${mer}</td>
