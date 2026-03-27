@@ -279,6 +279,7 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
 
             sort_field_map = {
                 'fum':       ('fund_size_aud_millions', 'DESC'),
+                'chess_fum': ('units_on_issue * current_price / 1e6', 'DESC'),
                 'price':     ('current_price',          'DESC'),
                 'return_1y': ('return_1y',              'DESC'),
                 'return_3y': ('return_3y',              'DESC'),
@@ -2625,7 +2626,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
                 <th class="px-3 py-2.5 text-center select-none" style="width:90px">Class</th>
                 <th class="px-3 py-2.5 text-right cursor-pointer select-none hover:text-gray-700" data-sort="price">Price</th>
                 <th class="px-3 py-2.5 text-right cursor-pointer select-none hover:text-gray-700" data-sort="fum">Total FUM</th>
-                <th class="px-3 py-2.5 text-right select-none text-gray-500">CHESS FUM</th>
+                <th class="px-3 py-2.5 text-right cursor-pointer select-none hover:text-gray-700 text-gray-500" data-sort="chess_fum">CHESS FUM</th>
                 <th class="px-3 py-2.5 text-right cursor-pointer select-none hover:text-gray-700" data-sort="return_1y">1Y Rtn</th>
                 <th class="px-3 py-2.5 text-right cursor-pointer select-none hover:text-gray-700" data-sort="yield">Yield</th>
                 <th class="px-3 py-2.5 text-right cursor-pointer select-none hover:text-gray-700 col-3y hidden" data-sort="return_3y">3Y Rtn</th>
