@@ -27,6 +27,19 @@ def get_db():
     return conn
 
 
+def slugify(name: str) -> str:
+    """Convert an issuer name to a URL slug."""
+    import re as _re
+    s = name.lower()
+    s = _re.sub(r'\s*/\s*', '-', s)
+    s = s.replace(' & ', '-').replace('&', '-')
+    s = s.replace('.', '').replace("'", '')
+    s = s.replace(' ', '-')
+    s = _re.sub(r'[^a-z0-9-]', '', s)
+    s = _re.sub(r'-+', '-', s)
+    return s.strip('-')
+
+
 def estimate_asset_class(name, fund_type='', benchmark='', issuer=''):
     """Keyword-based asset class estimator for ETFs without a stored classification."""
     text = ' '.join([str(s) for s in [name, fund_type, benchmark, issuer] if s]).upper()
@@ -131,6 +144,18 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
         m2 = re.match(r'^/api/v1/history/etf/([A-Za-z0-9]+)$', path)
         if m2:
             self.handle_history_etf(m2.group(1).upper())
+            return
+
+        # Issuer page: /issuers/{slug}
+        m_iss = re.match(r'^/issuers/([a-z0-9\-]+)$', path)
+        if m_iss:
+            self.handle_issuer_page(m_iss.group(1))
+            return
+
+        # Issuer API: /api/v1/issuers/{slug}
+        m_iss_api = re.match(r'^/api/v1/issuers/([a-z0-9\-]+)$', path)
+        if m_iss_api:
+            self.handle_issuer_api(m_iss_api.group(1))
             return
 
         # Parameterised routes: /api/v1/etfs/{code}[/sub]
@@ -3038,6 +3063,13 @@ const ISSUER_DOMAINS = {
   'Avantis':         'au.avantis.com',
   'Australian Ethical': 'australianethical.com.au',
 };
+function slugify(name) {
+  return name.toLowerCase()
+    .replace(/\s*\/\s*/g, '-').replace(/\s*&\s*/g, '-')
+    .replace(/\./g, '').replace(/'/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '');
+}
 function issuerColor(name) {
   return ISSUER_COLORS[name] || '#94a3b8';
 }
@@ -3441,7 +3473,7 @@ async function showDetail(code) {
     { label: 'Yield',     value: d.distribution_yield != null ? d.distribution_yield.toFixed(1) + '%' : '—', tip: _aSrc },
     { label: 'MER',       value: (d.expense_ratio || d.management_fee) != null
                                  ? (d.expense_ratio || d.management_fee).toFixed(2) + '%' : '—', tip: _mSrc },
-    { label: 'Issuer',    value: d.issuer || '—' },
+    { label: 'Issuer',    value: d.issuer ? `<a href="/issuers/${slugify(d.issuer)}" class="text-blue-500 hover:underline" onclick="event.stopPropagation()">${d.issuer}</a>` : '—' },
   ];
   document.getElementById('d-metrics').innerHTML = metrics.map(m => `
     <div class="px-4 py-3">
@@ -4669,7 +4701,7 @@ function renderCmpTable(etfs) {
 
   const rows = [
     { label: 'Name',          fmt: e => `<span class="font-medium text-gray-800 text-xs">${e.name || '—'}</span>` },
-    { label: 'Issuer',        fmt: e => e.issuer || '—' },
+    { label: 'Issuer',        fmt: e => e.issuer ? `<a href="/issuers/${slugify(e.issuer)}" class="text-blue-500 hover:underline">${e.issuer}</a>` : '—' },
     { label: 'Exchange',      fmt: e => `<span class="badge-${(e.exchange||'asx').toLowerCase()} px-1.5 py-0.5 rounded text-xs font-medium">${e.exchange || '—'}</span>` },
     { label: 'Asset Class',   fmt: e => acChip(e.asset_class) },
     { label: 'Benchmark',     fmt: e => e.benchmark ? `<span class="text-xs text-indigo-700">${e.benchmark}</span>` : '—' },
@@ -5720,6 +5752,138 @@ def _handle_screener_preferences_api(self):
     except Exception as e:
         self.send_json({'error': str(e)}, 500)
 
+
+def _handle_issuer_page(self, slug):
+    from insights_pages import get_issuer_page
+    html = get_issuer_page(slug)
+    self.send_html(html)
+
+def _handle_issuer_api(self, slug):
+    conn = get_db()
+    try:
+        # Resolve slug → canonical issuer name from the etfs table
+        issuer_names = [r[0] for r in conn.execute(
+            "SELECT DISTINCT issuer FROM etfs WHERE issuer IS NOT NULL ORDER BY issuer"
+        ).fetchall()]
+        issuer_name = next((n for n in issuer_names if slugify(n) == slug), None)
+        if not issuer_name:
+            self.send_json({'error': f'Issuer not found: {slug}'}, 404)
+            return
+
+        # Website from issuers table
+        meta_row = conn.execute(
+            "SELECT website FROM issuers WHERE name=?", (issuer_name,)
+        ).fetchone()
+        website = meta_row['website'] if meta_row and meta_row['website'] else None
+
+        # Aggregate stats
+        stats_row = conn.execute("""
+            SELECT
+                COUNT(*) AS etf_count,
+                COALESCE(SUM(fund_size_aud_millions), 0) AS total_fum,
+                AVG(CASE WHEN COALESCE(expense_ratio, management_fee) > 0
+                         THEN COALESCE(expense_ratio, management_fee) END) AS avg_mer,
+                SUM(CASE WHEN fund_size_aud_millions > 0 AND COALESCE(expense_ratio, management_fee) > 0
+                         THEN fund_size_aud_millions * COALESCE(expense_ratio, management_fee) END)
+                / NULLIF(SUM(CASE WHEN fund_size_aud_millions > 0 AND COALESCE(expense_ratio, management_fee) > 0
+                                   THEN fund_size_aud_millions END), 0) AS fum_weighted_mer,
+                AVG(return_1y) AS avg_return_1y,
+                AVG(distribution_yield) AS avg_yield,
+                MIN(inception_date) AS inception_earliest,
+                COALESCE(SUM(fund_flow_1m), 0) AS fund_flow_1m,
+                COALESCE(SUM(fund_flow_1y), 0) AS fund_flow_1y
+            FROM etfs WHERE issuer=?
+        """, (issuer_name,)).fetchone()
+
+        # Market total for share %
+        total_mkt = conn.execute(
+            "SELECT COALESCE(SUM(fund_size_aud_millions),1) FROM etfs"
+        ).fetchone()[0] or 1
+        market_share = round((stats_row['total_fum'] / total_mkt) * 100, 1)
+
+        # Asset class mix — FUM per class
+        ac_rows = conn.execute("""
+            SELECT COALESCE(asset_class,'Other') AS ac,
+                   COUNT(*) AS cnt,
+                   COALESCE(SUM(fund_size_aud_millions),0) AS fum
+            FROM etfs WHERE issuer=?
+            GROUP BY ac ORDER BY fum DESC
+        """, (issuer_name,)).fetchall()
+
+        # All ETFs for this issuer
+        etf_rows = conn.execute("""
+            SELECT code, name, asset_class, exchange,
+                   fund_size_aud_millions, expense_ratio, management_fee,
+                   return_1y, return_3y, return_5y, distribution_yield,
+                   fund_flow_1m, inception_date, fx_hedged, benchmark, rank_by_fum
+            FROM etfs WHERE issuer=?
+            ORDER BY fund_size_aud_millions DESC NULLS LAST
+        """, (issuer_name,)).fetchall()
+
+        # Related articles — match issuer name in title/slug
+        from articles import get_all_articles
+        issuer_lower = issuer_name.lower()
+        # Also try the first word (e.g. "Betashares" from "Betashares / something")
+        issuer_words = issuer_lower.split()[0] if ' ' in issuer_lower else issuer_lower
+        all_articles = get_all_articles()
+        related = [
+            {'slug': a['slug'], 'title': a['title'],
+             'category': a['category'], 'date': a['date'], 'subtitle': a.get('subtitle','')}
+            for a in all_articles
+            if (issuer_lower in a['title'].lower()
+                or issuer_words in a['slug']
+                or issuer_lower in a.get('subtitle', '').lower()
+                or a.get('category') == 'Issuer Profile' and issuer_words in a['slug'])
+        ][:6]
+
+        self.send_json({
+            'issuer': issuer_name,
+            'slug': slug,
+            'website': website,
+            'stats': {
+                'etf_count': stats_row['etf_count'],
+                'total_fum': round(stats_row['total_fum'] or 0, 2),
+                'market_share_pct': market_share,
+                'avg_mer': round(stats_row['avg_mer'] or 0, 3),
+                'fum_weighted_mer': round(stats_row['fum_weighted_mer'] or 0, 3),
+                'avg_return_1y': round(stats_row['avg_return_1y'] or 0, 2) if stats_row['avg_return_1y'] is not None else None,
+                'avg_yield': round(stats_row['avg_yield'] or 0, 2) if stats_row['avg_yield'] is not None else None,
+                'inception_earliest': stats_row['inception_earliest'],
+                'fund_flow_1m': round(stats_row['fund_flow_1m'] or 0, 2),
+                'fund_flow_1y': round(stats_row['fund_flow_1y'] or 0, 2),
+            },
+            'asset_class_mix': [
+                {'ac': r['ac'], 'cnt': r['cnt'], 'fum': round(r['fum'], 2)}
+                for r in ac_rows
+            ],
+            'etfs': [
+                {
+                    'code': r['code'],
+                    'name': r['name'],
+                    'asset_class': r['asset_class'],
+                    'exchange': r['exchange'],
+                    'fund_size_aud_millions': r['fund_size_aud_millions'],
+                    'expense_ratio': r['expense_ratio'] or r['management_fee'],
+                    'return_1y': r['return_1y'],
+                    'return_3y': r['return_3y'],
+                    'return_5y': r['return_5y'],
+                    'distribution_yield': r['distribution_yield'],
+                    'fund_flow_1m': r['fund_flow_1m'],
+                    'inception_date': r['inception_date'],
+                    'fx_hedged': r['fx_hedged'],
+                    'rank_by_fum': r['rank_by_fum'],
+                }
+                for r in etf_rows
+            ],
+            'related_articles': related,
+        })
+    except Exception as e:
+        self.send_json({'error': str(e)}, 500)
+    finally:
+        conn.close()
+
+ETFAPIHandler.handle_issuer_page = _handle_issuer_page
+ETFAPIHandler.handle_issuer_api = _handle_issuer_api
 
 # Attach to the real handler class (defined earlier in the file)
 ETFAPIHandler.handle_articles_list = _handle_articles_list

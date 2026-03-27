@@ -78,15 +78,19 @@ const AC_COLORS = {
   'leveraged & inverse': '#ef4444', 'Currency': '#a855f7',
 };
 const ISS_COLORS = {
+  'Betashares':                '#1b2b6b',
   'BetaShares':                '#1b2b6b',
   'iShares':                   '#13294b',
   'Global X':                  '#00adef',
   'VanEck':                    '#f7941d',
   'Vanguard':                  '#c41230',
+  'J.P. Morgan':               '#003087',
   'JPMorgan':                  '#003087',
+  'State Street':              '#1a9dd9',
   'StateStreet':               '#1a9dd9',
   'SPDR':                      '#1a9dd9',
   'Macquarie':                 '#002b5c',
+  'Dimensional':               '#004b87',
   'DFA':                       '#004b87',
   'Magellan':                  '#b8141a',
   'Russell Investments':       '#007dc5',
@@ -97,6 +101,7 @@ const ISS_COLORS = {
   'Franklin Templeton':        '#af1f24',
   'ClearBridge / Franklin Templeton': '#af1f24',
   'Perpetual':                 '#5b0c8f',
+  'J.P. Morgan / Perpetual':   '#5b0c8f',
   'JPMAM / Perpetual':         '#5b0c8f',
   'Coolabah':                  '#0d6efd',
   'Hyperion / Pinnacle':       '#7c3aed',
@@ -122,6 +127,17 @@ function hbar(label, value, maxVal, fillColor, valStr, subStr) {
     <span class="hbar-val">${valStr}</span>
     <span class="hbar-sub">${subStr || ''}</span>
   </div>`;
+}
+function slugify(name) {
+  return name.toLowerCase()
+    .replace(/\\s*\\/\\s*/g, '-').replace(/\\s*&\\s*/g, '-')
+    .replace(/\\./g, '').replace(/'/g, '')
+    .replace(/\\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '');
+}
+function issLink(name) {
+  if (!name) return '—';
+  return `<a href="/issuers/${slugify(name)}" style="color:${issColor(name)}" class="hover:underline font-semibold">${name}</a>`;
 }
 """
 
@@ -659,7 +675,7 @@ async function init() {
   document.getElementById('bars-issuer').innerHTML =
     `<div class="grid grid-cols-1 md:grid-cols-2 gap-x-8">` +
     d.by_issuer.map(r => `<div class="hbar-row">
-      <span class="hbar-label" title="${r.issuer}">${r.issuer}</span>
+      <span class="hbar-label"><a href="/issuers/${slugify(r.issuer)}" style="color:inherit" class="hover:underline">${r.issuer}</a></span>
       <div class="hbar-track"><div class="hbar-fill" style="width:${r.avg_1y != null ? Math.min(Math.abs(r.avg_1y) / issMax * 100, 100).toFixed(1) : 0}%;background:${r.avg_1y >= 0 ? issColor(r.issuer) : '#ef4444'}"></div></div>
       <span class="hbar-val ${pcls(r.avg_1y)}">${pct(r.avg_1y, 1)}</span>
       <span class="hbar-sub">${r.etf_count}e</span>
@@ -837,7 +853,7 @@ async function init() {
   const issSorted = [...d.by_issuer].sort((a, b) => (a.fum_weighted_mer || 99) - (b.fum_weighted_mer || 99));
   const fwMax = Math.max(...issSorted.map(r => r.fum_weighted_mer || 0));
   document.getElementById('tbl-issuers').innerHTML = issSorted.map(r => `<tr>
-    <td class="font-semibold text-sm" style="color:${issColor(r.issuer)}">${r.issuer}</td>
+    <td class="font-semibold text-sm">${issLink(r.issuer)}</td>
     <td class="text-right tabular-nums text-slate-400">${r.etf_count}</td>
     <td class="text-right tabular-nums text-slate-400">${mer(r.avg_mer)}</td>
     <td class="text-right tabular-nums font-semibold">${mer(r.fum_weighted_mer)}</td>
@@ -966,7 +982,7 @@ async function init() {
     const primaryAC = Object.entries(r.asset_classes || {}).sort((a, b) => b[1] - a[1])[0]?.[0] || '—';
     return `<tr>
       <td class="text-slate-500 tabular-nums">${i + 1}</td>
-      <td class="font-semibold" style="color:${issColor(r.issuer)}">${r.issuer}</td>
+      <td class="font-semibold">${issLink(r.issuer)}</td>
       <td class="text-right font-semibold tabular-nums">${fmtFum(r.total_fum)}</td>
       <td class="text-right tabular-nums">
         <div class="flex items-center justify-end gap-1">
@@ -2149,6 +2165,244 @@ PAGE_ASSET_CLASSES = _page(
     _AC_BODY,
     _AC_JS,
 )
+
+
+# ---------------------------------------------------------------------------
+# ISSUER PAGE
+# ---------------------------------------------------------------------------
+_ISSUER_BODY = """
+<div id="issuer-hero" class="card">
+  <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-3 flex-wrap">
+        <h2 id="issuer-name" class="text-2xl font-bold text-white"></h2>
+        <a id="issuer-website" href="#" target="_blank" rel="noopener"
+           class="hidden text-sm text-blue-400 hover:text-blue-300 font-medium">
+          Visit website &#8599;
+        </a>
+      </div>
+      <p id="issuer-meta" class="text-sm text-[#7fa3c8] mt-1"></p>
+    </div>
+    <a href="/insights/issuers" class="text-xs text-[#7fa3c8] hover:text-white shrink-0">
+      ← All issuers
+    </a>
+  </div>
+</div>
+
+<div id="stats-bar" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4"></div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+  <div class="card">
+    <h2 class="font-semibold text-sm text-slate-300 mb-4">AUM by Asset Class</h2>
+    <div class="relative" style="height:260px"><canvas id="chart-ac"></canvas></div>
+  </div>
+  <div class="card">
+    <h2 class="font-semibold text-sm text-slate-300 mb-4">ETFs by Asset Class</h2>
+    <div id="ac-count-bars" class="space-y-1 mt-2"></div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+    <h2 class="font-semibold text-sm text-slate-300">All Products</h2>
+    <div class="flex items-center gap-2">
+      <input id="etf-search" type="text" placeholder="Filter…"
+             class="border border-[#1e3860] rounded-lg px-2.5 py-1.5 text-sm
+                    bg-[#0d1c35] text-slate-200 focus:ring-2 focus:ring-blue-800 outline-none w-44">
+      <select id="etf-ac-filter"
+              class="border border-[#1e3860] rounded-lg px-2.5 py-1.5 text-sm
+                     bg-[#0d1c35] text-slate-200 focus:ring-2 focus:ring-blue-800 outline-none">
+        <option value="">All asset classes</option>
+      </select>
+    </div>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-left text-xs text-slate-400 border-b border-[#1e3860]">
+          <th class="pb-2 pr-3 font-semibold">Code</th>
+          <th class="pb-2 pr-3 font-semibold">Name</th>
+          <th class="pb-2 pr-3 font-semibold">Asset Class</th>
+          <th class="pb-2 pr-3 font-semibold text-right">FUM</th>
+          <th class="pb-2 pr-3 font-semibold text-right">MER</th>
+          <th class="pb-2 pr-3 font-semibold text-right">1Y Ret</th>
+          <th class="pb-2 pr-3 font-semibold text-right">3Y Ret</th>
+          <th class="pb-2 pr-3 font-semibold text-right">Yield</th>
+          <th class="pb-2 pr-3 font-semibold text-right">1M Flow</th>
+          <th class="pb-2 font-semibold">Inception</th>
+        </tr>
+      </thead>
+      <tbody id="etf-table"></tbody>
+    </table>
+  </div>
+</div>
+
+<div id="articles-section" class="card hidden">
+  <h2 class="font-semibold text-sm text-slate-300 mb-4">Related Articles</h2>
+  <div id="articles-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+</div>
+"""
+
+_ISSUER_JS = """
+let _issuerData = null;
+let _acChart = null;
+
+async function init() {
+  const slug = window.location.pathname.replace(/^\\/issuers\\//, '');
+  const d = await api('/api/v1/issuers/' + slug);
+  _issuerData = d;
+
+  document.title = d.issuer + ' ETFs — Australian ETF Market';
+  document.getElementById('ts').textContent = new Date().toLocaleTimeString('en-AU', {hour:'2-digit',minute:'2-digit'});
+
+  // Hero
+  document.getElementById('issuer-name').textContent = d.issuer;
+  const since = d.stats.inception_earliest ? d.stats.inception_earliest.slice(0,4) : null;
+  document.getElementById('issuer-meta').textContent =
+    d.stats.etf_count + ' ETFs' + (since ? ' · since ' + since : '') +
+    ' · ' + d.stats.market_share_pct + '% market share';
+
+  if (d.website) {
+    const a = document.getElementById('issuer-website');
+    a.href = d.website;
+    a.classList.remove('hidden');
+  }
+
+  // Stats bar
+  const s = d.stats;
+  const flow1m = s.fund_flow_1m;
+  document.getElementById('stats-bar').innerHTML = [
+    ['Total AUM',       fmtFum(s.total_fum),           ''],
+    ['ETF Count',       s.etf_count + ' ETFs',          ''],
+    ['Market Share',    s.market_share_pct + '%',       'of Aus ETF market'],
+    ['FUM-Wtd MER',     mer(s.fum_weighted_mer),        'asset-weighted cost'],
+    ['1M Net Flows',    fmtFum(flow1m),                 flow1m >= 0 ? 'net inflow' : 'net outflow'],
+  ].map(([label, val, sub]) => `
+    <div class="card">
+      <div class="sl">${label}</div>
+      <div class="sv ${label==='1M Net Flows'?(flow1m>=0?'pos':'neg'):''}">${val}</div>
+      ${sub ? `<div class="ss">${sub}</div>` : ''}
+    </div>`).join('');
+
+  // Asset class donut
+  const acData = d.asset_class_mix.filter(r => r.fum > 0);
+  const totalFum = acData.reduce((s,r) => s+r.fum, 0);
+  if (_acChart) _acChart.destroy();
+  _acChart = new Chart(document.getElementById('chart-ac').getContext('2d'), {
+    type: 'doughnut',
+    plugins: [{
+      id: 'centre',
+      beforeDraw(chart) {
+        const {ctx, chartArea:{top,left,width,height}} = chart;
+        ctx.save();
+        const cx = left+width/2, cy = top+height/2;
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.font='bold 13px Inter,sans-serif'; ctx.fillStyle='#e2e8f0';
+        ctx.fillText(fmtFum(totalFum), cx, cy-7);
+        ctx.font='10px Inter,sans-serif'; ctx.fillStyle='#94a3b8';
+        ctx.fillText('Total AUM', cx, cy+8);
+        ctx.restore();
+      }
+    }],
+    data: {
+      labels: acData.map(r => r.ac),
+      datasets: [{
+        data: acData.map(r => r.fum),
+        backgroundColor: acData.map(r => acColor(r.ac)),
+        borderWidth: 2, borderColor: '#0f2040',
+        hoverOffset: 6,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '62%',
+      plugins: {
+        legend: { position: 'bottom', labels: { font:{size:10}, padding:8, boxWidth:10, color:'#94a3b8' } },
+        tooltip: { callbacks: {
+          label: ctx => {
+            const r = acData[ctx.dataIndex];
+            const p = totalFum > 0 ? (r.fum/totalFum*100).toFixed(1) : '0';
+            return [' ' + fmtFum(r.fum) + '  (' + p + '%)', ' ' + r.cnt + ' ETFs'];
+          }
+        }}
+      }
+    }
+  });
+
+  // AC count bars
+  const cntMax = Math.max(...d.asset_class_mix.map(r => r.cnt), 1);
+  document.getElementById('ac-count-bars').innerHTML =
+    d.asset_class_mix.map(r =>
+      hbar(r.ac, r.cnt, cntMax, acColor(r.ac), r.cnt + ' ETF' + (r.cnt!==1?'s':''), fmtFum(r.fum))
+    ).join('');
+
+  // Populate asset class filter
+  const acFilter = document.getElementById('etf-ac-filter');
+  const acSet = [...new Set(d.etfs.map(e => e.asset_class).filter(Boolean))].sort();
+  acSet.forEach(ac => {
+    const opt = document.createElement('option');
+    opt.value = ac; opt.textContent = ac;
+    acFilter.appendChild(opt);
+  });
+
+  // ETF table
+  renderETFTable();
+  document.getElementById('etf-search').addEventListener('input', renderETFTable);
+  document.getElementById('etf-ac-filter').addEventListener('change', renderETFTable);
+
+  // Related articles
+  if (d.related_articles && d.related_articles.length) {
+    document.getElementById('articles-section').classList.remove('hidden');
+    document.getElementById('articles-grid').innerHTML = d.related_articles.map(a => `
+      <a href="/articles/${a.slug}" class="block rounded-lg border border-[#1e3860]
+         hover:border-blue-500/50 transition-colors p-4" style="background:#142850">
+        <span class="text-xs font-semibold" style="color:#93c5fd">${a.category}</span>
+        <h3 class="text-sm font-bold text-slate-100 mt-1.5 leading-snug line-clamp-2">${a.title}</h3>
+        <p class="text-xs text-slate-400 mt-1 line-clamp-2">${a.subtitle||''}</p>
+        <p class="text-xs text-slate-500 mt-2">${a.date}</p>
+      </a>`).join('');
+  }
+
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('page').classList.remove('hidden');
+}
+
+function renderETFTable() {
+  const q = (document.getElementById('etf-search').value || '').toLowerCase();
+  const ac = document.getElementById('etf-ac-filter').value;
+  const etfs = (_issuerData.etfs || []).filter(e =>
+    (!q || (e.code+' '+(e.name||'')).toLowerCase().includes(q)) &&
+    (!ac || e.asset_class === ac)
+  );
+  const tbody = document.getElementById('etf-table');
+  tbody.innerHTML = etfs.map(e => {
+    const mer_v = e.expense_ratio;
+    const flow = e.fund_flow_1m;
+    return `<tr class="border-b border-[#1a2e4a] hover:bg-[#142850] cursor-pointer"
+                onclick="window.location='/dashboard#etf=${e.code}'">
+      <td class="py-2 pr-3 font-bold text-blue-400 font-mono text-xs">${e.code}</td>
+      <td class="py-2 pr-3 text-xs text-slate-300" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.name||''}">${e.name||'—'}</td>
+      <td class="py-2 pr-3"><span class="text-xs px-1.5 py-0.5 rounded font-medium" style="background:${acColor(e.asset_class)}22;color:${acColor(e.asset_class)}">${e.asset_class||'—'}</span></td>
+      <td class="py-2 pr-3 text-right tabular-nums text-sm font-semibold text-white">${fmtFum(e.fund_size_aud_millions)}</td>
+      <td class="py-2 pr-3 text-right tabular-nums text-xs text-slate-400">${mer_v!=null?mer_v.toFixed(2)+'%':'—'}</td>
+      <td class="py-2 pr-3 text-right tabular-nums text-sm font-semibold ${pcls(e.return_1y)}">${pct(e.return_1y,1)}</td>
+      <td class="py-2 pr-3 text-right tabular-nums text-xs ${pcls(e.return_3y)}">${pct(e.return_3y,1)}</td>
+      <td class="py-2 pr-3 text-right tabular-nums text-xs text-slate-400">${e.distribution_yield!=null?e.distribution_yield.toFixed(1)+'%':'—'}</td>
+      <td class="py-2 pr-3 text-right tabular-nums text-xs ${pcls(flow)}">${fmtFum(flow)}</td>
+      <td class="py-2 text-xs text-slate-500">${e.inception_date||'—'}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="10" class="text-center text-slate-500 py-4">No ETFs matched</td></tr>';
+}
+"""
+
+PAGE_ISSUER = _page(
+    'Issuer Profile',
+    'ETF products, AUM, performance and flows',
+    _ISSUER_BODY,
+    _ISSUER_JS,
+)
+
+def get_issuer_page(slug: str) -> str:
+    return PAGE_ISSUER
 
 
 # ---------------------------------------------------------------------------
