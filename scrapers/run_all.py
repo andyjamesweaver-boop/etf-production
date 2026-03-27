@@ -99,6 +99,11 @@ def run_upcoming():
     return scrape_upcoming_listings(DB_PATH)
 
 
+def run_cboe_quarterly():
+    from scrapers.cboe_quarterly_scraper import scrape_cboe_quarterly_portfolios
+    return scrape_cboe_quarterly_portfolios(DB_PATH)
+
+
 SOURCES = {
     'asx_report': ('ASX Monthly Report', run_asx_report),
     'cboe': ('Cboe Australia', run_cboe),
@@ -109,6 +114,7 @@ SOURCES = {
     'documents': ('Document Ingestion & AI Summaries', run_documents),
     'pcf': ('PCF / Holdings Refresh', run_pcf),
     'upcoming': ('Upcoming ETF Listings', run_upcoming),
+    'cboe_quarterly': ('CBOE Quarterly Portfolio Disclosures', run_cboe_quarterly),
 }
 
 
@@ -223,7 +229,7 @@ Sources:
 
     if args.source == 'all':
         # documents excluded from default daily run (slow + API costs)
-        sources = ['asx_report', 'cboe', 'issuers', 'asx_api', 'master', 'nav', 'upcoming']
+        sources = ['asx_report', 'cboe', 'issuers', 'asx_api', 'master', 'nav', 'upcoming', 'cboe_quarterly']
     else:
         sources = [args.source]
         # Always run master list after individual scrapers, except for

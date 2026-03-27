@@ -399,7 +399,14 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
                 "SELECT name, ticker, weight_pct, sector, country, last_updated FROM etf_holdings "
                 "WHERE etf_code = ? ORDER BY weight_pct DESC", (code,)
             ).fetchall()
-            self.send_json({'code': code, 'holdings': [dict(r) for r in rows]})
+            meta = conn.execute(
+                "SELECT holdings_disclosure, holdings_as_of FROM etfs WHERE code = ?", (code,)
+            ).fetchone()
+            resp = {'code': code, 'holdings': [dict(r) for r in rows]}
+            if meta:
+                resp['holdings_disclosure'] = meta['holdings_disclosure']
+                resp['holdings_as_of'] = meta['holdings_as_of']
+            self.send_json(resp)
         except Exception as e:
             self.send_json({'error': str(e)}, 500)
         finally:
@@ -1393,7 +1400,8 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
             pattern = f'%{q.lower()}%'
             rows = conn.execute(
                 "SELECT h.etf_code, e.name AS etf_name, e.asset_class, e.issuer, "
-                "       h.name AS holding_name, h.ticker, h.weight_pct, h.sector "
+                "       h.name AS holding_name, h.ticker, h.weight_pct, h.sector, "
+                "       e.holdings_disclosure, e.holdings_as_of "
                 "FROM etf_holdings h JOIN etfs e ON e.code = h.etf_code "
                 "WHERE (LOWER(h.name) LIKE ? OR LOWER(h.ticker) LIKE ?) "
                 "  AND COALESCE(h.weight_pct, 0) >= ? "
@@ -1402,11 +1410,21 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
                 (pattern, pattern, min_weight)
             ).fetchall()
             etf_codes = list(dict.fromkeys(r['etf_code'] for r in rows))
+            # Build per-ETF disclosure metadata map
+            disclosure_meta = {}
+            for r in rows:
+                code = r['etf_code']
+                if code not in disclosure_meta:
+                    disclosure_meta[code] = {
+                        'holdings_disclosure': r['holdings_disclosure'],
+                        'holdings_as_of': r['holdings_as_of'],
+                    }
             self.send_json({
                 'query': q,
                 'total': len(rows),
                 'etf_count': len(etf_codes),
                 'etfs': etf_codes,
+                'disclosure_meta': disclosure_meta,
                 'results': [dict(r) for r in rows],
             })
         except Exception as e:
@@ -3777,6 +3795,11 @@ async function showTab(tab) {
     const topCountries = Object.entries(byCountry).sort((a, b) => b[1] - a[1]).slice(0, 4);
 
     el.innerHTML = `
+      ${h.holdings_disclosure === 'quarterly' ? `
+      <div class="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3 text-xs text-amber-800">
+        <svg class="shrink-0 mt-0.5" width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>
+        <span><strong>Quarterly disclosure</strong> — This is an active/complex ETF listed on Cboe Australia. Full portfolio holdings are publicly disclosed once per quarter, up to 60 days after quarter-end.${h.holdings_as_of ? ` Holdings shown are as of <strong>${h.holdings_as_of}</strong>.` : ''}</span>
+      </div>` : ''}
       <div class="flex flex-wrap items-center gap-2 mb-3">
         <span class="bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full text-xs font-semibold">${all.length} holdings</span>
         <span class="text-xs text-gray-500">Top 10 concentration:
@@ -4918,9 +4941,23 @@ async function hsFetch() {
 
   tblWrap.classList.remove('hidden');
   const maxW = Math.max(...d.results.map(r => r.weight_pct || 0));
-  document.getElementById('holdings-table').innerHTML = d.results.map(r => `
+  const discMeta = d.disclosure_meta || {};
+  // Show quarterly notice if any result ETF has quarterly disclosure
+  const quarterlyEtfs = Object.entries(discMeta)
+    .filter(([, m]) => m.holdings_disclosure === 'quarterly')
+    .map(([code, m]) => ({ code, as_of: m.holdings_as_of }));
+  const qBanner = quarterlyEtfs.length ? `
+    <tr><td colspan="7" class="px-3 py-2">
+      <div class="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
+        <svg class="shrink-0 mt-0.5" width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>
+        <span><strong>Quarterly disclosure:</strong> ${quarterlyEtfs.map(e => `<strong>${e.code}</strong>${e.as_of ? ` (as of ${e.as_of})` : ''}`).join(', ')} ${quarterlyEtfs.length === 1 ? 'is an' : 'are'} active/complex ETF${quarterlyEtfs.length > 1 ? 's' : ''} listed on Cboe Australia. Holdings are publicly disclosed once per quarter, up to 60 days after quarter-end.</span>
+      </div>
+    </td></tr>` : '';
+  document.getElementById('holdings-table').innerHTML = qBanner + d.results.map(r => {
+    const isQ = discMeta[r.etf_code]?.holdings_disclosure === 'quarterly';
+    return `
     <tr class="cursor-pointer" onclick="showDetail('${r.etf_code}');document.querySelector('.main-tab[data-view=screener]').click()">
-      <td class="px-3 py-2.5 font-bold text-blue-700">${r.etf_code}</td>
+      <td class="px-3 py-2.5 font-bold text-blue-700">${r.etf_code}${isQ ? ' <span title="Quarterly portfolio disclosure" class="text-amber-500 text-xs">Q</span>' : ''}</td>
       <td class="px-3 py-2.5 text-gray-600 max-w-[160px] truncate text-xs">${r.etf_name || ''}</td>
       <td class="px-3 py-2.5 font-medium text-gray-800 max-w-[180px] truncate">${r.holding_name || ''}</td>
       <td class="px-3 py-2.5 font-mono text-xs text-gray-500">${r.ticker || '—'}</td>
@@ -4937,7 +4974,8 @@ async function hsFetch() {
       </td>
       <td class="px-3 py-2.5 text-xs text-gray-500 max-w-[120px] truncate">${r.sector || '—'}</td>
       <td class="px-3 py-2.5">${acChip(r.asset_class)}</td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 }
 
 /* ============================================================ HOLDINGS CONCENTRATION */
