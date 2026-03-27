@@ -66,10 +66,10 @@ def fetch_etf_price(code: str) -> dict | None:
         'data_source': 'asx_api',
     }
 
-    # Note: market cap is NOT written to fund_size_aud_millions here.
-    # FUM is set from the authoritative ASX monthly ETP report (asx_report_scraper)
-    # and should not be overwritten with intraday market cap, which fluctuates with
-    # price and would make the total FUM figure inconsistent with the reported figure.
+    # Market cap -> FUM estimate (for ETFs, market cap ~= FUM)
+    mktcap = _safe_float(info.get('marketCap'))
+    if mktcap and mktcap > 0:
+        result['fund_size_aud_millions'] = round(mktcap / 1_000_000, 1)
 
     # Calculate bid-ask spread
     if result.get('bid_price') and result.get('offer_price') and result['bid_price'] > 0:
