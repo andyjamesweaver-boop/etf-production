@@ -2016,6 +2016,7 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
                            pds_lodged_date, offer_doc_url, asic_detail_url, status
                     FROM upcoming_listings
                     WHERE status = 'pending'
+                    AND LOWER(name) LIKE '%etf%'
                     ORDER BY expected_listing_date ASC NULLS LAST
                 """).fetchall()
                 upcoming = [dict(r) for r in rows]

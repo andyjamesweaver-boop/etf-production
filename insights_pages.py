@@ -1553,7 +1553,7 @@ function renderUpcoming() {
     if (r.asic_detail_url) links.push(`<a href="${r.asic_detail_url}" target="_blank" style="color:#6366f1;font-size:.7rem">ASIC notice ↗</a>`);
     if (r.offer_doc_url)   links.push(`<a href="${r.offer_doc_url}" target="_blank" style="color:#6366f1;font-size:.7rem">Offer doc ↗</a>`);
     return `
-    <div style="border:1px solid #e2e8f0;border-radius:10px;padding:1rem;background:#fff">
+    <div style="border:1px solid #2e5285;border-radius:10px;padding:1rem;background:#1e3354">
       <div class="flex items-start justify-between gap-2 mb-2">
         <div class="flex-1 min-w-0">
           <div style="font-weight:700;font-size:.82rem;line-height:1.3;color:#e2e8f0">${r.name || '—'}</div>
@@ -1565,7 +1565,7 @@ function renderUpcoming() {
         </div>
       </div>
       ${r.fund_type ? `<div style="font-size:.68rem;color:#94a3b8;margin-bottom:.5rem">${r.fund_type}</div>` : ''}
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.25rem;font-size:.7rem;color:#475569;margin-bottom:.75rem">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.25rem;font-size:.7rem;color:#a8c4e0;margin-bottom:.75rem">
         <div><span style="color:#94a3b8">Expected:</span> ${dateStr}</div>
         <div><span style="color:#94a3b8">PDS lodged:</span> ${lodgedStr}</div>
         ${r.arsn ? `<div style="grid-column:span 2"><span style="color:#94a3b8">ARSN:</span> ${r.arsn}</div>` : ''}
