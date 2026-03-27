@@ -637,10 +637,16 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
                 elif row['exchange'] and row['exchange'].upper() == 'CXA':
                     cxa_count = row['cnt']
 
+            issuer_count_row = conn.execute(
+                "SELECT COUNT(DISTINCT issuer) FROM etfs WHERE issuer IS NOT NULL"
+            ).fetchone()
+            issuer_count = issuer_count_row[0] if issuer_count_row else 0
+
             self.send_json({
                 'total_fum_millions': stats['total_fum_millions'],
                 'chess_fum_millions': stats['chess_fum_millions'],
                 'total_etfs': stats['total_etfs'],
+                'total_issuers': issuer_count,
                 'avg_return_1y': round(stats['avg_return_1y'], 2),
                 'avg_expense_ratio': round(stats['avg_expense_ratio'], 3),
                 'top_performer': dict(top) if top else None,
@@ -2678,31 +2684,6 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
     </div>
   </div>
 
-  <!-- ── Analytics row ── -->
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-    <!-- Asset class doughnut -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-      <h3 class="font-semibold text-gray-700 text-sm mb-3">Asset Class Breakdown</h3>
-      <div class="relative" style="height:220px">
-        <canvas id="chart-asset"></canvas>
-      </div>
-    </div>
-    <!-- Issuer market share pie chart -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-      <h3 class="font-semibold text-gray-700 text-sm mb-3">Issuer Market Share</h3>
-      <div class="relative" style="height:220px">
-        <canvas id="chart-issuers"></canvas>
-      </div>
-    </div>
-    <!-- Fund flows bar chart -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-      <h3 class="font-semibold text-gray-700 text-sm mb-3">Fund Flows — Top 1M</h3>
-      <div class="relative" style="height:220px">
-        <canvas id="chart-flows"></canvas>
-      </div>
-    </div>
-  </div>
-
   </div><!-- /view-screener -->
 
   <!-- ══════════════════════════════ VIEW: Compare ══════════════════════════════ -->
@@ -3003,7 +2984,6 @@ const API = '';
 let page = 0, pageSize = 50, selectedCode = null;
 let tableSortKey = 'rank', tableSortDir = 'asc';
 let topPerformerCode = null;
-let chartAsset = null, chartFlows = null, chartIssuers = null;
 
 const PALETTE = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6',
                  '#ec4899','#06b6d4','#84cc16','#f97316','#6366f1'];
@@ -3235,6 +3215,9 @@ async function loadOverview() {
   if (m.most_etfs_issuer) {
     document.getElementById('c-most-etfs-issuer').textContent =
       m.most_etfs_issuer.name + ' ' + m.most_etfs_issuer.etf_count + ' ETFs';
+  }
+  if (m.total_issuers) {
+    document.getElementById('c-issuers').textContent = m.total_issuers;
   }
   // Upcoming listings stat card (best-effort, non-blocking)
   try {
@@ -4267,252 +4250,6 @@ document.getElementById('etf-thead').addEventListener('click', e => {
   if (th) sortTable(th.dataset.sort);
 });
 
-/* ======================================================= analytics */
-async function loadAnalytics() {
-  const [flows, issuers, cats] = await Promise.all([
-    api('/api/v1/analytics/fund-flows?limit=8'),
-    api('/api/v1/issuers'),
-    api('/api/v1/categories'),
-  ]);
-
-  // Issuer count stat card
-  document.getElementById('c-issuers').textContent = (issuers.issuers || []).length;
-
-  /* ── 1. Asset class doughnut ── */
-  const catData = (cats.categories || []).filter(c => c.total_fum > 0).slice(0, 12);
-  const totalAum = catData.reduce((s, c) => s + (c.total_fum || 0), 0);
-
-  // Centre-text plugin
-  const centreTextPlugin = {
-    id: 'centreText',
-    beforeDraw(chart) {
-      const { ctx, chartArea: { top, left, width, height } } = chart;
-      ctx.save();
-      const cx = left + width / 2, cy = top + height / 2;
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.font = 'bold 13px Inter,sans-serif';
-      ctx.fillStyle = '#e2e8f0';
-      ctx.fillText(fmtFum(totalAum), cx, cy - 7);
-      ctx.font = '10px Inter,sans-serif';
-      ctx.fillStyle = '#94a3b8';
-      ctx.fillText('Total AUM', cx, cy + 8);
-      ctx.restore();
-    }
-  };
-
-  if (chartAsset) chartAsset.destroy();
-  chartAsset = new Chart(
-    document.getElementById('chart-asset').getContext('2d'), {
-      type: 'doughnut',
-      plugins: [centreTextPlugin],
-      data: {
-        labels: catData.map(c => c.asset_class || 'Other'),
-        datasets: [{
-          data: catData.map(c => c.total_fum || 0),
-          backgroundColor: catData.map(c => assetColor(c.asset_class)),
-          hoverBackgroundColor: catData.map(c => assetColor(c.asset_class)),
-          borderWidth: 2,
-          borderColor: '#fff',
-          hoverBorderWidth: 3,
-          hoverOffset: 8,
-        }],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: '64%',
-        animation: { animateRotate: true, duration: 600 },
-        onClick(evt, els) {
-          if (!els.length) return;
-          const label = catData[els[0].index]?.asset_class;
-          if (!label) return;
-          // Navigate to list view filtered by this asset class
-          document.querySelector('.main-tab[data-view=screener]').click();
-          setTimeout(() => {
-            // Set the sort to FUM and apply asset class text filter
-            const search = document.getElementById('search');
-            if (search) { search.value = ''; search.dispatchEvent(new Event('input')); }
-            // Trigger asset class filter in the screener — open screener with that class pre-filtered
-            document.querySelector('.main-tab[data-view=screener]').click();
-            setTimeout(() => {
-              const cb = [...document.querySelectorAll('.sc-ac')].find(el => el.value === label);
-              if (cb && !cb.checked) { cb.checked = true; cb.dispatchEvent(new Event('change')); }
-            }, 50);
-          }, 50);
-        },
-        plugins: {
-          legend: {
-            position: 'bottom',
-            labels: {
-              font: { size: 10 },
-              padding: 8,
-              boxWidth: 10,
-              generateLabels(chart) {
-                return chart.data.labels.map((label, i) => ({
-                  text: label,
-                  fillStyle: catData[i] ? assetColor(catData[i].asset_class) : '#ccc',
-                  strokeStyle: '#fff',
-                  lineWidth: 0,
-                  index: i,
-                }));
-              },
-            },
-          },
-          tooltip: {
-            callbacks: {
-              label(ctx) {
-                const c = catData[ctx.dataIndex];
-                const pct = totalAum > 0 ? ((c.total_fum / totalAum) * 100).toFixed(1) : '0';
-                return [
-                  ' ' + fmtFum(c.total_fum) + '  (' + pct + '%)',
-                  ' ' + c.etf_count + ' ETFs',
-                ];
-              },
-            },
-          },
-        },
-      },
-    }
-  );
-
-  /* ── 2. Issuer market share — pie/doughnut chart ── */
-  const topIss = (issuers.issuers || []).filter(i => (i.total_fum || 0) > 0).slice(0, 10);
-  const issTotal = topIss.reduce((s, i) => s + (i.total_fum || 0), 0);
-
-  if (chartIssuers) chartIssuers.destroy();
-  chartIssuers = new Chart(
-    document.getElementById('chart-issuers').getContext('2d'), {
-      type: 'doughnut',
-      data: {
-        labels: topIss.map(i => i.name),
-        datasets: [{
-          data: topIss.map(i => i.total_fum || 0),
-          backgroundColor: topIss.map(i => issuerColor(i.name)),
-          borderWidth: 2,
-          borderColor: '#fff',
-          hoverBorderWidth: 3,
-          hoverOffset: 8,
-        }],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: '60%',
-        animation: { animateRotate: true, duration: 600 },
-        onClick(evt, els) {
-          if (!els.length) return;
-          const iss = topIss[els[0].index];
-          if (!iss) return;
-          document.querySelector('.main-tab[data-view=screener]').click();
-          setTimeout(() => {
-            const cb = [...document.querySelectorAll('.sc-is')].find(el => el.value === iss.name);
-            if (cb && !cb.checked) { cb.checked = true; cb.dispatchEvent(new Event('change')); }
-          }, 80);
-        },
-        plugins: {
-          legend: {
-            position: 'bottom',
-            labels: {
-              font: { size: 10 },
-              padding: 7,
-              boxWidth: 10,
-            },
-          },
-          tooltip: {
-            callbacks: {
-              label(ctx) {
-                const iss = topIss[ctx.dataIndex];
-                const pct = issTotal > 0 ? ((iss.total_fum / issTotal) * 100).toFixed(1) : '0';
-                return [
-                  ' ' + fmtFum(iss.total_fum) + '  (' + pct + '%)',
-                  ' ' + iss.etf_count + ' ETFs',
-                ];
-              },
-            },
-          },
-        },
-      },
-    }
-  );
-
-  /* ── 3. Fund flows bar chart — coloured by issuer, click to detail ── */
-  const inflows  = (flows.top_inflows  || []).slice(0, 5);
-  const outflows = (flows.top_outflows || []).slice(0, 5);
-  const flowRows   = [...inflows, ...outflows];
-  const flowLabels = flowRows.map(r => r.code);
-  const flowVals   = flowRows.map(r => r.fund_flow_1m || 0);
-  // Positive bars: issuer brand color; negative bars: muted red
-  const flowBg = flowRows.map(r =>
-    (r.fund_flow_1m || 0) >= 0
-      ? issuerColor(r.issuer)
-      : 'rgba(239,68,68,0.75)'
-  );
-  const flowBorder = flowRows.map(r =>
-    (r.fund_flow_1m || 0) >= 0
-      ? issuerColor(r.issuer)
-      : '#ef4444'
-  );
-
-  if (chartFlows) chartFlows.destroy();
-  chartFlows = new Chart(
-    document.getElementById('chart-flows').getContext('2d'), {
-      type: 'bar',
-      data: {
-        labels: flowLabels,
-        datasets: [{
-          data: flowVals,
-          backgroundColor: flowBg,
-          borderColor: flowBorder,
-          borderWidth: 1,
-          borderRadius: 5,
-          borderSkipped: false,
-        }],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: { duration: 500 },
-        onClick(evt, els) {
-          if (!els.length) return;
-          const row = flowRows[els[0].index];
-          if (row) {
-            showDetail(row.code);
-            document.querySelector('.main-tab[data-view=screener]').click();
-          }
-        },
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              title: ctx => {
-                const r = flowRows[ctx[0].dataIndex];
-                return r ? r.code + (r.issuer ? '  ·  ' + r.issuer : '') : ctx[0].label;
-              },
-              label: ctx => {
-                const r = flowRows[ctx.dataIndex];
-                return [
-                  ' Flow: ' + fmtFum(ctx.parsed.y),
-                  r?.name ? ' ' + r.name.slice(0, 40) : '',
-                ].filter(Boolean);
-              },
-            },
-          },
-        },
-        scales: {
-          y: {
-            grid: { color: '#2e5285' },
-            ticks: { font: { size: 10 }, callback: v => fmtFum(v) },
-          },
-          x: {
-            grid: { display: false },
-            ticks: { font: { size: 10 } },
-          },
-        },
-      },
-    }
-  );
-}
-
 /* ======================================================= data freshness */
 let scrapeTimes = {};
 
@@ -4544,7 +4281,7 @@ async function loadScrapeTimes() {
 /* ======================================================= init */
 async function init() {
   try {
-    await Promise.all([loadFilters(), loadOverview(), loadTable(), loadAnalytics(), loadScrapeTimes()]);
+    await Promise.all([loadFilters(), loadOverview(), loadTable(), loadScrapeTimes()]);
   } catch (e) {
     console.error('Init error:', e);
   }
