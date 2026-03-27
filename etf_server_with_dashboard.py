@@ -3027,6 +3027,19 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
 
     <!-- ── Industry Growth ── -->
     <div id="asub-industry" class="hidden">
+      <!-- ASX vs Cboe snapshot -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+          <h3 class="font-semibold text-gray-700 text-sm mb-1">Market Cap by Exchange</h3>
+          <p class="text-xs text-gray-400 mb-3">Current FUM split between ASX and Cboe Australia</p>
+          <div style="height:220px" class="flex items-center justify-center">
+            <canvas id="exch-donut" style="max-height:220px"></canvas>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex flex-col justify-center">
+          <div id="exch-stats" class="space-y-4"></div>
+        </div>
+      </div>
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <h3 class="font-semibold text-gray-700 text-sm mb-1">Industry AUM ($B)</h3>
@@ -5326,6 +5339,59 @@ function makeBarChart(canvasId, labels, datasets) {
 }
 
 async function loadHistIndustry() {
+  // ── Exchange breakdown (ASX vs Cboe) ──
+  const exData = await api('/api/v1/exchanges');
+  if (exData.exchanges && exData.exchanges.length) {
+    const exchanges = exData.exchanges.filter(e => e.exchange && e.total_fum > 0);
+    const labels = exchanges.map(e => e.exchange === 'CXA' ? 'Cboe Australia' : e.exchange);
+    const fums   = exchanges.map(e => +(e.total_fum / 1000).toFixed(2));
+    const counts = exchanges.map(e => e.etf_count);
+    const total  = fums.reduce((a, b) => a + b, 0);
+    const COLORS = ['#3b82f6', '#f59e0b', '#10b981', '#8b5cf6'];
+
+    const ctx = document.getElementById('exch-donut').getContext('2d');
+    new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels,
+        datasets: [{ data: fums, backgroundColor: COLORS.slice(0, exchanges.length),
+                     borderWidth: 2, borderColor: '#fff' }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        cutout: '62%',
+        plugins: {
+          legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 }, padding: 12 } },
+          tooltip: { callbacks: { label: c => ` A$${c.parsed.toFixed(1)}B (${(c.parsed/total*100).toFixed(1)}%)` } }
+        }
+      }
+    });
+
+    document.getElementById('exch-stats').innerHTML = exchanges.map((e, i) => {
+      const pct = (e.total_fum / 1000 / total * 100).toFixed(1);
+      const fum = (e.total_fum / 1000).toFixed(1);
+      const label = e.exchange === 'CXA' ? 'Cboe Australia' : e.exchange;
+      return `
+        <div class="flex items-center gap-3">
+          <div class="w-3 h-3 rounded-sm shrink-0" style="background:${COLORS[i]}"></div>
+          <div class="flex-1">
+            <div class="flex items-baseline justify-between">
+              <span class="text-sm font-semibold text-gray-700">${label}</span>
+              <span class="text-sm font-bold text-gray-800">A$${fum}B</span>
+            </div>
+            <div class="flex items-center justify-between text-xs text-gray-400 mt-0.5">
+              <span>${e.etf_count} ETFs</span>
+              <span>${pct}% of market</span>
+            </div>
+            <div class="mt-1 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+              <div class="h-full rounded-full" style="width:${pct}%;background:${COLORS[i]}"></div>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  // ── Historical industry data ──
   const d = await api('/api/v1/history/industry');
   if (!d.data) return;
   const rows = d.data;
