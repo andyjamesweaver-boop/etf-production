@@ -2406,6 +2406,306 @@ def get_issuer_page(slug: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# TOTAL MARKET ANALYSER PAGE
+# ---------------------------------------------------------------------------
+_TM_BODY = """
+<div id="tm-tabs" class="flex gap-2 flex-wrap mb-6">
+  <button data-tm="exchange"   class="tm-btn active-tm px-4 py-2 rounded-lg text-sm font-semibold border transition-colors">Exchange</button>
+  <button data-tm="assetclass" class="tm-btn px-4 py-2 rounded-lg text-sm font-semibold border transition-colors">Asset Class</button>
+  <button data-tm="geography"  class="tm-btn px-4 py-2 rounded-lg text-sm font-semibold border transition-colors">Geography</button>
+  <button data-tm="strategy"   class="tm-btn px-4 py-2 rounded-lg text-sm font-semibold border transition-colors">Strategy &amp; Factors</button>
+</div>
+
+<!-- EXCHANGE -->
+<div id="tm-exchange">
+  <div class="card mb-5">
+    <div class="flex items-start justify-between flex-wrap gap-3 mb-4">
+      <div>
+        <h2 class="font-semibold text-slate-200 mb-0.5">Australian ETF Market — Historical AUM</h2>
+        <p class="text-xs text-slate-400">Monthly ASX-listed ETF market cap since July 2013. Cboe Australia data is current-month only (not in ASX monthly report).</p>
+      </div>
+      <p class="text-xs text-slate-500" id="tm-ts"></p>
+    </div>
+    <div style="height:320px"><canvas id="tm-exch-hist"></canvas></div>
+  </div>
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+    <div class="card">
+      <h2 class="font-semibold text-slate-200 text-sm mb-1">Current Market Cap by Exchange</h2>
+      <p class="text-xs text-slate-400 mb-4">Live FUM from ETF database</p>
+      <div style="height:240px" class="flex items-center justify-center">
+        <canvas id="tm-exch-donut" style="max-height:240px"></canvas>
+      </div>
+    </div>
+    <div class="card flex flex-col justify-center">
+      <div id="tm-exch-stats" class="space-y-5"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ASSET CLASS -->
+<div id="tm-assetclass" class="hidden">
+  <div class="card mb-5">
+    <h2 class="font-semibold text-slate-200 mb-1">Market AUM by Asset Class — Historical</h2>
+    <p class="text-xs text-slate-400 mb-4">Stacked monthly market cap by broad asset class since July 2013</p>
+    <div style="height:380px"><canvas id="tm-ac-hist"></canvas></div>
+  </div>
+  <div class="card">
+    <h2 class="font-semibold text-slate-200 text-sm mb-4">Current Snapshot</h2>
+    <div id="tm-ac-bars" class="space-y-2"></div>
+  </div>
+</div>
+
+<!-- GEOGRAPHY -->
+<div id="tm-geography" class="hidden">
+  <div class="card mb-5">
+    <h2 class="font-semibold text-slate-200 mb-1">Market AUM by Geographic Focus — Historical</h2>
+    <p class="text-xs text-slate-400 mb-4">Stacked monthly market cap by geographic investment mandate since July 2013</p>
+    <div style="height:380px"><canvas id="tm-geo-hist"></canvas></div>
+  </div>
+  <div class="card">
+    <h2 class="font-semibold text-slate-200 text-sm mb-4">Current Snapshot</h2>
+    <div id="tm-geo-bars" class="space-y-2"></div>
+  </div>
+</div>
+
+<!-- STRATEGY & FACTORS -->
+<div id="tm-strategy" class="hidden">
+  <div class="card mb-5">
+    <h2 class="font-semibold text-slate-200 mb-1">Market AUM by Strategy — Historical</h2>
+    <p class="text-xs text-slate-400 mb-4">Stacked monthly market cap by investment style and factor strategy since July 2013</p>
+    <div style="height:380px"><canvas id="tm-strat-hist"></canvas></div>
+  </div>
+  <div class="card">
+    <h2 class="font-semibold text-slate-200 text-sm mb-4">Current Snapshot</h2>
+    <div id="tm-strat-bars" class="space-y-2"></div>
+  </div>
+</div>
+"""
+
+_TM_JS = """
+const TM_PALETTE = [
+  '#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6',
+  '#f97316','#06b6d4','#84cc16','#ec4899','#14b8a6','#a855f7','#6366f1',
+];
+
+const TM_BTN_ACTIVE = 'active-tm bg-blue-600 border-blue-600 text-white';
+const TM_BTN_IDLE   = 'bg-[#0f2040] border-[#1e3860] text-slate-300 hover:border-blue-500/60';
+
+function setTmBtns(active) {{
+  document.querySelectorAll('.tm-btn').forEach(b => {{
+    const on = b.dataset.tm === active;
+    b.className = 'tm-btn px-4 py-2 rounded-lg text-sm font-semibold border transition-colors ' + (on ? TM_BTN_ACTIVE : TM_BTN_IDLE);
+  }});
+  ['exchange','assetclass','geography','strategy'].forEach(id => {{
+    document.getElementById('tm-' + id).classList.toggle('hidden', id !== active);
+  }});
+}}
+
+// Tab init tracking
+const _tmLoaded = {{}};
+
+document.getElementById('tm-tabs').addEventListener('click', async e => {{
+  const btn = e.target.closest('[data-tm]');
+  if (!btn) return;
+  const tab = btn.dataset.tm;
+  setTmBtns(tab);
+  if (!_tmLoaded[tab]) {{
+    _tmLoaded[tab] = true;
+    if (tab === 'exchange')   await loadTmExchange();
+    if (tab === 'assetclass') await loadTmAssetClass();
+    if (tab === 'geography')  await loadTmGeography();
+    if (tab === 'strategy')   await loadTmStrategy();
+  }}
+}});
+
+// Shared: stacked area chart
+function makeStackedArea(canvasId, dates, series) {{
+  const ctx = document.getElementById(canvasId)?.getContext('2d');
+  if (!ctx) return;
+  const datasets = series.map((s, i) => ({{
+    label: s.name,
+    data: s.data,
+    backgroundColor: TM_PALETTE[i % TM_PALETTE.length] + '99',
+    borderColor:     TM_PALETTE[i % TM_PALETTE.length],
+    borderWidth: 1.5,
+    fill: true,
+    tension: 0.3,
+    pointRadius: 0,
+  }}));
+  new Chart(ctx, {{
+    type: 'line',
+    data: {{ labels: dates, datasets }},
+    options: {{
+      responsive: true, maintainAspectRatio: false,
+      interaction: {{ mode: 'index', intersect: false }},
+      plugins: {{
+        legend: {{ position: 'bottom', labels: {{ boxWidth: 10, font: {{ size: 10 }}, color: '#94a3b8', padding: 10 }} }},
+        tooltip: {{
+          callbacks: {{
+            label: c => ` ${{c.dataset.label}}: A$${{c.parsed.y.toFixed(1)}}B`,
+            footer: items => {{
+              const tot = items.reduce((s, i) => s + i.parsed.y, 0);
+              return `Total: A$${{tot.toFixed(1)}}B`;
+            }}
+          }}
+        }}
+      }},
+      scales: {{
+        x: {{
+          type: 'time', time: {{ unit: 'year', displayFormats: {{ year: 'yyyy' }} }},
+          ticks: {{ font: {{ size: 10 }}, color: '#64748b', maxTicksLimit: 12 }},
+          grid: {{ color: '#1e3860' }}
+        }},
+        y: {{
+          stacked: true,
+          ticks: {{ font: {{ size: 10 }}, color: '#64748b', callback: v => 'A$' + v + 'B' }},
+          grid: {{ color: '#1e3860' }}
+        }}
+      }}
+    }}
+  }});
+}}
+
+// Shared: horizontal bars snapshot
+function renderHBars(containerId, series, dates) {{
+  const idx = dates.length - 1;
+  const items = series.map((s, i) => ({{
+    name: s.name, val: s.data[idx] || 0, color: TM_PALETTE[i % TM_PALETTE.length]
+  }})).filter(x => x.val > 0).sort((a, b) => b.val - a.val);
+  const total = items.reduce((s, x) => s + x.val, 0) || 1;
+  document.getElementById(containerId).innerHTML = items.map(x => `
+    <div class="flex items-center gap-3">
+      <div class="w-3 h-3 rounded-sm shrink-0" style="background:${{x.color}}"></div>
+      <div class="flex-1 min-w-0">
+        <div class="flex justify-between text-xs mb-1">
+          <span class="text-slate-300 truncate">${{x.name}}</span>
+          <span class="text-slate-200 font-semibold ml-2 shrink-0">A$${{x.val.toFixed(1)}}B <span class="text-slate-500 font-normal">${{(x.val/total*100).toFixed(1)}}%</span></span>
+        </div>
+        <div class="h-1.5 bg-[#1e3860] rounded-full overflow-hidden">
+          <div class="h-full rounded-full" style="width:${{(x.val/total*100).toFixed(1)}}%;background:${{x.color}}"></div>
+        </div>
+      </div>
+    </div>`).join('');
+}}
+
+// Exchange
+async function loadTmExchange() {{
+  const [histD, exD] = await Promise.all([
+    api('/api/v1/history/industry'),
+    api('/api/v1/exchanges'),
+  ]);
+  document.getElementById('tm-ts').textContent = new Date().toLocaleDateString('en-AU', {{month:'long',year:'numeric'}});
+
+  if (histD.data) {{
+    const dates = histD.data.map(r => r.date);
+    const aums  = histD.data.map(r => +(r.aum_b || 0).toFixed(1));
+    const ctx = document.getElementById('tm-exch-hist').getContext('2d');
+    new Chart(ctx, {{
+      type: 'line',
+      data: {{ labels: dates, datasets: [{{
+        label: 'ASX-listed ETF Market Cap (A$B)',
+        data: aums,
+        borderColor: '#3b82f6', backgroundColor: '#3b82f620',
+        fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2,
+      }}]}]}},
+      options: {{
+        responsive: true, maintainAspectRatio: false,
+        plugins: {{
+          legend: {{ labels: {{ color: '#94a3b8', font: {{ size: 11 }} }} }},
+          tooltip: {{ callbacks: {{ label: c => ` A$${{c.parsed.y.toFixed(1)}}B` }} }}
+        }},
+        scales: {{
+          x: {{ type: 'time', time: {{ unit: 'year', displayFormats: {{ year: 'yyyy' }} }},
+               ticks: {{ font: {{ size: 10 }}, color: '#64748b' }}, grid: {{ color: '#1e3860' }} }},
+          y: {{ ticks: {{ font: {{ size: 10 }}, color: '#64748b', callback: v => 'A$' + v + 'B' }},
+               grid: {{ color: '#1e3860' }} }}
+        }}
+      }}
+    }});
+  }}
+
+  if (exD.exchanges) {{
+    const exchanges = exD.exchanges.filter(e => e.exchange && e.total_fum > 0);
+    const labels = exchanges.map(e => e.exchange === 'CXA' ? 'Cboe Australia' : e.exchange);
+    const fums   = exchanges.map(e => +(e.total_fum / 1000).toFixed(2));
+    const total  = fums.reduce((a, b) => a + b, 0);
+    const COLORS = TM_PALETTE;
+    const ctx2 = document.getElementById('tm-exch-donut').getContext('2d');
+    new Chart(ctx2, {{
+      type: 'doughnut',
+      data: {{ labels, datasets: [{{ data: fums, backgroundColor: COLORS.slice(0, exchanges.length), borderWidth: 2, borderColor: '#0f2040' }}] }},
+      options: {{
+        responsive: true, maintainAspectRatio: false, cutout: '62%',
+        plugins: {{
+          legend: {{ position: 'bottom', labels: {{ color: '#94a3b8', boxWidth: 10, font: {{ size: 11 }}, padding: 12 }} }},
+          tooltip: {{ callbacks: {{ label: c => ` A$${{c.parsed.toFixed(1)}}B (${{(c.parsed/total*100).toFixed(1)}}%)` }} }}
+        }}
+      }}
+    }});
+    document.getElementById('tm-exch-stats').innerHTML = exchanges.map((e, i) => {{
+      const pct_v = (e.total_fum / 1000 / total * 100).toFixed(1);
+      const fum = (e.total_fum / 1000).toFixed(1);
+      const label = e.exchange === 'CXA' ? 'Cboe Australia' : e.exchange;
+      return `
+        <div>
+          <div class="flex items-baseline justify-between mb-1">
+            <span class="flex items-center gap-2"><span class="w-3 h-3 rounded-sm shrink-0 inline-block" style="background:${{COLORS[i]}}"></span><span class="text-sm font-semibold text-slate-200">${{label}}</span></span>
+            <span class="text-sm font-bold text-slate-100">A$${{fum}}B</span>
+          </div>
+          <div class="flex justify-between text-xs text-slate-400 mb-1.5">
+            <span>${{e.etf_count}} ETFs</span><span>${{pct_v}}% of market</span>
+          </div>
+          <div class="h-1.5 bg-[#1e3860] rounded-full overflow-hidden">
+            <div class="h-full rounded-full" style="width:${{pct_v}}%;background:${{COLORS[i]}}"></div>
+          </div>
+        </div>`;
+    }}).join('');
+  }}
+}}
+
+// Asset Class
+async function loadTmAssetClass() {{
+  const d = await api('/api/v1/history/asset-classes');
+  if (!d.dates) return;
+  makeStackedArea('tm-ac-hist', d.dates, d.series);
+  renderHBars('tm-ac-bars', d.series, d.dates);
+}}
+
+// Geography
+async function loadTmGeography() {{
+  const d = await api('/api/v1/history/geography');
+  if (!d.dates) return;
+  makeStackedArea('tm-geo-hist', d.dates, d.series);
+  renderHBars('tm-geo-bars', d.series, d.dates);
+}}
+
+// Strategy & Factors
+async function loadTmStrategy() {{
+  const d = await api('/api/v1/history/strategy');
+  if (!d.dates) return;
+  makeStackedArea('tm-strat-hist', d.dates, d.series);
+  renderHBars('tm-strat-bars', d.series, d.dates);
+}}
+
+// Init: load exchange tab by default
+async function init() {{
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('page').classList.remove('hidden');
+  setTmBtns('exchange');
+  _tmLoaded['exchange'] = true;
+  await loadTmExchange();
+  document.getElementById('ts').textContent = new Date().toLocaleDateString('en-AU', {{month:'long',year:'numeric'}});
+}}
+"""
+
+PAGE_TOTAL_MARKET = _page(
+    'Total Market Analyser',
+    'Historic market size by exchange, asset class, geography and strategy',
+    _TM_BODY,
+    _TM_JS,
+)
+
+# ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
 PAGES = {
@@ -2417,6 +2717,7 @@ PAGES = {
     'nav':           PAGE_NAV,
     'upcoming':      PAGE_UPCOMING,
     'asset-classes': PAGE_ASSET_CLASSES,
+    'total-market':  PAGE_TOTAL_MARKET,
 }
 
 def get_insights_page(name: str) -> str | None:

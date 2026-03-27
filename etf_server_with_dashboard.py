@@ -105,6 +105,8 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
             '/api/v1/history/asset-classes': self.handle_history_asset_classes,
             '/api/v1/history/flows':         lambda: self.handle_history_flows(qs),
             '/api/v1/history/launches':      self.handle_history_launches,
+            '/api/v1/history/geography':     self.handle_history_geography,
+            '/api/v1/history/strategy':      self.handle_history_strategy,
             # Insights API
             '/api/v1/insights/fum':      self.handle_insights_fum,
             '/api/v1/insights/listings': self.handle_insights_listings,
@@ -123,6 +125,7 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
             '/insights/nav':      lambda: self.handle_insights_page('nav'),
             '/insights/upcoming':      lambda: self.handle_insights_page('upcoming'),
             '/insights/asset-classes': lambda: self.handle_insights_page('asset-classes'),
+            '/insights/total-market':  lambda: self.handle_insights_page('total-market'),
             '/admin/sync-db':     self.handle_sync_db,
             # Articles
             '/articles':          self.handle_articles_list,
@@ -1019,6 +1022,100 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
                 'by_year':   [dict(r) for r in by_year],
                 'by_issuer': [dict(r) for r in by_issuer],
             })
+        except Exception as e:
+            self.send_json({'error': str(e)}, 500)
+        finally:
+            conn.close()
+
+    # ----- History: Geography -----
+    def handle_history_geography(self):
+        conn = get_db()
+        try:
+            # Group etp_list.country into cleaner buckets
+            all_rows = conn.execute("""
+                SELECT m.date,
+                       CASE
+                           WHEN l.country = 'Australia'                           THEN 'Australia'
+                           WHEN l.country IN ('Global','International')           THEN 'Global'
+                           WHEN l.country = 'U.S.'                               THEN 'United States'
+                           WHEN l.country IN ('Asia','Asian Pacific Region','Asian Pacific Region ex Japan',
+                                              'China','Hong Kong','India','Japan','Singapore',
+                                              'South Korea','Taiwan')             THEN 'Asia-Pacific'
+                           WHEN l.country IN ('Europe','U.K.')                   THEN 'Europe'
+                           WHEN l.country = 'Emerging Markets'                   THEN 'Emerging Markets'
+                           WHEN l.country IS NULL                                 THEN 'Unclassified'
+                           ELSE 'Other'
+                       END AS geo,
+                       SUM(m.market_cap)/1e9 AS aum_b
+                FROM etp_monthly m LEFT JOIN etp_list l ON l.ticker = m.code
+                WHERE m.market_cap > 0
+                GROUP BY m.date, geo ORDER BY m.date ASC
+            """).fetchall()
+            # Determine top geos by latest-month AUM
+            latest = max(r['date'] for r in all_rows)
+            top = sorted(
+                [(r['geo'], r['aum_b']) for r in all_rows if r['date'] == latest],
+                key=lambda x: -x[1]
+            )
+            top_names = [g for g, _ in top]
+            from collections import defaultdict
+            pivot = defaultdict(dict)
+            dates_seen = []
+            seen_set = set()
+            for r in all_rows:
+                nm = r['geo'] if r['geo'] in top_names else 'Other'
+                pivot[r['date']][nm] = pivot[r['date']].get(nm, 0) + (r['aum_b'] or 0)
+                if r['date'] not in seen_set:
+                    seen_set.add(r['date'])
+                    dates_seen.append(r['date'])
+            ordered = list(dict.fromkeys(top_names + (['Other'] if any(r['geo'] not in top_names for r in all_rows) else [])))
+            series = [{'name': n, 'data': [round(pivot[d].get(n, 0), 2) for d in dates_seen]} for n in ordered]
+            self.send_json({'dates': dates_seen, 'series': series})
+        except Exception as e:
+            self.send_json({'error': str(e)}, 500)
+        finally:
+            conn.close()
+
+    # ----- History: Strategy & Factors -----
+    def handle_history_strategy(self):
+        conn = get_db()
+        try:
+            all_rows = conn.execute("""
+                SELECT m.date,
+                       CASE
+                           WHEN l.investment_style = 'Active'                    THEN 'Active'
+                           WHEN l.smart_beta = 'yes' AND l.strategy = 'Quality'  THEN 'Quality'
+                           WHEN l.smart_beta = 'yes' AND l.strategy = 'Value'    THEN 'Value'
+                           WHEN l.smart_beta = 'yes' AND l.strategy = 'Growth'   THEN 'Growth'
+                           WHEN l.smart_beta = 'yes' AND l.strategy = 'Blend'    THEN 'Blend (Multi-factor)'
+                           WHEN l.smart_beta = 'yes'                             THEN 'Other Smart Beta'
+                           WHEN l.investment_style IN ('Index','Index-Tracking')  THEN 'Passive Index'
+                           ELSE 'Unclassified'
+                       END AS strategy,
+                       SUM(m.market_cap)/1e9 AS aum_b
+                FROM etp_monthly m LEFT JOIN etp_list l ON l.ticker = m.code
+                WHERE m.market_cap > 0
+                GROUP BY m.date, strategy ORDER BY m.date ASC
+            """).fetchall()
+            latest = max(r['date'] for r in all_rows)
+            top = sorted(
+                [(r['strategy'], r['aum_b']) for r in all_rows if r['date'] == latest],
+                key=lambda x: -x[1]
+            )
+            top_names = [s for s, _ in top]
+            from collections import defaultdict
+            pivot = defaultdict(dict)
+            dates_seen = []
+            seen_set = set()
+            for r in all_rows:
+                nm = r['strategy'] if r['strategy'] in top_names else 'Other'
+                pivot[r['date']][nm] = pivot[r['date']].get(nm, 0) + (r['aum_b'] or 0)
+                if r['date'] not in seen_set:
+                    seen_set.add(r['date'])
+                    dates_seen.append(r['date'])
+            ordered = list(dict.fromkeys(top_names))
+            series = [{'name': n, 'data': [round(pivot[d].get(n, 0), 2) for d in dates_seen]} for n in ordered]
+            self.send_json({'dates': dates_seen, 'series': series})
         except Exception as e:
             self.send_json({'error': str(e)}, 500)
         finally:
@@ -3418,7 +3515,7 @@ async function loadOverview() {
 /* ======================================================= stat card navigation */
 function goCard(type) {
   switch (type) {
-    case 'fum':           window.location.href = '/insights/asset-classes'; break;
+    case 'fum':           window.location.href = '/insights/total-market'; break;
     case 'asset-classes': window.location.href = '/insights/asset-classes'; break;
     case 'listings':      window.location.href = '/insights/listings';      break;
     case 'returns':       window.location.href = '/insights/returns';       break;
