@@ -2751,25 +2751,25 @@ ARTICLES = [
     {
         "slug": "active-etf-surge-2025",
         "title": "The Active Revolution: How Active ETFs Came to Dominate New Launches",
-        "subtitle": "In 2025, active ETFs outnumbered new passive launches by nearly four to one. The Dimensional phenomenon — $17.5B across six funds in two years — is reshaping what Australian investors expect from professionally managed portfolios.",
+        "subtitle": "For the first time, active ETFs outnumbered new index launches in 2024 — and maintained that lead in 2025. The Dimensional phenomenon — $18B across six funds in two years — is reshaping what Australian investors expect from professionally managed portfolios.",
         "date": "2026-03-27",
         "category": "Market Trends",
-        "summary": "The structure of the Australian ETF market is undergoing a quiet revolution. In 2025, 58 active ETFs launched versus just 15 passive products — a nearly four-to-one ratio that would have been unthinkable five years ago. The catalyst was partly regulatory (ASIC's 2019 active ETF framework) and partly the Dimensional Asset Management effect: DACE, DGCE and DFGH collectively attracted $17.5 billion in assets after converting from managed funds to ETFs in November 2023, demonstrating that institutional-quality active management and ETF wrapper convenience are not mutually exclusive.",
+        "summary": "The structure of the Australian ETF market is undergoing a meaningful shift. For the first time in 2024, active ETF launches (32) outnumbered new index products (22) — and 2025 maintained that lead with 35 active versus 26 index-tracking launches. The catalyst was partly regulatory (ASIC's 2019 active ETF framework) and partly the Dimensional Asset Management effect: DACE, DGCE and DFGH attracted $15 billion in assets after converting from managed funds to ETFs in November 2023, demonstrating that institutional-quality active management and ETF wrapper convenience are not mutually exclusive.",
         "body": """
 <h2>The numbers tell the story</h2>
-<p>In 2025, Australian fund managers launched <strong>58 active ETFs</strong> and just <strong>15 passive index products</strong>. That four-to-one ratio represents a structural inflection point. For most of the ETF market's history in Australia, the product pipeline skewed heavily passive — in 2017 and 2018, passive launches dominated. The shift has been building for several years, but 2025 marked the year active launches became the clear majority by any measure.</p>
+<p>In 2025, Australian fund managers launched <strong>35 active ETFs</strong> and <strong>26 index-tracking products</strong> — a ratio of about 1.35 to one in favour of active. That marks the second consecutive year active launches have outnumbered passive: 2024 was the first year on record where active products (32) outpaced index-tracking ones (22). For most of the ETF market's history in Australia, the product pipeline skewed heavily passive. In 2019, passive launches outnumbered active by two to one; even as recently as 2022, 24 index products launched against 17 active. The crossover arrived quietly in 2023 with the two categories dead-even at 26 each, before active pulled ahead in 2024.</p>
 
-<p>The aggregate numbers are equally stark. Australia's ETF market now holds $327 billion in total assets. Of that, passive products — index-tracking ETFs that have been the traditional core of the market — account for $265.8 billion across 217 funds. Active ETFs hold $61.3 billion across 260 funds. Passive still holds a four-to-one FUM advantage, but that reflects a fifteen-year head start: the oldest ETFs in Australia, like STW (listed 2001) and VAS (2009), have had decades to compound inflows. The new product pipeline tells a very different story about where the industry is heading.</p>
+<p>The aggregate numbers reflect a longer history. Australia's ETF market holds $327 billion in total assets. Of that, index-tracking products account for $258.8 billion across 271 funds. Active ETFs hold $58.2 billion across 160 funds. Passive still holds a roughly four-to-one FUM advantage, but that reflects a fifteen-year head start: the oldest ETFs in Australia, like STW (listed 2001) and VAS (2009), have had decades to compound inflows. The new product pipeline tells a different story about where the industry is heading.</p>
 
 <div class="chart-box">
-  <h3>New ETF Launches by Year — Active vs Passive</h3>
+  <h3>New ETF Launches by Year — Active vs Index-Tracking</h3>
   <div style="position:relative;height:240px"><canvas id="chart-launches-type"></canvas></div>
 </div>
 <script>
 (function() {
   const years   = ['2019','2020','2021','2022','2023','2024','2025'];
-  const active  = [11, 13, 18, 22, 32, 40, 58];
-  const passive = [7,  12,  7, 13, 22, 24, 15];
+  const active  = [7,  9, 11, 17, 26, 32, 35];
+  const passive = [14, 14, 13, 24, 26, 22, 26];
   new Chart(document.getElementById('chart-launches-type'), {
     type: 'bar',
     data: {
@@ -2794,40 +2794,40 @@ ARTICLES = [
 <h2>The Dimensional effect</h2>
 <p>No story about Australia's active ETF market is complete without Dimensional Fund Advisors. In November 2023, DFA converted three of its largest managed funds to ASX-listed active ETFs: DACE (Australian Core Equity), DGCE (Global Core Equity Unhedged), and DFGH (Global Core Equity Hedged). At conversion, these products already had decades of institutional assets behind them. The move brought them onto the ASX for the first time, making them accessible to retail investors, financial advisers, and self-managed superannuation funds without minimum investment thresholds.</p>
 
-<p>The result has been one of the most remarkable growth stories in Australian ETF history. DACE now holds <strong>$6.31 billion</strong> — making it the ninth-largest ETF on the ASX and one of only two products launched after 2020 to crack the top ten by FUM. DGCE holds $4.83 billion and DFGH $3.76 billion. Together, the three November 2023 conversions manage $14.9 billion. Dimensional then listed three additional ETFs in August 2024 — DAVA (Australian Value), DGVA (Global Value) and DGSM (Global Small Company) — which have collectively attracted a further $3.1 billion. The Dimensional ETF range now manages $17.5 billion across six products, all active, none with a publicly disclosed expense ratio.</p>
+<p>The result has been one of the most remarkable growth stories in Australian ETF history. DACE now holds <strong>$6.31 billion</strong> — making it the largest active ETF on the ASX. DGCE holds $4.83 billion and DFGH $3.76 billion. Together, the three November 2023 conversions manage $14.9 billion. Dimensional then listed three additional ETFs in August 2024 — DAVA (Australian Value), DGVA (Global Value) and DGSM (Global Small Company) — which have collectively attracted a further $3.1 billion. The Dimensional ETF range now manages <strong>$18 billion</strong> across six products, all active, none with a publicly disclosed expense ratio.</p>
 
 <table>
   <thead><tr><th>ETF</th><th>Strategy</th><th>Listed</th><th>FUM</th><th>1Y Return</th></tr></thead>
   <tbody>
-    <tr><td>DACE</td><td>Australian Core Equity</td><td>Nov 2023</td><td>$6,307M</td><td class="pos">+14.05%</td></tr>
-    <tr><td>DGCE</td><td>Global Core Equity (Unhedged)</td><td>Nov 2023</td><td>$4,830M</td><td class="pos">+6.70%</td></tr>
-    <tr><td>DFGH</td><td>Global Core Equity (Hedged)</td><td>Nov 2023</td><td>$3,758M</td><td class="pos">+16.22%</td></tr>
-    <tr><td>DAVA</td><td>Australian Value</td><td>Aug 2024</td><td>$1,398M</td><td class="pos">+20.66%</td></tr>
-    <tr><td>DGVA</td><td>Global Value</td><td>Aug 2024</td><td>$1,075M</td><td class="pos">+11.77%</td></tr>
-    <tr><td>DGSM</td><td>Global Small Company</td><td>Aug 2024</td><td>$648M</td><td class="pos">+4.64%</td></tr>
+    <tr><td>DACE</td><td>Australian Core Equity</td><td>Nov 2023</td><td>$6,307M</td><td class="pos">+20.76%</td></tr>
+    <tr><td>DGCE</td><td>Global Core Equity (Unhedged)</td><td>Nov 2023</td><td>$4,830M</td><td class="pos">+9.73%</td></tr>
+    <tr><td>DFGH</td><td>Global Core Equity (Hedged)</td><td>Nov 2023</td><td>$3,758M</td><td class="pos">+22.33%</td></tr>
+    <tr><td>DAVA</td><td>Australian Value</td><td>Aug 2024</td><td>$1,397M</td><td class="pos">+30.71%</td></tr>
+    <tr><td>DGVA</td><td>Global Value</td><td>Aug 2024</td><td>$1,075M</td><td class="pos">+14.16%</td></tr>
+    <tr><td>DGSM</td><td>Global Small Company</td><td>Aug 2024</td><td>$648M</td><td class="pos">+11.48%</td></tr>
   </tbody>
 </table>
 
 <p>Dimensional's approach is often described as "systematic active" — it does not track an index, but nor does it rely on stock-picking in the traditional sense. The funds tilt toward documented risk premia: value, profitability, and size, in proportions determined by rules-based factor models rather than individual analyst conviction. This places Dimensional in a conceptual space between passive index investing and traditional stock-picking active management — and its growth suggests that investors find this positioning attractive at a time when both passive concentration risk and traditional active fund manager underperformance are live concerns.</p>
 
 <h2>Beyond Dimensional: the broader active surge</h2>
-<p>Dimensional accounts for $17.5 billion of the active market's $61.3 billion total, but the remaining $43.8 billion tells its own story. The cohort of large active ETFs includes names that will be familiar to long-term investors in Australian managed funds: Magellan ($5.1B for MGOC), Plato Global Alpha ($1.05B for PGA1), Antipodes ($373M for AGX1), Platinum ($299M for PAXX), and Pendal. These are fund managers with decades of track records who have found the ETF wrapper to be a more efficient distribution channel than traditional unlisted managed fund structures.</p>
+<p>Dimensional accounts for $18 billion of the active market's $58.2 billion total, but the remaining $40 billion tells its own story. The cohort of large active ETFs includes names that will be familiar to long-term investors in Australian managed funds: Magellan ($5.1B for MGOC), Hyperion ($3.2B for HYGG), BetaShares Australian Hybrids ($2.6B for HBRD), Plato Global Alpha ($1.05B for PGA1) and Airlie Australian Share Fund ($935M for AASF). These are fund managers with decades of track records who have found the ETF wrapper to be a more efficient distribution channel than traditional unlisted managed fund structures.</p>
 
 <p>The ETF format offers genuine advantages for active managers: daily NAV transparency, no investor entry and exit spread costs on secondary market trades, ASX listing providing superannuation fund eligibility, and no minimum investment requirement. For advisers recommending products to clients across diverse account sizes, ETF-wrapped active funds are simply easier to work with.</p>
 
 <h2>The fee gap — and what performance data says</h2>
 <p>Active ETFs charge more: the market-wide average expense ratio is 0.52% for active products versus 0.37% for passive. For a $100,000 portfolio, that difference is $150 per year — compounding to a meaningful drag over a decade. The question is whether active outperformance justifies the cost.</p>
 
-<p>The data available is mixed. Among Australian equity active ETFs with one-year return data, DAVA (Dimensional Australian Value) returned +20.66% versus VAS (Vanguard Australian Shares, passive) at +7.61% — a remarkable gap. DACE (Dimensional Australian Core) returned +14.05% versus VAS's 7.61%. In international equities, DFGH returned +16.22% versus VGS (passive global) at approximately +6%, and PGA1 (Plato Global Alpha) delivered +24.22%. These are single-year comparisons that don't account for fees in the Dimensional case, but the magnitude of outperformance over 2025 suggests the active tilt was real.</p>
+<p>The data available is striking. Among Australian equity active ETFs, DAVA (Dimensional Australian Value) returned +30.71% over the year to March 2026 versus VAS (Vanguard Australian Shares, passive) at approximately +8% — a remarkable gap. DACE (Dimensional Australian Core) returned +20.76%. In international equities, DFGH (Dimensional Global Core Hedged) returned +22.33%, and PGA1 (Plato Global Alpha) delivered +25.13%. Not every active ETF outperformed: MGOC (Magellan Global) returned -5.51% and HYGG (Hyperion Global Growth) -9.06%, a reminder that active management carries the risk of both under- and outperformance. These are single-year comparisons, but the dispersion of outcomes makes clear that manager selection matters far more in active ETFs than in passive products.</p>
 
 <p>The harder test comes over full market cycles. The one-year period to early 2026 was unusual in several respects — particularly the divergence between hedged and unhedged returns as the AUD moved — and active managers with factor tilts (particularly value and quality) benefited from a factor environment that suited their models. Whether these results persist in a more benign or growth-oriented market environment remains to be seen.</p>
 
 <h2>What the active surge means for the market</h2>
 <p>The rise of active ETFs is changing the competitive dynamics of the industry in ways that go beyond product counts. Passive giants like Vanguard, iShares and BetaShares have responded by launching ultra-cheap core products (VTS at 0.03%, A200 at 0.04%) that make the cost of passive ownership negligibly small — effectively daring active managers to justify their fees through performance alone. Meanwhile, the active managers are competing on both performance and the ETF convenience that was previously a passive-only advantage.</p>
 
-<p>The 2025 launch pipeline — 58 active products across Australian equities, international equities, fixed income, thematic and alternatives — suggests this trend has not peaked. Every traditional fund manager that converts an unlisted fund to an ETF structure brings an established investor base onto the ASX, seeding new products with meaningful day-one assets. The 2025 active ETF cohort began their lives with $8.7 billion in combined FUM — vastly more than the typical passive ETF launch.</p>
+<p>The 2025 launch pipeline — 35 active products across Australian equities, international equities, fixed income, thematic and alternatives — suggests this trend has not peaked. Every traditional fund manager that converts an unlisted fund to an ETF structure brings an established investor base onto the ASX, seeding new products with meaningful day-one assets. That dynamic helped the 2023 Dimensional conversions arrive with billions already under management — a model other managers are clearly watching closely.</p>
 
-<p>The Australian ETF market in 2030 will almost certainly look different from today: more active products, more institutional assets, and a passive core that remains dominant in broad-market exposure but increasingly shares shelf space with systematic and active alternatives. The question for investors is not whether active ETFs have a place in portfolios — at $61 billion, that question has been answered — but which active strategies will justify their fees over the full market cycle.</p>
+<p>The Australian ETF market in 2030 will almost certainly look different from today: more active products, more institutional assets, and a passive core that remains dominant in broad-market exposure but increasingly shares shelf space with systematic and active alternatives. The question for investors is not whether active ETFs have a place in portfolios — at $58 billion, that question has been answered — but which active strategies will justify their fees over the full market cycle.</p>
 """,
     },
 
