@@ -783,21 +783,24 @@ async function init() {
 
     // nav trend chart — market_history has {date, avg_pd, min_pd, max_pd}
     const hist = nav.market_history || [];
+    const fmtD = s => { const d=new Date(s); return d.toLocaleDateString('en-AU',{day:'numeric',month:'short'}); };
+    // Show every ~10th label to avoid crowding
+    const step = Math.max(1, Math.floor(hist.length / 8));
     new Chart(document.getElementById('cost-nav-chart').getContext('2d'), {
       type:'line',
       data:{
         labels: hist.map(r=>r.date),
         datasets:[
           {label:'Avg Prem/Disc %', data:hist.map(r=>r.avg_pd), borderColor:'#3b82f6', backgroundColor:'#3b82f620', fill:true, tension:0.3, pointRadius:0, borderWidth:2},
-          {label:'Max',  data:hist.map(r=>r.max_pd), borderColor:'#22c55e44', fill:false, pointRadius:0, borderWidth:1},
-          {label:'Min',  data:hist.map(r=>r.min_pd), borderColor:'#ef444444', fill:false, pointRadius:0, borderWidth:1},
+          {label:'Max',  data:hist.map(r=>r.max_pd), borderColor:'#22c55e66', fill:false, pointRadius:0, borderWidth:1},
+          {label:'Min',  data:hist.map(r=>r.min_pd), borderColor:'#ef444466', fill:false, pointRadius:0, borderWidth:1},
         ]
       },
       options:{
         responsive:true, maintainAspectRatio:false,
         plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${c.parsed.y>0?'+':''}${c.parsed.y.toFixed(3)}%`}}},
         scales:{
-          x:{type:'time',time:{unit:'month',displayFormats:{month:'MMM yy'}},ticks:{maxTicksLimit:6,font:{size:10}},grid:{display:false}},
+          x:{ticks:{font:{size:10}, maxTicksLimit:8, callback:(v,i)=> i%step===0 ? fmtD(hist[i]?.date||'') : null}, grid:{display:false}},
           y:{ticks:{font:{size:10},callback:v=>(v>0?'+':'')+v.toFixed(2)+'%'},grid:{color:'#1e3860'}},
         }
       },
