@@ -888,81 +888,77 @@ async function init() {
     </div>`).join('');
 
   // ── Interactive cost ranking chart ──────────────────────────────────────
-  let _rankMetric = 'mer';
-  let _rankDir    = 'cheapest';
-  let _rankChart  = null;
-
-  const _rankData = () => ({
-    'mer':      { cheapest: d.cheapest,          priciest: d.most_expensive },
-    'spread':   { cheapest: d.cheapest_spread,   priciest: d.priciest_spread },
-    'combined': { cheapest: d.cheapest_combined, priciest: d.priciest_combined },
-  });
+  // State lives at module scope so onclick handlers can reach it
+  window._rankState = { metric: 'mer', dir: 'cheapest', chart: null, data: d };
 
   const _rankNotes = {
     'mer':      'Ranked by Management Expense Ratio (MER) only.',
     'spread':   'Ranked by live bid/ask spread. Spread is a per-transaction cost that varies with market liquidity and trading volume.',
-    'combined': 'MER + bid/ask spread stacked. MER is an annual recurring cost; spread is per transaction. Combined gives a rough total-cost-of-ownership picture.',
+    'combined': 'MER + bid/ask spread stacked. MER is an annual recurring cost; spread is per transaction. Combined gives a rough total-cost-of-ownership view.',
   };
 
-  function renderRanking() {
-    const rows = (_rankData()[_rankMetric][_rankDir] || []).slice(0, 20);
+  window.renderRanking = function() {
+    const { metric, dir, data } = window._rankState;
+    const srcMap = {
+      mer:      { cheapest: data.cheapest,         priciest: data.most_expensive },
+      spread:   { cheapest: data.cheapest_spread,  priciest: data.priciest_spread },
+      combined: { cheapest: data.cheapest_combined,priciest: data.priciest_combined },
+    };
+    const rows    = (srcMap[metric][dir] || []).slice(0, 20);
     const labels  = rows.map(r => r.code);
     const merVals = rows.map(r => r.effective_mer || 0);
     const sprVals = rows.map(r => r.spread || 0);
 
-    document.getElementById('rank-note').textContent = _rankNotes[_rankMetric];
-    document.getElementById('rank-col-hdr').textContent =
-      _rankMetric === 'mer' ? 'MER' : _rankMetric === 'spread' ? 'Spread' : 'MER + Spread';
+    document.getElementById('rank-note').textContent = _rankNotes[metric];
 
-    const datasets = _rankMetric === 'combined'
+    // Show/hide the Total column — redundant when metric is mer or spread
+    const showTotal = metric === 'combined';
+    document.getElementById('rank-col-hdr').style.display = showTotal ? '' : 'none';
+
+    const datasets = metric === 'combined'
       ? [
-          { label: 'MER',        data: merVals, backgroundColor: '#3b82f6cc', borderRadius: 3 },
-          { label: 'Bid/Ask',    data: sprVals, backgroundColor: '#f59e0bcc', borderRadius: 3 },
+          { label: 'MER',       data: merVals, backgroundColor: '#3b82f6cc', borderRadius: 3 },
+          { label: 'Bid/Ask',   data: sprVals, backgroundColor: '#f59e0bcc', borderRadius: 3 },
         ]
-      : _rankMetric === 'spread'
+      : metric === 'spread'
       ? [{ label: 'Bid/Ask Spread', data: sprVals, backgroundColor: '#f59e0bcc', borderRadius: 3 }]
       : [{ label: 'MER',           data: merVals, backgroundColor: '#3b82f6cc', borderRadius: 3 }];
 
-    if (_rankChart) _rankChart.destroy();
-    _rankChart = new Chart(document.getElementById('chart-ranking'), {
+    if (window._rankState.chart) window._rankState.chart.destroy();
+    window._rankState.chart = new Chart(document.getElementById('chart-ranking'), {
       type: 'bar',
       data: { labels, datasets },
       options: {
         indexAxis: 'y',
         responsive: true, maintainAspectRatio: false,
         plugins: {
-          legend: { display: _rankMetric === 'combined', position: 'top', labels: { font: { size: 10 }, boxWidth: 10 } },
+          legend: { display: metric === 'combined', position: 'top', labels: { font: { size: 10 }, boxWidth: 10 } },
           tooltip: {
             callbacks: {
               label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.x.toFixed(4)}%`,
               footer: ctxArr => {
-                if (_rankMetric !== 'combined') return;
-                const total = ctxArr.reduce((s, c) => s + c.parsed.x, 0);
-                return `Total: ${total.toFixed(4)}%`;
+                if (metric !== 'combined') return;
+                return `Total: ${ctxArr.reduce((s,c) => s + c.parsed.x, 0).toFixed(4)}%`;
               },
             },
           },
         },
         scales: {
           x: {
-            stacked: _rankMetric === 'combined',
+            stacked: metric === 'combined',
             ticks: { font: { size: 10 }, callback: v => v.toFixed(2) + '%' },
             grid: { color: '#1e3860' },
-            title: { display: true, text: '% p.a. / per transaction', font: { size: 10 }, color: '#7fa3c8' },
+            title: { display: true, text: metric === 'spread' ? '% per transaction' : '% p.a.', font: { size: 10 }, color: '#7fa3c8' },
           },
-          y: {
-            stacked: _rankMetric === 'combined',
-            ticks: { font: { size: 11 } },
-            grid: { display: false },
-          },
+          y: { stacked: metric === 'combined', ticks: { font: { size: 11 } }, grid: { display: false } },
         },
       },
     });
 
     document.getElementById('tbl-ranking').innerHTML = rows.map((e, i) => {
-      const total = _rankMetric === 'combined' ? (e.effective_mer + e.spread).toFixed(4) + '%'
-                  : _rankMetric === 'spread'   ? mer(e.spread)
-                  :                              mer(e.effective_mer);
+      const totalCell = showTotal
+        ? `<td class="text-right tabular-nums font-semibold" style="">${(e.effective_mer + e.spread).toFixed(4)}%</td>`
+        : `<td style="display:none"></td>`;
       return `<tr>
         <td class="text-slate-500 tabular-nums">${i + 1}</td>
         <td><a href="/?code=${e.code}" class="font-bold text-blue-400 hover:underline">${e.code}</a></td>
@@ -970,35 +966,35 @@ async function init() {
         <td class="text-slate-400 text-xs">${e.issuer || '—'}</td>
         <td class="text-right tabular-nums">${mer(e.effective_mer)}</td>
         <td class="text-right tabular-nums text-amber-400">${e.spread > 0 ? e.spread.toFixed(4) + '%' : '—'}</td>
-        <td class="text-right tabular-nums font-semibold">${total}</td>
+        ${totalCell}
         <td class="text-right text-slate-500 tabular-nums text-xs">${fmtFum(e.fund_size_aud_millions)}</td>
       </tr>`;
     }).join('');
-  }
+  };
 
-  function setMetric(m) {
-    _rankMetric = m;
+  window.setMetric = function(m) {
+    window._rankState.metric = m;
     ['mer','spread','combined'].forEach(x => {
       const btn = document.getElementById('metric-' + x);
-      btn.classList.toggle('bg-blue-600', x === m);
-      btn.classList.toggle('text-white',  x === m);
+      btn.classList.toggle('bg-blue-600',    x === m);
+      btn.classList.toggle('text-white',     x === m);
       btn.classList.toggle('text-slate-400', x !== m);
     });
-    renderRanking();
-  }
+    window.renderRanking();
+  };
 
-  function setRankDir(dir) {
-    _rankDir = dir;
+  window.setRankDir = function(dir) {
+    window._rankState.dir = dir;
     ['cheapest','priciest'].forEach(x => {
       const btn = document.getElementById('rank-' + x);
-      btn.classList.toggle('bg-blue-600', x === dir);
-      btn.classList.toggle('text-white',  x === dir);
+      btn.classList.toggle('bg-blue-600',    x === dir);
+      btn.classList.toggle('text-white',     x === dir);
       btn.classList.toggle('text-slate-400', x !== dir);
     });
-    renderRanking();
-  }
+    window.renderRanking();
+  };
 
-  renderRanking();
+  window.renderRanking();
 
   // Issuer comparison table (sorted by FUM-weighted MER)
   const issSorted = [...d.by_issuer].sort((a, b) => (a.fum_weighted_mer || 99) - (b.fum_weighted_mer || 99));
