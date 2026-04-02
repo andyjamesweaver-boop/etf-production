@@ -699,32 +699,54 @@ PAGE_RETURNS = _page(
 # ---------------------------------------------------------------------------
 _EXPENSE_BODY = """
 <div id="hero" class="grid grid-cols-2 sm:grid-cols-4 gap-4"></div>
-<!-- NAV prem/disc summary -->
-<div class="grid grid-cols-2 sm:grid-cols-4 gap-4" id="cost-hero"></div>
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-  <div class="card">
-    <div class="flex items-center justify-between mb-3">
-      <h2 class="font-semibold text-sm text-slate-300">Market Premium/Discount (90 days)</h2>
-      <a href="/insights/nav" class="text-xs text-blue-400 hover:text-blue-300">Full NAV analysis ›</a>
+
+<!-- Cost explainer -->
+<div class="card">
+  <h2 class="font-semibold text-sm text-slate-300 mb-3">Understanding ETF Costs</h2>
+  <p class="text-xs text-slate-400 mb-4 leading-relaxed">
+    The total cost of holding an ETF is made up of several components — some visible, some less so.
+    Even small differences in fees compound significantly over time: a 0.50% annual cost difference
+    on a $100,000 portfolio costs roughly $5,000 extra over 10 years, before any performance drag.
+  </p>
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+    <div class="rounded-lg p-3 bg-[#081929] border border-[#1e3860]">
+      <div class="text-xs font-bold uppercase text-blue-400 mb-1.5">Management Expense Ratio (MER)</div>
+      <p class="text-xs text-slate-400 leading-relaxed">
+        The annual fee charged by the fund manager, expressed as a percentage of your investment. It covers
+        portfolio management, custody, administration, and legal costs. Deducted daily from the fund's NAV —
+        you never see a bill, but the return is reduced by this amount every year. <span class="text-slate-300">This is the most
+        commonly quoted cost.</span>
+      </p>
     </div>
-    <div class="relative" style="height:180px"><canvas id="cost-nav-chart"></canvas></div>
+    <div class="rounded-lg p-3 bg-[#081929] border border-[#1e3860]">
+      <div class="text-xs font-bold uppercase text-amber-400 mb-1.5">Bid/Ask Spread</div>
+      <p class="text-xs text-slate-400 leading-relaxed">
+        When you buy an ETF on the ASX, you pay the <em>ask</em> (offer) price; when you sell, you receive
+        the <em>bid</em> price. The gap between these — the spread — is a per-transaction cost paid to
+        market makers for providing liquidity. <span class="text-slate-300">Spreads are larger for illiquid or thinly traded ETFs</span>
+        and matter more for frequent traders than long-term holders.
+      </p>
+    </div>
+    <div class="rounded-lg p-3 bg-[#081929] border border-[#1e3860]">
+      <div class="text-xs font-bold uppercase text-emerald-400 mb-1.5">Premium / Discount to NAV</div>
+      <p class="text-xs text-slate-400 leading-relaxed">
+        An ETF's market price can diverge from its underlying net asset value (NAV). If you buy at a premium,
+        you pay more than the basket of assets is worth; a discount works in your favour. For most large,
+        liquid ETFs premiums and discounts are tiny (under 0.10%). <span class="text-slate-300">They can be larger for
+        ETFs holding illiquid assets</span> (e.g. fixed income, small caps) or those tracking overseas markets
+        outside trading hours.
+      </p>
+    </div>
   </div>
-  <div class="card">
-    <h2 class="font-semibold text-sm text-slate-300 mb-3">Today's Spread Distribution</h2>
-    <div class="relative" style="height:180px"><canvas id="cost-nav-dist"></canvas></div>
-  </div>
+  <p class="text-xs text-slate-500 mt-3 leading-relaxed">
+    <span class="text-slate-400 font-medium">Other costs to be aware of:</span>
+    brokerage commissions charged by your broker (not the ETF), buy/sell spread on some unlisted unit
+    classes, and potential capital gains tax drag from portfolio rebalancing inside the fund (more
+    relevant for actively managed ETFs).
+  </p>
 </div>
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-  <div class="card">
-    <h2 class="font-semibold text-sm text-slate-300 mb-4">MER Distribution</h2>
-    <div class="relative" style="height:220px"><canvas id="chart-dist"></canvas></div>
-  </div>
-  <div class="card">
-    <h2 class="font-semibold text-sm text-slate-300 mb-1">Average MER — by Asset Class</h2>
-    <p class="text-xs text-slate-500 mb-3">Simple avg · FUM-weighted avg per class</p>
-    <div id="bars-ac"></div>
-  </div>
-</div>
+
+<!-- Cost ranking (moved above distribution charts) -->
 <div class="card">
   <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
     <h2 class="font-semibold text-sm text-slate-300">ETF Cost Ranking — Top 20</h2>
@@ -770,6 +792,34 @@ _EXPENSE_BODY = """
     </table>
   </div>
 </div>
+
+<!-- NAV prem/disc summary -->
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-4" id="cost-hero"></div>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+  <div class="card">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="font-semibold text-sm text-slate-300">Market Premium/Discount (90 days)</h2>
+      <a href="/insights/nav" class="text-xs text-blue-400 hover:text-blue-300">Full NAV analysis ›</a>
+    </div>
+    <div class="relative" style="height:180px"><canvas id="cost-nav-chart"></canvas></div>
+  </div>
+  <div class="card">
+    <h2 class="font-semibold text-sm text-slate-300 mb-3">Today's Spread Distribution</h2>
+    <div class="relative" style="height:180px"><canvas id="cost-nav-dist"></canvas></div>
+  </div>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+  <div class="card">
+    <h2 class="font-semibold text-sm text-slate-300 mb-4">MER Distribution</h2>
+    <div class="relative" style="height:220px"><canvas id="chart-dist"></canvas></div>
+  </div>
+  <div class="card">
+    <h2 class="font-semibold text-sm text-slate-300 mb-1">Average MER — by Asset Class</h2>
+    <p class="text-xs text-slate-500 mb-3">Simple avg · FUM-weighted avg per class</p>
+    <div id="bars-ac"></div>
+  </div>
+</div>
+
 <div class="card">
   <h2 class="font-semibold text-sm text-slate-300 mb-1">MER by Issuer — Simple vs FUM-Weighted</h2>
   <p class="text-xs text-slate-500 mb-4">FUM-weighted MER reflects what investors actually pay on average, weighted by fund size.</p>
