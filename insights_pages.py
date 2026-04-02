@@ -726,7 +726,7 @@ _EXPENSE_BODY = """
   </div>
 </div>
 <div class="card">
-  <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+  <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
     <h2 class="font-semibold text-sm text-slate-300">ETF Cost Ranking — Top 20</h2>
     <div class="flex flex-wrap gap-2">
       <div class="flex rounded-lg overflow-hidden border border-[#1e3860] text-xs font-medium">
@@ -744,6 +744,17 @@ _EXPENSE_BODY = """
           class="px-3 py-1.5 text-slate-400 hover:text-slate-200 transition-colors">MER + Spread</button>
       </div>
     </div>
+  </div>
+  <!-- Filters row -->
+  <div class="flex flex-wrap items-center gap-2 mb-3">
+    <span class="text-xs text-slate-500 shrink-0">Asset class:</span>
+    <div id="ac-pills" class="flex flex-wrap gap-1"></div>
+    <span class="text-xs text-slate-500 shrink-0 ml-2">Issuer:</span>
+    <select id="issuer-select" onchange="setIssuer(this.value)"
+      class="text-xs bg-[#0d2137] border border-[#1e3860] text-slate-300 rounded px-2 py-1 focus:outline-none focus:border-blue-500">
+      <option value="">All issuers</option>
+    </select>
+    <span id="rank-count" class="text-xs text-slate-500 ml-auto"></span>
   </div>
   <p id="rank-note" class="text-xs text-slate-500 mb-3"></p>
   <div class="relative" style="height:420px"><canvas id="chart-ranking"></canvas></div>
@@ -888,84 +899,117 @@ async function init() {
     </div>`).join('');
 
   // ── Interactive cost ranking chart ──────────────────────────────────────
-  // State lives at module scope so onclick handlers can reach it
-  window._rankState = { metric: 'mer', dir: 'cheapest', chart: null, data: d };
+  window._rs = { metric:'mer', dir:'cheapest', ac:'', issuer:'', chart:null, all: d.all_etfs || [] };
 
   const _rankNotes = {
-    'mer':      'Ranked by Management Expense Ratio (MER) only.',
-    'spread':   'Ranked by live bid/ask spread. Spread is a per-transaction cost that varies with market liquidity and trading volume.',
-    'combined': 'MER + bid/ask spread stacked. MER is an annual recurring cost; spread is per transaction. Combined gives a rough total-cost-of-ownership view.',
+    mer:      'Ranked by Management Expense Ratio (MER) only.',
+    spread:   'Ranked by live bid/ask spread — a per-transaction cost that varies with liquidity.',
+    combined: 'MER + bid/ask spread stacked. Tooltip shows total on hover.',
   };
 
+  // Build asset-class pills
+  const allAC = [...new Set(window._rs.all.map(e => e.asset_class).filter(Boolean))].sort();
+  document.getElementById('ac-pills').innerHTML =
+    ['', ...allAC].map(ac => `<button
+      id="ac-pill-${ac.replace(/\s+/g,'_')}"
+      onclick="setAC(${JSON.stringify(ac)})"
+      class="px-2 py-0.5 rounded text-xs border transition-colors ${ac==='' ? 'bg-blue-600 text-white border-blue-600' : 'border-[#1e3860] text-slate-400 hover:text-slate-200'}"
+    >${ac || 'All'}</button>`).join('');
+
+  function _filteredETFs() {
+    const { ac, issuer, all } = window._rs;
+    return all.filter(e =>
+      (!ac     || e.asset_class === ac) &&
+      (!issuer || e.issuer === issuer)
+    );
+  }
+
+  function _refreshIssuerDropdown() {
+    const { ac, issuer } = window._rs;
+    const issuers = [...new Set(_filteredETFs().map(e=>e.issuer).filter(Boolean))].sort();
+    const sel = document.getElementById('issuer-select');
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">All issuers</option>' +
+      issuers.map(s => `<option value="${s}" ${s===cur?'selected':''}>${s}</option>`).join('');
+    // if previously selected issuer no longer valid, reset
+    if (cur && !issuers.includes(cur)) { window._rs.issuer = ''; sel.value = ''; }
+  }
+
   window.renderRanking = function() {
-    const { metric, dir, data } = window._rankState;
-    const srcMap = {
-      mer:      { cheapest: data.cheapest,         priciest: data.most_expensive },
-      spread:   { cheapest: data.cheapest_spread,  priciest: data.priciest_spread },
-      combined: { cheapest: data.cheapest_combined,priciest: data.priciest_combined },
-    };
-    const rows    = (srcMap[metric][dir] || []).slice(0, 20);
-    const labels  = rows.map(r => r.code);
-    const merVals = rows.map(r => r.effective_mer || 0);
-    const sprVals = rows.map(r => r.spread || 0);
+    const { metric, dir } = window._rs;
+    const pool = _filteredETFs();
+
+    const sortKey = metric === 'spread'   ? e => e.spread
+                  : metric === 'combined' ? e => (e.effective_mer||0) + (e.spread||0)
+                  :                        e => e.effective_mer||0;
+    const sorted = [...pool].sort((a,b) => dir==='cheapest' ? sortKey(a)-sortKey(b) : sortKey(b)-sortKey(a));
+    const rows   = sorted.slice(0, 20);
 
     document.getElementById('rank-note').textContent = _rankNotes[metric];
+    document.getElementById('rank-count').textContent =
+      pool.length < window._rs.all.length ? `${pool.length} ETFs match filters` : '';
 
-    // Show/hide the Total column — redundant when metric is mer or spread
     const showTotal = metric === 'combined';
     document.getElementById('rank-col-hdr').style.display = showTotal ? '' : 'none';
 
+    const merVals = rows.map(r => +(r.effective_mer||0).toFixed(4));
+    const sprVals = rows.map(r => +(r.spread||0).toFixed(4));
+
     const datasets = metric === 'combined'
       ? [
-          { label: 'MER',       data: merVals, backgroundColor: '#3b82f6cc', borderRadius: 3 },
-          { label: 'Bid/Ask',   data: sprVals, backgroundColor: '#f59e0bcc', borderRadius: 3 },
+          { label:'MER',     data:merVals, backgroundColor:'#3b82f6cc', borderRadius:3 },
+          { label:'Bid/Ask', data:sprVals, backgroundColor:'#f59e0bcc', borderRadius:3 },
         ]
       : metric === 'spread'
-      ? [{ label: 'Bid/Ask Spread', data: sprVals, backgroundColor: '#f59e0bcc', borderRadius: 3 }]
-      : [{ label: 'MER',           data: merVals, backgroundColor: '#3b82f6cc', borderRadius: 3 }];
+      ? [{ label:'Bid/Ask Spread', data:sprVals, backgroundColor:'#f59e0bcc', borderRadius:3 }]
+      : [{ label:'MER',           data:merVals, backgroundColor:'#3b82f6cc', borderRadius:3 }];
 
-    if (window._rankState.chart) window._rankState.chart.destroy();
-    window._rankState.chart = new Chart(document.getElementById('chart-ranking'), {
+    if (window._rs.chart) window._rs.chart.destroy();
+    window._rs.chart = new Chart(document.getElementById('chart-ranking'), {
       type: 'bar',
-      data: { labels, datasets },
+      data: { labels: rows.map(r=>r.code), datasets },
       options: {
         indexAxis: 'y',
         responsive: true, maintainAspectRatio: false,
         plugins: {
-          legend: { display: metric === 'combined', position: 'top', labels: { font: { size: 10 }, boxWidth: 10 } },
+          legend: { display: metric==='combined', position:'top', labels:{font:{size:10},boxWidth:10} },
           tooltip: {
+            mode: 'index', axis: 'y',
             callbacks: {
               label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.x.toFixed(4)}%`,
               footer: ctxArr => {
-                if (metric !== 'combined') return;
-                return `Total: ${ctxArr.reduce((s,c) => s + c.parsed.x, 0).toFixed(4)}%`;
+                if (metric !== 'combined') return null;
+                const total = ctxArr.reduce((s,c) => s + c.parsed.x, 0);
+                return `Total cost: ${total.toFixed(4)}%`;
               },
             },
+            footerFont: { weight:'bold' },
+            footerColor: '#f8fafc',
           },
         },
         scales: {
           x: {
-            stacked: metric === 'combined',
-            ticks: { font: { size: 10 }, callback: v => v.toFixed(2) + '%' },
-            grid: { color: '#1e3860' },
-            title: { display: true, text: metric === 'spread' ? '% per transaction' : '% p.a.', font: { size: 10 }, color: '#7fa3c8' },
+            stacked: metric==='combined',
+            ticks: { font:{size:10}, callback: v => v.toFixed(2)+'%' },
+            grid: { color:'#1e3860' },
+            title: { display:true, text: metric==='spread' ? '% per transaction' : '% p.a.', font:{size:10}, color:'#7fa3c8' },
           },
-          y: { stacked: metric === 'combined', ticks: { font: { size: 11 } }, grid: { display: false } },
+          y: { stacked: metric==='combined', ticks:{font:{size:11}}, grid:{display:false} },
         },
       },
     });
 
-    document.getElementById('tbl-ranking').innerHTML = rows.map((e, i) => {
+    document.getElementById('tbl-ranking').innerHTML = rows.map((e,i) => {
       const totalCell = showTotal
-        ? `<td class="text-right tabular-nums font-semibold" style="">${(e.effective_mer + e.spread).toFixed(4)}%</td>`
+        ? `<td class="text-right tabular-nums font-semibold">${((e.effective_mer||0)+(e.spread||0)).toFixed(4)}%</td>`
         : `<td style="display:none"></td>`;
       return `<tr>
-        <td class="text-slate-500 tabular-nums">${i + 1}</td>
+        <td class="text-slate-500 tabular-nums">${i+1}</td>
         <td><a href="/?code=${e.code}" class="font-bold text-blue-400 hover:underline">${e.code}</a></td>
-        <td class="text-slate-300" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.name}">${e.name}</td>
-        <td class="text-slate-400 text-xs">${e.issuer || '—'}</td>
+        <td class="text-slate-300" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.name}">${e.name}</td>
+        <td class="text-slate-400 text-xs">${e.issuer||'—'}</td>
         <td class="text-right tabular-nums">${mer(e.effective_mer)}</td>
-        <td class="text-right tabular-nums text-amber-400">${e.spread > 0 ? e.spread.toFixed(4) + '%' : '—'}</td>
+        <td class="text-right tabular-nums text-amber-400">${e.spread>0 ? e.spread.toFixed(4)+'%' : '—'}</td>
         ${totalCell}
         <td class="text-right text-slate-500 tabular-nums text-xs">${fmtFum(e.fund_size_aud_millions)}</td>
       </tr>`;
@@ -973,27 +1017,60 @@ async function init() {
   };
 
   window.setMetric = function(m) {
-    window._rankState.metric = m;
+    window._rs.metric = m;
     ['mer','spread','combined'].forEach(x => {
-      const btn = document.getElementById('metric-' + x);
-      btn.classList.toggle('bg-blue-600',    x === m);
-      btn.classList.toggle('text-white',     x === m);
-      btn.classList.toggle('text-slate-400', x !== m);
+      const b = document.getElementById('metric-'+x);
+      b.classList.toggle('bg-blue-600',    x===m);
+      b.classList.toggle('text-white',     x===m);
+      b.classList.toggle('text-slate-400', x!==m);
     });
     window.renderRanking();
   };
 
   window.setRankDir = function(dir) {
-    window._rankState.dir = dir;
+    window._rs.dir = dir;
     ['cheapest','priciest'].forEach(x => {
-      const btn = document.getElementById('rank-' + x);
-      btn.classList.toggle('bg-blue-600',    x === dir);
-      btn.classList.toggle('text-white',     x === dir);
-      btn.classList.toggle('text-slate-400', x !== dir);
+      const b = document.getElementById('rank-'+x);
+      b.classList.toggle('bg-blue-600',    x===dir);
+      b.classList.toggle('text-white',     x===dir);
+      b.classList.toggle('text-slate-400', x!==dir);
     });
     window.renderRanking();
   };
 
+  window.setAC = function(ac) {
+    window._rs.ac = ac;
+    window._rs.issuer = '';
+    document.getElementById('issuer-select').value = '';
+    allAC.forEach(a => {
+      const pill = document.getElementById('ac-pill-'+a.replace(/\s+/g,'_'));
+      if (pill) {
+        pill.classList.toggle('bg-blue-600',    a===ac);
+        pill.classList.toggle('text-white',     a===ac);
+        pill.classList.toggle('border-blue-600',a===ac);
+        pill.classList.toggle('text-slate-400', a!==ac);
+        pill.classList.toggle('border-[#1e3860]',a!==ac);
+      }
+    });
+    // "All" pill
+    const allPill = document.getElementById('ac-pill-');
+    if (allPill) {
+      allPill.classList.toggle('bg-blue-600',     ac==='');
+      allPill.classList.toggle('text-white',      ac==='');
+      allPill.classList.toggle('border-blue-600', ac==='');
+      allPill.classList.toggle('text-slate-400',  ac!=='');
+      allPill.classList.toggle('border-[#1e3860]',ac!=='');
+    }
+    _refreshIssuerDropdown();
+    window.renderRanking();
+  };
+
+  window.setIssuer = function(issuer) {
+    window._rs.issuer = issuer;
+    window.renderRanking();
+  };
+
+  _refreshIssuerDropdown();
   window.renderRanking();
 
   // Issuer comparison table (sorted by FUM-weighted MER)
