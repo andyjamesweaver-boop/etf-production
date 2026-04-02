@@ -1830,15 +1830,35 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
                 f"FROM etfs WHERE {MER} > 0 AND fund_size_aud_millions > 0"
             ).fetchone()[0]
 
+            COLS = (f"code, name, issuer, asset_class, {MER} AS effective_mer, "
+                    f"COALESCE(bid_ask_spread_pct, 0) AS spread, fund_size_aud_millions")
             cheapest = conn.execute(
-                f"SELECT code, name, issuer, asset_class, {MER} AS effective_mer, "
-                f"expense_ratio, management_fee, fund_size_aud_millions "
-                f"FROM etfs WHERE {MER} > 0 ORDER BY effective_mer ASC LIMIT 25"
+                f"SELECT {COLS} FROM etfs WHERE {MER} > 0 "
+                f"ORDER BY effective_mer ASC LIMIT 25"
             ).fetchall()
             priciest = conn.execute(
-                f"SELECT code, name, issuer, asset_class, {MER} AS effective_mer, "
-                f"expense_ratio, management_fee, fund_size_aud_millions "
-                f"FROM etfs WHERE {MER} IS NOT NULL ORDER BY effective_mer DESC LIMIT 25"
+                f"SELECT {COLS} FROM etfs WHERE {MER} IS NOT NULL "
+                f"ORDER BY effective_mer DESC LIMIT 25"
+            ).fetchall()
+            cheapest_spread = conn.execute(
+                f"SELECT {COLS} FROM etfs "
+                f"WHERE {MER} > 0 AND bid_ask_spread_pct > 0 "
+                f"ORDER BY bid_ask_spread_pct ASC LIMIT 25"
+            ).fetchall()
+            priciest_spread = conn.execute(
+                f"SELECT {COLS} FROM etfs "
+                f"WHERE {MER} > 0 AND bid_ask_spread_pct > 0 "
+                f"ORDER BY bid_ask_spread_pct DESC LIMIT 25"
+            ).fetchall()
+            cheapest_combined = conn.execute(
+                f"SELECT {COLS} FROM etfs "
+                f"WHERE {MER} > 0 AND bid_ask_spread_pct > 0 "
+                f"ORDER BY ({MER} + bid_ask_spread_pct) ASC LIMIT 25"
+            ).fetchall()
+            priciest_combined = conn.execute(
+                f"SELECT {COLS} FROM etfs "
+                f"WHERE {MER} > 0 AND bid_ask_spread_pct > 0 "
+                f"ORDER BY ({MER} + bid_ask_spread_pct) DESC LIMIT 25"
             ).fetchall()
 
             by_ac = conn.execute(
@@ -1875,13 +1895,17 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
                 else:          counts['>1.00%']     += 1
 
             self.send_json({
-                'avg_mer':          round(avg, 3) if avg is not None else None,
-                'fum_weighted_mer': round(fum_weighted_row, 3) if fum_weighted_row else None,
-                'cheapest':         [dict(r) for r in cheapest],
-                'most_expensive':   [dict(r) for r in priciest],
-                'by_asset_class':   [dict(r) for r in by_ac],
-                'by_issuer':        [dict(r) for r in by_issuer],
-                'distribution':     [{'bucket': b, 'count': counts[b]} for b in buckets],
+                'avg_mer':            round(avg, 3) if avg is not None else None,
+                'fum_weighted_mer':   round(fum_weighted_row, 3) if fum_weighted_row else None,
+                'cheapest':           [dict(r) for r in cheapest],
+                'most_expensive':     [dict(r) for r in priciest],
+                'cheapest_spread':    [dict(r) for r in cheapest_spread],
+                'priciest_spread':    [dict(r) for r in priciest_spread],
+                'cheapest_combined':  [dict(r) for r in cheapest_combined],
+                'priciest_combined':  [dict(r) for r in priciest_combined],
+                'by_asset_class':     [dict(r) for r in by_ac],
+                'by_issuer':          [dict(r) for r in by_issuer],
+                'distribution':       [{'bucket': b, 'count': counts[b]} for b in buckets],
             })
         except Exception as e:
             self.send_json({'error': str(e)}, 500)

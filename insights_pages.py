@@ -725,20 +725,38 @@ _EXPENSE_BODY = """
     <div id="bars-ac"></div>
   </div>
 </div>
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-  <div class="card">
-    <h2 class="font-semibold text-sm text-slate-300 mb-3">Cheapest ETFs</h2>
-    <div class="overflow-x-auto"><table>
-      <thead><tr><th>#</th><th>Code</th><th>Name</th><th>Issuer</th><th class="text-right">MER</th><th class="text-right">FUM</th></tr></thead>
-      <tbody id="tbl-cheap"></tbody>
-    </table></div>
+<div class="card">
+  <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+    <h2 class="font-semibold text-sm text-slate-300">ETF Cost Ranking — Top 20</h2>
+    <div class="flex flex-wrap gap-2">
+      <div class="flex rounded-lg overflow-hidden border border-[#1e3860] text-xs font-medium">
+        <button id="rank-cheapest" onclick="setRankDir('cheapest')"
+          class="px-3 py-1.5 bg-blue-600 text-white transition-colors">Cheapest</button>
+        <button id="rank-priciest" onclick="setRankDir('priciest')"
+          class="px-3 py-1.5 text-slate-400 hover:text-slate-200 transition-colors">Most Expensive</button>
+      </div>
+      <div class="flex rounded-lg overflow-hidden border border-[#1e3860] text-xs font-medium">
+        <button id="metric-mer" onclick="setMetric('mer')"
+          class="px-3 py-1.5 bg-blue-600 text-white transition-colors">MER</button>
+        <button id="metric-spread" onclick="setMetric('spread')"
+          class="px-3 py-1.5 text-slate-400 hover:text-slate-200 transition-colors">Bid/Ask Spread</button>
+        <button id="metric-combined" onclick="setMetric('combined')"
+          class="px-3 py-1.5 text-slate-400 hover:text-slate-200 transition-colors">MER + Spread</button>
+      </div>
+    </div>
   </div>
-  <div class="card">
-    <h2 class="font-semibold text-sm text-slate-300 mb-3">Most Expensive ETFs</h2>
-    <div class="overflow-x-auto"><table>
-      <thead><tr><th>#</th><th>Code</th><th>Name</th><th>Issuer</th><th class="text-right">MER</th><th class="text-right">FUM</th></tr></thead>
-      <tbody id="tbl-exp"></tbody>
-    </table></div>
+  <p id="rank-note" class="text-xs text-slate-500 mb-3"></p>
+  <div class="relative" style="height:420px"><canvas id="chart-ranking"></canvas></div>
+  <div class="overflow-x-auto mt-4">
+    <table>
+      <thead><tr>
+        <th>#</th><th>Code</th><th>Name</th><th>Issuer</th>
+        <th class="text-right">MER</th><th class="text-right">Bid/Ask</th>
+        <th class="text-right" id="rank-col-hdr">Total</th>
+        <th class="text-right">FUM</th>
+      </tr></thead>
+      <tbody id="tbl-ranking"></tbody>
+    </table>
   </div>
 </div>
 <div class="card">
@@ -869,17 +887,118 @@ async function init() {
       </div>
     </div>`).join('');
 
-  // Cheapest / priciest tables
-  const merRow = (e, i) => `<tr>
-    <td class="text-slate-500 tabular-nums">${i + 1}</td>
-    <td class="font-bold text-green-600">${e.code}</td>
-    <td class="text-slate-300" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.name}">${e.name}</td>
-    <td class="text-slate-400 text-xs">${e.issuer || '—'}</td>
-    <td class="text-right font-semibold tabular-nums">${mer(e.effective_mer)}</td>
-    <td class="text-right text-slate-500 tabular-nums text-xs">${fmtFum(e.fund_size_aud_millions)}</td>
-  </tr>`;
-  document.getElementById('tbl-cheap').innerHTML = d.cheapest.map(merRow).join('');
-  document.getElementById('tbl-exp').innerHTML = d.most_expensive.map(merRow).join('');
+  // ── Interactive cost ranking chart ──────────────────────────────────────
+  let _rankMetric = 'mer';
+  let _rankDir    = 'cheapest';
+  let _rankChart  = null;
+
+  const _rankData = () => ({
+    'mer':      { cheapest: d.cheapest,          priciest: d.most_expensive },
+    'spread':   { cheapest: d.cheapest_spread,   priciest: d.priciest_spread },
+    'combined': { cheapest: d.cheapest_combined, priciest: d.priciest_combined },
+  });
+
+  const _rankNotes = {
+    'mer':      'Ranked by Management Expense Ratio (MER) only.',
+    'spread':   'Ranked by live bid/ask spread. Spread is a per-transaction cost that varies with market liquidity and trading volume.',
+    'combined': 'MER + bid/ask spread stacked. MER is an annual recurring cost; spread is per transaction. Combined gives a rough total-cost-of-ownership picture.',
+  };
+
+  function renderRanking() {
+    const rows = (_rankData()[_rankMetric][_rankDir] || []).slice(0, 20);
+    const labels  = rows.map(r => r.code);
+    const merVals = rows.map(r => r.effective_mer || 0);
+    const sprVals = rows.map(r => r.spread || 0);
+
+    document.getElementById('rank-note').textContent = _rankNotes[_rankMetric];
+    document.getElementById('rank-col-hdr').textContent =
+      _rankMetric === 'mer' ? 'MER' : _rankMetric === 'spread' ? 'Spread' : 'MER + Spread';
+
+    const datasets = _rankMetric === 'combined'
+      ? [
+          { label: 'MER',        data: merVals, backgroundColor: '#3b82f6cc', borderRadius: 3 },
+          { label: 'Bid/Ask',    data: sprVals, backgroundColor: '#f59e0bcc', borderRadius: 3 },
+        ]
+      : _rankMetric === 'spread'
+      ? [{ label: 'Bid/Ask Spread', data: sprVals, backgroundColor: '#f59e0bcc', borderRadius: 3 }]
+      : [{ label: 'MER',           data: merVals, backgroundColor: '#3b82f6cc', borderRadius: 3 }];
+
+    if (_rankChart) _rankChart.destroy();
+    _rankChart = new Chart(document.getElementById('chart-ranking'), {
+      type: 'bar',
+      data: { labels, datasets },
+      options: {
+        indexAxis: 'y',
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: _rankMetric === 'combined', position: 'top', labels: { font: { size: 10 }, boxWidth: 10 } },
+          tooltip: {
+            callbacks: {
+              label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.x.toFixed(4)}%`,
+              footer: ctxArr => {
+                if (_rankMetric !== 'combined') return;
+                const total = ctxArr.reduce((s, c) => s + c.parsed.x, 0);
+                return `Total: ${total.toFixed(4)}%`;
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            stacked: _rankMetric === 'combined',
+            ticks: { font: { size: 10 }, callback: v => v.toFixed(2) + '%' },
+            grid: { color: '#1e3860' },
+            title: { display: true, text: '% p.a. / per transaction', font: { size: 10 }, color: '#7fa3c8' },
+          },
+          y: {
+            stacked: _rankMetric === 'combined',
+            ticks: { font: { size: 11 } },
+            grid: { display: false },
+          },
+        },
+      },
+    });
+
+    document.getElementById('tbl-ranking').innerHTML = rows.map((e, i) => {
+      const total = _rankMetric === 'combined' ? (e.effective_mer + e.spread).toFixed(4) + '%'
+                  : _rankMetric === 'spread'   ? mer(e.spread)
+                  :                              mer(e.effective_mer);
+      return `<tr>
+        <td class="text-slate-500 tabular-nums">${i + 1}</td>
+        <td><a href="/?code=${e.code}" class="font-bold text-blue-400 hover:underline">${e.code}</a></td>
+        <td class="text-slate-300" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.name}">${e.name}</td>
+        <td class="text-slate-400 text-xs">${e.issuer || '—'}</td>
+        <td class="text-right tabular-nums">${mer(e.effective_mer)}</td>
+        <td class="text-right tabular-nums text-amber-400">${e.spread > 0 ? e.spread.toFixed(4) + '%' : '—'}</td>
+        <td class="text-right tabular-nums font-semibold">${total}</td>
+        <td class="text-right text-slate-500 tabular-nums text-xs">${fmtFum(e.fund_size_aud_millions)}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  function setMetric(m) {
+    _rankMetric = m;
+    ['mer','spread','combined'].forEach(x => {
+      const btn = document.getElementById('metric-' + x);
+      btn.classList.toggle('bg-blue-600', x === m);
+      btn.classList.toggle('text-white',  x === m);
+      btn.classList.toggle('text-slate-400', x !== m);
+    });
+    renderRanking();
+  }
+
+  function setRankDir(dir) {
+    _rankDir = dir;
+    ['cheapest','priciest'].forEach(x => {
+      const btn = document.getElementById('rank-' + x);
+      btn.classList.toggle('bg-blue-600', x === dir);
+      btn.classList.toggle('text-white',  x === dir);
+      btn.classList.toggle('text-slate-400', x !== dir);
+    });
+    renderRanking();
+  }
+
+  renderRanking();
 
   // Issuer comparison table (sorted by FUM-weighted MER)
   const issSorted = [...d.by_issuer].sort((a, b) => (a.fum_weighted_mer || 99) - (b.fum_weighted_mer || 99));
