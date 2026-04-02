@@ -857,8 +857,8 @@ async function init() {
     });
   } catch(e) { console.warn('NAV section error:', e); }
 
-  const cheapest = d.cheapest[0];
-  const priciest = d.most_expensive[0];
+  const cheapest = (d.all_etfs || []).slice().sort((a,b) => a.effective_mer - b.effective_mer)[0];
+  const priciest = (d.all_etfs || []).slice().sort((a,b) => b.effective_mer - a.effective_mer)[0];
   document.getElementById('hero').innerHTML = [
     ['Market Simple Avg MER', mer(d.avg_mer), 'equal-weighted average'],
     ['FUM-Weighted Avg MER', mer(d.fum_weighted_mer), 'weighted by fund size'],
