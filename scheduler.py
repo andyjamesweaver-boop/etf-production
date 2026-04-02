@@ -48,6 +48,18 @@ def _run_pcf_job():
         logger.error(f"[scheduler] PCF job failed: {e}", exc_info=True)
 
 
+def _run_nav_job():
+    """Fetch daily NAV + premium/discount from Yahoo Finance after ASX close."""
+    now_sydney = datetime.now(SYDNEY).strftime("%Y-%m-%d %H:%M %Z")
+    logger.info(f"[scheduler] NAV/premium-discount job starting — {now_sydney}")
+    try:
+        from scrapers.nav_fetcher import scrape_nav
+        count = scrape_nav()
+        logger.info(f"[scheduler] NAV job complete — {count} records updated")
+    except Exception as e:
+        logger.error(f"[scheduler] NAV job failed: {e}", exc_info=True)
+
+
 def _run_price_history_job():
     """Update price history from Yahoo Finance (weekly, Sunday evenings)."""
     now_sydney = datetime.now(SYDNEY).strftime("%Y-%m-%d %H:%M %Z")
@@ -77,20 +89,22 @@ def _schedule_loop():
 
     def _register_today():
         schedule.clear("pcf")
+        schedule.clear("nav")
         today = datetime.now(SYDNEY).date()
+        from datetime import timezone as _tz
+
         for hhmm in PCF_SCHEDULE_TIMES:
             h, m = map(int, hhmm.split(":"))
-            # Build a timezone-aware Sydney datetime and convert to local UTC time string
-            from datetime import timezone as _tz
-            sydney_dt = datetime(today.year, today.month, today.day, h, m,
-                                 tzinfo=SYDNEY)
-            utc_dt = sydney_dt.astimezone(_tz.utc)
-            utc_hhmm = utc_dt.strftime("%H:%M")
-            logger.info(
-                f"[scheduler] Registering PCF job at {hhmm} Sydney "
-                f"= {utc_hhmm} UTC (server time)"
-            )
+            sydney_dt = datetime(today.year, today.month, today.day, h, m, tzinfo=SYDNEY)
+            utc_hhmm = sydney_dt.astimezone(_tz.utc).strftime("%H:%M")
+            logger.info(f"[scheduler] Registering PCF job at {hhmm} Sydney = {utc_hhmm} UTC")
             schedule.every().day.at(utc_hhmm, "UTC").do(_run_pcf_job).tag("pcf")
+
+        # NAV / premium-discount: daily at 17:30 Sydney (ASX closes 16:00, NAV published ~17:00)
+        nav_sydney = datetime(today.year, today.month, today.day, 17, 30, tzinfo=SYDNEY)
+        nav_utc = nav_sydney.astimezone(_tz.utc).strftime("%H:%M")
+        logger.info(f"[scheduler] Registering NAV job at 17:30 Sydney = {nav_utc} UTC")
+        schedule.every().day.at(nav_utc, "UTC").do(_run_nav_job).tag("nav")
 
     # Re-register at midnight UTC so any DST shift is absorbed automatically
     _register_today()

@@ -2890,6 +2890,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
       <div class="flex gap-6 border-b border-gray-100 mb-5 text-sm">
         <button class="dtab tab-active" data-tab="overview">Overview</button>
         <button class="dtab" data-tab="performance">Performance</button>
+        <button class="dtab" data-tab="costs">Costs &amp; Efficiency</button>
         <button class="dtab" data-tab="holdings">Holdings</button>
         <button class="dtab" data-tab="sectors">Sectors</button>
         <button class="dtab" data-tab="dividends">Dividends</button>
@@ -3888,6 +3889,130 @@ async function showTab(tab) {
   } else if (tab === 'performance') {
     el.innerHTML = '<div class="flex justify-center py-10"><div class="spinner"></div></div>';
     await renderPerformanceTab(selectedCode);
+
+  } else if (tab === 'costs') {
+    el.innerHTML = '<div class="flex justify-center py-10"><div class="spinner"></div></div>';
+    const [d, nh] = await Promise.all([
+      api('/api/v1/etfs/' + selectedCode),
+      api('/api/v1/etfs/' + selectedCode + '/nav-history?period=1y'),
+    ]);
+    const rows = (nh.nav_history || []).filter(r => r.premium_discount_pct != null);
+    const pds  = rows.map(r => r.premium_discount_pct);
+    const avgPd   = pds.length ? (pds.reduce((a,b)=>a+b,0)/pds.length).toFixed(3) : null;
+    const maxPd   = pds.length ? Math.max(...pds).toFixed(3) : null;
+    const minPd   = pds.length ? Math.min(...pds).toFixed(3) : null;
+    const latestPd = pds.length ? pds[pds.length-1].toFixed(3) : null;
+    const latestDate = rows.length ? rows[rows.length-1].date : null;
+    const pdColor = v => v == null ? '' : parseFloat(v) > 0.1 ? 'color:#22c55e' : parseFloat(v) < -0.1 ? 'color:#ef4444' : '';
+
+    el.innerHTML = `
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+        <div class="rounded-lg bg-[#0d2137] p-3">
+          <div class="text-xs text-gray-400 mb-1">Current P/D</div>
+          <div class="text-lg font-semibold tabular-nums" style="${pdColor(latestPd)}">${latestPd != null ? (parseFloat(latestPd)>0?'+':'')+latestPd+'%' : '—'}</div>
+          <div class="text-xs text-gray-500 mt-0.5">${latestDate || ''}</div>
+        </div>
+        <div class="rounded-lg bg-[#0d2137] p-3">
+          <div class="text-xs text-gray-400 mb-1">1Y Avg P/D</div>
+          <div class="text-lg font-semibold tabular-nums" style="${pdColor(avgPd)}">${avgPd != null ? (parseFloat(avgPd)>0?'+':'')+avgPd+'%' : '—'}</div>
+          <div class="text-xs text-gray-500 mt-0.5">${rows.length} trading days</div>
+        </div>
+        <div class="rounded-lg bg-[#0d2137] p-3">
+          <div class="text-xs text-gray-400 mb-1">Max Premium</div>
+          <div class="text-lg font-semibold tabular-nums" style="color:#22c55e">${maxPd != null ? '+'+maxPd+'%' : '—'}</div>
+        </div>
+        <div class="rounded-lg bg-[#0d2137] p-3">
+          <div class="text-xs text-gray-400 mb-1">Max Discount</div>
+          <div class="text-lg font-semibold tabular-nums" style="color:#ef4444">${minPd != null ? minPd+'%' : '—'}</div>
+        </div>
+      </div>
+
+      ${rows.length ? `
+      <div class="rounded-lg bg-[#0d2137] p-3 mb-4">
+        <div class="text-xs text-gray-400 mb-2">Premium / Discount to NAV — daily (1 year)</div>
+        <div style="position:relative;height:180px"><canvas id="pd-chart"></canvas></div>
+      </div>` : `<p class="text-gray-400 text-sm text-center py-6">No NAV history available for this ETF.</p>`}
+
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div class="rounded-lg bg-[#0d2137] p-3">
+          <div class="text-xs text-gray-400 mb-1">MER</div>
+          <div class="text-lg font-semibold">${d.management_fee != null ? d.management_fee.toFixed(2)+'% p.a.' : d.expense_ratio != null ? d.expense_ratio.toFixed(2)+'% p.a.' : '—'}</div>
+        </div>
+        <div class="rounded-lg bg-[#0d2137] p-3">
+          <div class="text-xs text-gray-400 mb-1">Bid/Ask Spread</div>
+          <div class="text-lg font-semibold">${d.bid_ask_spread_pct != null ? d.bid_ask_spread_pct+'%' : '—'}</div>
+          <div class="text-xs text-gray-500 mt-0.5">Live market spread</div>
+        </div>
+        <div class="rounded-lg bg-[#0d2137] p-3">
+          <div class="text-xs text-gray-400 mb-1">Buy Spread</div>
+          <div class="text-lg font-semibold">${d.buy_spread != null ? d.buy_spread.toFixed(3)+'%' : '—'}</div>
+          <div class="text-xs text-gray-500 mt-0.5">Issuer spread</div>
+        </div>
+        <div class="rounded-lg bg-[#0d2137] p-3">
+          <div class="text-xs text-gray-400 mb-1">Sell Spread</div>
+          <div class="text-lg font-semibold">${d.sell_spread != null ? d.sell_spread.toFixed(3)+'%' : '—'}</div>
+          <div class="text-xs text-gray-500 mt-0.5">Issuer spread</div>
+        </div>
+      </div>
+      <p class="text-xs text-gray-500 mt-3">Premium/discount data sourced from Yahoo Finance NAV feed, updated daily after ASX close (~17:30 AEST).</p>`;
+
+    if (rows.length) {
+      const zero = rows.map(() => 0);
+      new Chart(document.getElementById('pd-chart'), {
+        type: 'line',
+        data: {
+          labels: rows.map(r => r.date),
+          datasets: [
+            {
+              label: 'Premium/Discount %',
+              data: rows.map(r => r.premium_discount_pct),
+              borderColor: rows.map(r => r.premium_discount_pct >= 0 ? '#22c55e' : '#ef4444'),
+              borderWidth: 1.5,
+              pointRadius: 0,
+              fill: false,
+              tension: 0.2,
+              segment: {
+                borderColor: ctx => ctx.p1.parsed.y >= 0 ? '#22c55e99' : '#ef444499',
+                backgroundColor: ctx => ctx.p1.parsed.y >= 0 ? '#22c55e18' : '#ef444418',
+              },
+            },
+            {
+              label: 'Zero',
+              data: zero,
+              borderColor: '#334155',
+              borderWidth: 1,
+              borderDash: [4,3],
+              pointRadius: 0,
+              fill: false,
+            }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => ctx.dataset.label === 'Zero' ? null :
+                  ` ${ctx.parsed.y > 0 ? '+' : ''}${ctx.parsed.y.toFixed(3)}%`,
+              },
+              filter: item => item.dataset.label !== 'Zero',
+            }
+          },
+          scales: {
+            x: {
+              type: 'time', time: { unit: 'month', displayFormats: { month: 'MMM yy' } },
+              ticks: { font: { size: 10 }, maxTicksLimit: 8 },
+              grid: { color: '#1e3860' },
+            },
+            y: {
+              ticks: { font: { size: 10 }, callback: v => (v>0?'+':'')+v.toFixed(2)+'%' },
+              grid: { color: '#1e3860' },
+            }
+          }
+        }
+      });
+    }
 
   } else if (tab === 'holdings') {
     el.innerHTML = '<div class="flex justify-center py-10"><div class="spinner"></div></div>';
