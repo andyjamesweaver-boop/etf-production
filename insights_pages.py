@@ -769,32 +769,61 @@ async function init() {
   // Fetch NAV data for prem/disc section
   try {
     const nav = await api('/api/v1/insights/nav');
-    // cost-hero
-    const avgPd = nav.avg_premium_discount ?? 0;
+    const sm  = nav.summary || {};
+    const avgPd = sm.avg_pd ?? 0;
+    const total = sm.total || 1;
+    const pctAtPremium = ((sm.at_premium || 0) / total * 100);
     const pdCls = avgPd >= 0 ? 'text-green-400' : 'text-red-400';
     document.getElementById('cost-hero').innerHTML = [
-      ['Market Avg MER', (d.avg_mer||0).toFixed(2)+'%', 'simple average'],
-      ['FUM-Wtd MER', (d.fum_weighted_mer||0).toFixed(2)+'%', 'cost per $1 invested'],
-      ['Avg Prem/Disc', (avgPd>=0?'+':'')+avgPd.toFixed(2)+'%', 'vs NAV today'],
-      ['ETFs at Premium', (nav.pct_at_premium||0).toFixed(0)+'%', 'of market by FUM'],
-    ].map(([l,v,s]) => `<div class="card"><div class="sl">${l}</div><div class="sv ${l.includes('Prem') ? pdCls : ''}">${v}</div><div class="ss">${s}</div></div>`).join('');
-    // nav trend chart (line)
-    const navDates = (nav.history||[]).map(r=>r.date);
-    const navVals  = (nav.history||[]).map(r=>r.avg_pd);
+      ['Market Avg MER',  (d.avg_mer||0).toFixed(2)+'%',                           'simple average'],
+      ['FUM-Wtd MER',     (d.fum_weighted_mer||0).toFixed(2)+'%',                  'cost per $1 invested'],
+      ['Avg Prem/Disc',   (avgPd>=0?'+':'')+avgPd.toFixed(2)+'%',                  'vs NAV · ' + nav.snapshot_date],
+      ['ETFs at Premium', pctAtPremium.toFixed(0)+'%',                             sm.at_premium + ' of ' + total + ' ETFs'],
+    ].map(([l,v,s]) => `<div class="card"><div class="sl">${l}</div><div class="sv ${l.includes('Prem/Disc') ? pdCls : ''}">${v}</div><div class="ss">${s}</div></div>`).join('');
+
+    // nav trend chart — market_history has {date, avg_pd, min_pd, max_pd}
+    const hist = nav.market_history || [];
     new Chart(document.getElementById('cost-nav-chart').getContext('2d'), {
       type:'line',
-      data:{labels:navDates,datasets:[{label:'Avg Prem/Disc %',data:navVals,borderColor:'#3b82f6',backgroundColor:'#3b82f620',fill:true,tension:0.3,pointRadius:0,borderWidth:2}]},
-      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.y.toFixed(3)+'%'}}},scales:{x:{ticks:{maxTicksLimit:6,font:{size:10}},grid:{display:false}},y:{ticks:{font:{size:10},callback:v=>v.toFixed(2)+'%'},grid:{color:'#1e3860'}}}},
+      data:{
+        labels: hist.map(r=>r.date),
+        datasets:[
+          {label:'Avg Prem/Disc %', data:hist.map(r=>r.avg_pd), borderColor:'#3b82f6', backgroundColor:'#3b82f620', fill:true, tension:0.3, pointRadius:0, borderWidth:2},
+          {label:'Max',  data:hist.map(r=>r.max_pd), borderColor:'#22c55e44', fill:false, pointRadius:0, borderWidth:1},
+          {label:'Min',  data:hist.map(r=>r.min_pd), borderColor:'#ef444444', fill:false, pointRadius:0, borderWidth:1},
+        ]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${c.parsed.y>0?'+':''}${c.parsed.y.toFixed(3)}%`}}},
+        scales:{
+          x:{type:'time',time:{unit:'month',displayFormats:{month:'MMM yy'}},ticks:{maxTicksLimit:6,font:{size:10}},grid:{display:false}},
+          y:{ticks:{font:{size:10},callback:v=>(v>0?'+':'')+v.toFixed(2)+'%'},grid:{color:'#1e3860'}},
+        }
+      },
     });
-    // distribution chart (bar)
-    const distLabels = (nav.distribution||[]).map(r=>r.bucket);
-    const distData   = (nav.distribution||[]).map(r=>r.count);
+
+    // P/D distribution — bucket snapshot into ranges from the snapshot data
+    const snap = nav.snapshot || [];
+    const buckets = {'< -1%':0, '-1 to -0.5%':0, '-0.5 to -0.1%':0, '-0.1 to 0.1%':0, '0.1 to 0.5%':0, '0.5 to 1%':0, '> 1%':0};
+    snap.forEach(r => {
+      const v = r.premium_discount_pct;
+      if (v == null) return;
+      if (v < -1)          buckets['< -1%']++;
+      else if (v < -0.5)   buckets['-1 to -0.5%']++;
+      else if (v < -0.1)   buckets['-0.5 to -0.1%']++;
+      else if (v <= 0.1)   buckets['-0.1 to 0.1%']++;
+      else if (v <= 0.5)   buckets['0.1 to 0.5%']++;
+      else if (v <= 1)     buckets['0.5 to 1%']++;
+      else                 buckets['> 1%']++;
+    });
+    const bColors = ['#ef4444','#f97316','#fbbf24','#6366f1','#34d399','#22c55e','#16a34a'];
     new Chart(document.getElementById('cost-nav-dist').getContext('2d'), {
       type:'bar',
-      data:{labels:distLabels,datasets:[{label:'ETFs',data:distData,backgroundColor:'#3b82f680',borderRadius:3}]},
-      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:9}}},y:{ticks:{font:{size:10},stepSize:5},grid:{color:'#1e3860'}}}},
+      data:{labels:Object.keys(buckets),datasets:[{label:'ETFs',data:Object.values(buckets),backgroundColor:bColors,borderRadius:3}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.parsed.y} ETFs`}}},scales:{x:{ticks:{font:{size:9}}},y:{ticks:{font:{size:10},stepSize:5},grid:{color:'#1e3860'}}}},
     });
-  } catch(_) {}
+  } catch(e) { console.warn('NAV section error:', e); }
 
   const cheapest = d.cheapest[0];
   const priciest = d.most_expensive[0];
