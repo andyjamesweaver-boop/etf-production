@@ -912,7 +912,7 @@ async function init() {
   document.getElementById('ac-pills').innerHTML =
     ['', ...allAC].map(ac => `<button
       id="ac-pill-${ac.replace(/\s+/g,'_')}"
-      onclick="setAC(${JSON.stringify(ac)})"
+      onclick='setAC(${JSON.stringify(ac)})'
       class="px-2 py-0.5 rounded text-xs border transition-colors ${ac==='' ? 'bg-blue-600 text-white border-blue-600' : 'border-[#1e3860] text-slate-400 hover:text-slate-200'}"
     >${ac || 'All'}</button>`).join('');
 
