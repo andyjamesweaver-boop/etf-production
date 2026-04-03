@@ -8,6 +8,147 @@ ARTICLES = [
     # ── Weekly Wrap ────────────────────────────────────────────────────────────
 
     {
+        "slug": "weekly-wrap-3-april-2026",
+        "title": "Weekly Wrap: Liberation Day Tariffs Rattle Markets, Australia Holds Its Ground",
+        "subtitle": "Trump's sweeping global tariffs announced on 2 April triggered sharp falls in US-facing equity ETFs, while Australian equities, infrastructure, and currency-hedged funds provided relative shelter.",
+        "date": "2026-04-03",
+        "category": "Market Trends",
+        "summary": "The week ending 3 April 2026 was defined by one macro event: the Trump administration's 'Liberation Day' tariff announcement on 2 April, imposing sweeping levies on imports from most trading partners. The S&P 500 and Nasdaq fell sharply in the aftermath. For Australian ETF investors, the divergence between domestic and US-facing portfolios was stark — Australian equities ETFs continued to perform strongly over the month, infrastructure surged to the top of the asset class leaderboard, and currency-hedged international products materially outperformed their unhedged counterparts. Crypto ETFs remained under severe pressure, averaging –23% for the month. Industry inflows remain robust at A$4.6B for the month.",
+        "body": """
+<h2>The Macro Event That Defined the Week</h2>
+<p>On 2 April 2026, the Trump administration announced what it called "Liberation Day" — a sweeping set of tariffs on imports from most of the US's major trading partners, including a 10% baseline tariff and substantially higher rates on goods from China, the European Union, Japan, and South Korea. The announcement was more comprehensive and less conditional than markets had expected, triggering an immediate selloff in US equity futures and risk assets globally.</p>
+<p>For Australian ETF investors, the impact was asymmetric. Products with direct US equity exposure — particularly unhedged S&P 500 and Nasdaq funds — fell sharply. Products with exposure to domestic Australian equities, global infrastructure, and non-US developed markets were broadly resilient. The week underscored a theme that has been building across the first quarter of 2026: the decade-long dominance of US technology stocks in global equity returns is being actively challenged by a combination of stretched valuations, geopolitical disruption, and accelerating flows into ex-US markets.</p>
+
+<h2>Asset Class Scorecard: Infrastructure Takes the Lead</h2>
+<p>Property and infrastructure ETFs were the strongest performing asset class over the month, with an average return of <strong>+4.8%</strong> across 17 products. The standout performers were all infrastructure funds with currency-hedged international exposure — a combination that benefited doubly from solid underlying assets and AUD appreciation. Lazard Global Listed Infrastructure (GIFL, +8.5%), ClearBridge Global Infrastructure Value Hedged (CIVH, +9.0%), Magellan Infrastructure Hedged (MICH, +9.0%), and iShares Global Infrastructure Hedged (GLIN, +7.8%) all delivered exceptional returns in the month. The infrastructure category has become an attractive destination for investors seeking real-asset exposure with yield, predictable cash flows, and lower sensitivity to US technology sector risk.</p>
+<p>Australian equities averaged <strong>+1.75%</strong> for the month, though the distribution was wide — domestic financials and banks were among the best performers across the entire market, while growth and small-cap names lagged. Fixed income averaged <strong>+0.83%</strong>, providing the stable portfolio anchor that volatile equity conditions demand. International equities averaged just <strong>+0.30%</strong>, but this aggregate hides enormous dispersion between US-facing and ex-US products.</p>
+<p>Digital assets remained the worst-performing category by a wide margin, averaging <strong>–23.2%</strong> for the month — more than 28 percentage points below the next-worst class. Commodities also fell, averaging –2.9%, with unhedged gold products giving back some of their extraordinary twelve-month gains.</p>
+
+<div class="chart-box">
+  <h3>Average 1-Month Return by Asset Class — Month to 3 April 2026</h3>
+  <div style="position:relative;height:260px"><canvas id="chart-ac-1m"></canvas></div>
+</div>
+<script>
+(function() {
+  const labels = ['Property','Aust Equities','Fixed Income','Cash','Intl Equities','Thematic','Commodities','Alternatives','Digital Assets'];
+  const data   = [4.83, 1.75, 0.83, 0.29, 0.30, -2.62, -2.91, -7.27, -23.16];
+  const colors = data.map(v => v >= 0 ? '#4ade8080' : '#f8717180');
+  const borders = data.map(v => v >= 0 ? '#4ade80' : '#f87171');
+  new Chart(document.getElementById('chart-ac-1m'), {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Avg 1M Return %', data, backgroundColor: colors, borderColor: borders, borderWidth: 1, borderRadius: 3, borderSkipped: false }] },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.x.toFixed(1) + '%' } } },
+      scales: {
+        x: { ticks: { font: { size: 10 }, callback: v => v + '%' }, grid: { color: '#1e3860' } },
+        y: { ticks: { font: { size: 10 } }, grid: { display: false } }
+      }
+    }
+  });
+})();
+</script>
+
+<h2>The US/Ex-US Divide: Currency Hedging Pays Off</h2>
+<p>The month's most instructive comparison is between Vanguard MSCI Index International Shares (VGS) — the market's largest international equities ETF at A$14.0B — and its AUD-hedged sibling Vanguard MSCI Index International Shares Hedged (VGAD, A$6.1B). VGS returned <strong>–1.1%</strong> for the month; VGAD returned <strong>+1.1%</strong>. The 2.2 percentage-point gap reflects AUD appreciation against the US dollar over the period — when the AUD rises, unhedged international exposure loses value in Australian dollar terms even if the underlying securities hold steady.</p>
+<p>The pattern is consistent across other hedged pairs. VEU (Vanguard All-World ex-US, unhedged) returned <strong>+2.9%</strong>, significantly outperforming US-centric products and confirming that ex-US developed markets have been the stronger venue over the month. IVV (iShares S&P 500, A$12.3B) returned <strong>–2.2%</strong>. NDQ (BetaShares Nasdaq 100, A$7.1B) returned <strong>–4.0%</strong> — its weakest monthly result in over a year, reflecting the technology sector's elevated sensitivity to tariff-driven earnings uncertainty and valuation compression.</p>
+<p>The relative outperformance of ex-US markets is a structural shift worth watching. For most of the past decade, US equity concentration in global indices made geographic diversification feel like a drag. In 2026, that calculus appears to be reversing: European defence spending, Asian semiconductor cycles, and a less US-centric global supply chain are all contributing to a broadening of equity market leadership.</p>
+
+<div class="chart-box">
+  <h3>US vs Ex-US: Key Benchmark Comparisons — Month to 3 April 2026</h3>
+  <div style="position:relative;height:220px"><canvas id="chart-us-exus"></canvas></div>
+</div>
+<script>
+(function() {
+  const labels = ['VEU\n(All-World ex-US)','VGAD\n(Intl Hedged)','VGS\n(Intl Unhedged)','IVV\n(S&P 500)','NDQ\n(Nasdaq 100)'];
+  const data   = [2.9, 1.1, -1.1, -2.2, -4.0];
+  const colors = data.map(v => v >= 0 ? '#4ade8080' : '#f8717180');
+  const borders = data.map(v => v >= 0 ? '#4ade80' : '#f87171');
+  new Chart(document.getElementById('chart-us-exus'), {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Return %', data, backgroundColor: colors, borderColor: borders, borderWidth: 1, borderRadius: 3, borderSkipped: false }] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.y.toFixed(1) + '%' } } },
+      scales: {
+        x: { ticks: { font: { size: 10 } }, grid: { display: false } },
+        y: { ticks: { font: { size: 10 }, callback: v => v + '%' }, grid: { color: '#1e3860' } }
+      }
+    }
+  });
+})();
+</script>
+
+<h2>Best Performers: Gold Miners, Korea, Banks</h2>
+<p>BetaShares Global Gold Miners Currency Hedged (MNRS) was the best-performing ETF across the market with a <strong>+21.0%</strong> return for the month — extending a run of exceptional performance that has now produced a <strong>+188%</strong> twelve-month return, the highest of any ETF in the Australian market. The currency hedge is doing material work: gold is priced in US dollars, and as the AUD has risen, hedged gold products have delivered meaningfully more than their unhedged counterparts.</p>
+<p>iShares MSCI South Korea (IKO) had its strongest month in recent history, gaining <strong>+18.5%</strong>, driven by semiconductor demand upgrades and improved domestic economic sentiment. However, this performance is notable in both directions: IKO also saw <strong>–A$37M in outflows</strong> for the month, suggesting investors were selling into the strength rather than adding exposure. The tariff announcement is a direct headwind for South Korea, given its export-oriented technology sector's dependence on US market access.</p>
+<p>Australian banks and financials were the standout domestic story. VanEck Australian Banks ETF (MVB) gained <strong>+10.5%</strong>, BetaShares Australian Financials Sector (QFN) gained <strong>+9.4%</strong>, and Vanguard Australian Shares High Yield (VHY, which has significant bank weighting) gained <strong>+7.2%</strong>. The broader S&amp;P/ASX 200 funds — VAS (+3.8%), A200 (+4.2%), IOZ (+4.1%), STW (+4.1%) — all had solid months. Australia's equity market, with its lower technology weight and higher financials, energy, and resources exposure, has been a relative beneficiary of the US-oriented market disruption.</p>
+
+<div class="chart-box">
+  <h3>Top Performers — Month to 3 April 2026</h3>
+  <div style="position:relative;height:220px"><canvas id="chart-top-1m"></canvas></div>
+</div>
+<script>
+(function() {
+  const labels = ['MNRS','IKO','XMET','ROYL','HJPN','MVB','QFN','FUEL','VHY','QOZ'];
+  const data   = [21.0, 18.5, 13.3, 11.9, 11.3, 10.5, 9.4, 9.3, 7.2, 6.0];
+  new Chart(document.getElementById('chart-top-1m'), {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Return %', data, backgroundColor: '#4ade8066', borderColor: '#4ade80', borderWidth: 1, borderRadius: 3, borderSkipped: false }] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => '+' + c.parsed.y.toFixed(1) + '%' } } },
+      scales: {
+        x: { ticks: { font: { size: 10 } }, grid: { display: false } },
+        y: { ticks: { font: { size: 10 }, callback: v => v + '%' }, grid: { color: '#1e3860' } }
+      }
+    }
+  });
+})();
+</script>
+
+<h2>Worst Performers: Crypto's Extended Rout</h2>
+<p>Cryptocurrency ETFs continued to be the market's largest source of drawdown. BetaShares Ethereum (QETH) fell <strong>–29.3%</strong> for the month, with Monochrome Ethereum (IETH, –27.3%) and Global X 21Shares Ethereum (EETH, –26.8%) close behind. Bitcoin ETFs were only modestly less severe: DigitalX Bitcoin (BTXX, –20.6%), VanEck Bitcoin (VBTC, –19.7%), BetaShares Bitcoin (QBTC, –23.1%), and iShares Bitcoin (IBIT, –19.4%) all suffered substantial losses. Across the digital assets category, the average one-month return was <strong>–23.2%</strong> and the average one-year return has deteriorated to <strong>–24.0%</strong> — one of the rare instances where the asset class has produced negative returns over a twelve-month horizon.</p>
+<p>Silver also reversed sharply. Global X Physical Silver (ETPMAG) fell <strong>–21.0%</strong> for the month — a significant giveback after a +149% twelve-month return. Silver's dual character as both an industrial metal (sensitive to tariff-driven demand destruction) and a monetary asset (sensitive to risk sentiment) makes it particularly vulnerable to exactly the macro environment created by Liberation Day: simultaneous fears of slowing global trade and elevated financial market volatility.</p>
+
+<h2>Fund Flows: A$4.6 Billion Inflows Despite Volatility</h2>
+<p>Despite the volatile backdrop, total industry inflows for the month reached <strong>A$4.6 billion</strong> — a robust result that suggests systematic investors are maintaining their accumulation strategies regardless of short-term market noise. The flow data tells a story of disciplined diversification: money is going into broad-based, low-cost passive vehicles across multiple asset classes, not just chasing recent winners.</p>
+<p>VGS attracted the largest single inflow at <strong>+A$503M</strong>, despite delivering a –1.1% return for the month. This counterintuitive pattern — investors buying more of a product that is falling — is consistent with systematic investors using monthly or weekly contributions that don't pause for short-term volatility. It also reflects rebalancing: as Australian equities outperformed, investors tilted back toward international exposure. Australian equity core products also saw strong flows: IOZ (+A$236M), VAS (+A$210M), and A200 (+A$208M). VHY attracted +A$119M, consistent with investors favouring yield-oriented domestic exposure. BetaShares ASX Technology (ATEC) saw <strong>+A$117M</strong> in inflows — the largest thematic inflow of the month.</p>
+<p>Fixed income flows were broad and healthy: BetaShares Australian Investment Grade Credit (CRED) attracted +A$106M and VanEck Cash Plus (MONY) +A$100M. The MONY result is particularly notable — the active cash management product launched in February and has now accumulated over A$100M in total assets within its first two months, suggesting genuine demand for yield enhancement above the RBA cash rate without meaningfully increasing credit risk.</p>
+<p>The largest outflow story remains <strong>Magellan Global Fund Open Class (MGOC)</strong>, which shed <strong>–A$209M</strong> for the month. MGOC's twelve-month return of <strong>–5.5%</strong> compares catastrophically against a peer group averaging +14.9%. At A$5.1B, the fund still commands significant assets, but the redemption pace has been sustained and accelerating. Alphinity Global Equity Fund (XALG, –A$45M) and BetaShares Financials Sector (QFN, –A$38M) also saw notable outflows, with the QFN result surprising given its strong +9.4% return — potentially investors locking in profits ahead of expected volatility.</p>
+
+<div class="chart-box">
+  <h3>Largest Fund Inflows — Month to 3 April 2026 (A$M)</h3>
+  <div style="position:relative;height:220px"><canvas id="chart-flows"></canvas></div>
+</div>
+<script>
+(function() {
+  const labels = ['VGS','IOZ','VAS','A200','QUAL','VHY','ATEC','VEU','CRED','MONY'];
+  const data   = [503, 236, 210, 208, 168, 119, 117, 109, 106, 100];
+  new Chart(document.getElementById('chart-flows'), {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'A$M', data, backgroundColor: '#3b82f666', borderColor: '#3b82f6', borderWidth: 1, borderRadius: 3, borderSkipped: false }] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => '+A$' + c.parsed.y + 'M' } } },
+      scales: {
+        x: { ticks: { font: { size: 10 } }, grid: { display: false } },
+        y: { ticks: { font: { size: 10 }, callback: v => 'A$' + v + 'M' }, grid: { color: '#1e3860' } }
+      }
+    }
+  });
+})();
+</script>
+
+<h2>The Twelve-Month View: Gold, Infrastructure, Domestic Equity</h2>
+<p>Stepping back from the week's noise, the twelve-month performance tables continue to be dominated by real assets. Physical gold ETFs (GOLD, QAU, GXLD, GLDN) have all returned approximately <strong>+58%</strong> over the year in unhedged AUD terms. Gold miners have done far better: MNRS (+188%), GDX (+156%). Copper infrastructure (WIRE, +121%) and silver (ETPMAG, +149%) extended the commodity supercycle theme. Infrastructure and property delivered strong returns as well: Lazard GIFL (+32.3%), VanEck Real Assets (MARB), and Magellan Infrastructure Hedged (MICH, +25.9%) all sit well above equity benchmarks.</p>
+<p>On the equity side, the ASX200 funds returned approximately <strong>+16%</strong> over twelve months, modestly ahead of VGS (+7.1%) and IVV (+3.5%) — marking a rare period of sustained domestic outperformance relative to the US. Emerging markets and ex-US developed markets have also rebounded meaningfully. VEU (all-world ex-US) is up +21.9% over the year, VGE (emerging markets) up +15.9%, and VGAD +19.9% — all materially ahead of S&P 500 returns in AUD terms.</p>
+
+<h2>What to Watch Next Week</h2>
+<p>The immediate question is whether the tariff announcement represents a peak in policy uncertainty or the beginning of a protracted negotiation and escalation cycle. If trading partners retaliate — which several have indicated they will — the market impact on US equities could deepen. Products to watch in that scenario: BBUS (BetaShares US Equities Strong Bear), BBOZ (Australian Bear), and SNAS (inverse Nasdaq) as hedging instruments, alongside safe-haven fixed income products like government bond ETFs.</p>
+<p>For currency-conscious investors, the AUD/USD relationship matters significantly. If the AUD continues to appreciate (reflecting relative confidence in Australia's commodity-exporting economy versus a tariff-impacted US), the gap between hedged and unhedged international products will continue to widen. VGAD versus VGS is the simplest expression of that view in the ETF market.</p>
+<p>The infrastructure and property sector's outperformance deserves attention as a potential regime change rather than a temporary rotation. With global fiscal spending accelerating (defence, energy transition, infrastructure), and rate expectations moderating, the asset class is structurally positioned for continued demand. GIFL, GLIN, CIVH, and MICH are the four largest products in this space and collectively hold over A$8B in assets.</p>
+<p>Finally, the RBA's next meeting will be watched for any signal that the tariff-driven global slowdown influences domestic monetary policy. If the bank becomes more dovish in response to global headwinds, fixed income ETFs — particularly duration products like VAF, IAF, and VGB — would be the primary beneficiaries. The carry in Australian investment-grade credit (CRED, approximately 5% p.a.) remains attractive relative to equity volatility at current spread levels.</p>
+""",
+    },
+
+    {
         "slug": "weekly-wrap-27-march-2026",
         "title": "Weekly Wrap: Financials Lead, Crypto Sold Off, Gold Still Dominant",
         "subtitle": "Australian and international equities held their ground in the month to 27 March while digital assets collapsed 19–27% and gold-linked ETFs extended a remarkable twelve-month run.",
