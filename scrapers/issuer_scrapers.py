@@ -719,8 +719,15 @@ def scrape_vaneck(db_path=None) -> int:
                 'multi-asset': 'Diversified',
                 'australian-equities': 'Australian Equities',
                 'australian': 'Australian Equities',
+                'crypto': 'Digital Assets',
+                'digital-assets': 'Digital Assets',
+                'cryptocurrency': 'Digital Assets',
             }
             asset_class = cat_map.get(category_segment)
+            # Override: if the name contains bitcoin/ethereum/crypto keywords,
+            # always classify as Digital Assets regardless of URL segment
+            if name and any(kw in name.lower() for kw in ('bitcoin', 'ethereum', 'crypto', 'digital asset')):
+                asset_class = 'Digital Assets'
 
         snapshot_url = f"https://www.vaneck.com.au{href}"
         seen[code] = snapshot_url
