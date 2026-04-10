@@ -1249,7 +1249,7 @@ const ISSUER_PROFILES = {
   },
   'SPDR': {
     desc: "SPDR (State Street Global Advisors) created the world's first ETF — the S&P 500 SPDR (SPY) in 1993. STW was Australia's first ASX-listed ETF (2001). The Australian range is deliberately compact, focused on flagship index exposures for institutional and wholesale use.",
-    known: 'Australia\'s first ETF (STW) · Institutional-grade · ASX 200 · Global property',
+    known: "Australia's first ETF (STW) · Institutional-grade · ASX 200 · Global property",
   },
   'Magellan': {
     desc: "Australian active fund manager founded in 2006. Magellan built one of Australia's largest active equity franchises before a period of significant underperformance and management changes from 2021. Now managing a smaller, restructured range of global equity and infrastructure products.",
