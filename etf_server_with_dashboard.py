@@ -2506,7 +2506,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
 <main class="max-w-[1400px] mx-auto px-5 py-5">
 
   <!-- ── Stat cards ── -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 mb-5">
 
     <!-- Tile 1: Market Size -->
     <div class="stat-card bg-white rounded-xl border border-slate-200 p-5 cursor-pointer shadow-sm" onclick="goCard('fum')">
@@ -2529,11 +2529,25 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
       <p id="c-count" class="text-2xl font-bold text-slate-900 mt-1 leading-tight">—</p>
       <hr class="border-slate-100 my-2">
       <div class="flex items-center justify-between text-xs text-slate-500">
-        <span id="c-upcoming-count">—</span>
-        <span>coming soon</span>
+        <span>Exchange split</span>
       </div>
       <div class="flex items-center justify-between text-xs mt-2 text-slate-400">
         <span id="c-exchange-split">—</span>
+        <span>›</span>
+      </div>
+    </div>
+
+    <!-- Tile 6: Upcoming -->
+    <div class="stat-card bg-white rounded-xl border border-slate-200 p-5 cursor-pointer shadow-sm" onclick="window.location.href='/insights/upcoming'">
+      <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">UPCOMING</p>
+      <p id="c-upcoming-count" class="text-2xl font-bold text-slate-900 mt-1 leading-tight">—</p>
+      <hr class="border-slate-100 my-2">
+      <div class="flex items-center justify-between text-xs text-slate-500">
+        <span>Next:</span>
+        <span id="c-upcoming-next" class="font-medium truncate ml-1 text-right" style="max-width:120px">—</span>
+      </div>
+      <div class="flex items-center justify-between text-xs mt-2 text-slate-400">
+        <span>ETFs pending listing</span>
         <span>›</span>
       </div>
     </div>
@@ -3439,7 +3453,12 @@ async function loadOverview() {
   try {
     const up = await api('/api/v1/insights/upcoming');
     const n = (up.stats || {}).upcoming_count || 0;
-    document.getElementById('c-upcoming-count').textContent = n > 0 ? n : '—';
+    document.getElementById('c-upcoming-count').textContent = n > 0 ? n : '0';
+    const next = (up.upcoming || [])[0];
+    if (next) {
+      const label = next.code ? next.code : (next.name || '').split(' ').slice(0,3).join(' ');
+      document.getElementById('c-upcoming-next').textContent = label || '—';
+    }
   } catch (_) {}
   const now = new Date().toLocaleTimeString();
   document.getElementById('subtitle').textContent =
@@ -3461,7 +3480,7 @@ function goCard(type) {
     case 'return':   window.location.href = '/insights/returns';   break;
     case 'top':      window.location.href = '/insights/returns';   break;
     case 'nav':      window.location.href = '/insights/expense';   break;
-    case 'upcoming': window.location.href = '/insights/listings';  break;
+    case 'upcoming': window.location.href = '/insights/upcoming';  break;
   }
 }
 
