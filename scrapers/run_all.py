@@ -70,6 +70,54 @@ def run_master():
     return build_master_list(DB_PATH)
 
 
+def run_prices_and_fum():
+    """
+    Twice-daily price refresh pipeline:
+      1. Fetch live prices + market-cap FUM from ASX API for all ETFs.
+      2. Recalculate fund_size_aud_millions = units_on_issue * current_price / 1e6
+         for any ETF where the ASX API did not return a market cap (newly listed,
+         Cboe-only, or API gap).
+      3. Rebuild FUM ranks and issuer totals via build_master_list.
+
+    Run at 10:30 and 16:20 Sydney time to capture the open and post-close snapshot.
+    """
+    logger = logging.getLogger('run_prices_and_fum')
+
+    from scrapers.asx_etf_scraper import scrape_asx_prices
+    from scrapers.master_list import build_master_list
+    from scrapers.db_writer import get_connection
+
+    # Step 1 — fetch live prices (also writes fund_size_aud_millions from marketCap)
+    updated = scrape_asx_prices(DB_PATH)
+    logger.info(f"Price scrape: {updated} ETFs updated")
+
+    # Step 2 — backfill FUM for ETFs the ASX API didn't return a market cap for,
+    # using the most recent known units_on_issue * fresh current_price
+    conn = get_connection(DB_PATH)
+    result = conn.execute('''
+        UPDATE etfs
+        SET fund_size_aud_millions = ROUND(units_on_issue * current_price / 1000000.0, 2),
+            last_updated = STRFTIME('%Y-%m-%dT%H:%M:%fZ', 'now')
+        WHERE units_on_issue IS NOT NULL
+          AND current_price IS NOT NULL
+          AND current_price > 0
+          AND (
+              fund_size_aud_millions IS NULL
+              OR ABS(fund_size_aud_millions - ROUND(units_on_issue * current_price / 1000000.0, 2))
+                 / fund_size_aud_millions > 0.10
+          )
+    ''')
+    backfilled = result.rowcount
+    conn.commit()
+    conn.close()
+    logger.info(f"FUM backfill: {backfilled} ETFs recalculated from units × price")
+
+    # Step 3 — rebuild ranks and issuer totals
+    build_master_list(DB_PATH)
+
+    return updated
+
+
 def run_documents():
     from scrapers.document_scraper import scrape_documents
     return scrape_documents(DB_PATH)
@@ -115,6 +163,7 @@ SOURCES = {
     'pcf': ('PCF / Holdings Refresh', run_pcf),
     'upcoming': ('Upcoming ETF Listings', run_upcoming),
     'cboe_quarterly': ('CBOE Quarterly Portfolio Disclosures', run_cboe_quarterly),
+    'prices': ('Daily Price + FUM Refresh', run_prices_and_fum),
 }
 
 

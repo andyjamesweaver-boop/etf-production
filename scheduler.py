@@ -1,9 +1,15 @@
 """
 Background scheduler for the ETF platform.
 
-Runs the PCF / holdings refresh twice daily at Sydney local time:
-  - 12:00 noon  (Australia/Sydney)
-  -  8:00 PM    (Australia/Sydney)
+Daily jobs (Sydney local time):
+  - 10:30 AM  — live price + FUM refresh (ASX open, mid-morning)
+  -  4:20 PM  — live price + FUM refresh (post-ASX close snapshot)
+  - 12:00 PM  — PCF / holdings refresh
+  -  8:00 PM  — PCF / holdings refresh
+  -  5:30 PM  — NAV & premium/discount (after NAV publication ~17:00)
+
+Weekly:
+  - Sunday 18:00 — price history backfill (Yahoo Finance)
 
 Start from the server with:
     from scheduler import start_scheduler
@@ -34,6 +40,22 @@ SYDNEY = ZoneInfo("Australia/Sydney")
 
 # Times to run the PCF scraper each day (Sydney local time, 24-hour)
 PCF_SCHEDULE_TIMES = ["12:00", "20:00"]
+
+# Times to run the live price + FUM refresh (Sydney local time, 24-hour)
+# 10:30 = mid-morning after ASX open; 16:20 = just after ASX close (16:00)
+PRICE_SCHEDULE_TIMES = ["10:30", "16:20"]
+
+
+def _run_prices_job():
+    """Fetch live ASX prices, recalculate FUM from units × price, rebuild ranks."""
+    now_sydney = datetime.now(SYDNEY).strftime("%Y-%m-%d %H:%M %Z")
+    logger.info(f"[scheduler] Price+FUM job starting — Sydney time {now_sydney}")
+    try:
+        from scrapers.run_all import run_prices_and_fum
+        count = run_prices_and_fum()
+        logger.info(f"[scheduler] Price+FUM job complete — {count} ETFs updated")
+    except Exception as e:
+        logger.error(f"[scheduler] Price+FUM job failed: {e}", exc_info=True)
 
 
 def _run_pcf_job():
@@ -85,14 +107,24 @@ def _schedule_loop():
     pending-check loop.  Re-registers jobs daily so that DST changes
     (AEST ↔ AEDT) are picked up automatically on the next midnight cycle.
     """
-    logger.info(f"[scheduler] Starting — PCF runs scheduled at {PCF_SCHEDULE_TIMES} Sydney time")
+    logger.info(f"[scheduler] Starting — prices at {PRICE_SCHEDULE_TIMES} Sydney, PCF at {PCF_SCHEDULE_TIMES} Sydney")
 
     def _register_today():
+        schedule.clear("prices")
         schedule.clear("pcf")
         schedule.clear("nav")
         today = datetime.now(SYDNEY).date()
         from datetime import timezone as _tz
 
+        # Live price + FUM refresh: 10:30 and 16:20 Sydney
+        for hhmm in PRICE_SCHEDULE_TIMES:
+            h, m = map(int, hhmm.split(":"))
+            sydney_dt = datetime(today.year, today.month, today.day, h, m, tzinfo=SYDNEY)
+            utc_hhmm = sydney_dt.astimezone(_tz.utc).strftime("%H:%M")
+            logger.info(f"[scheduler] Registering price+FUM job at {hhmm} Sydney = {utc_hhmm} UTC")
+            schedule.every().day.at(utc_hhmm, "UTC").do(_run_prices_job).tag("prices")
+
+        # PCF / holdings refresh: 12:00 and 20:00 Sydney
         for hhmm in PCF_SCHEDULE_TIMES:
             h, m = map(int, hhmm.split(":"))
             sydney_dt = datetime(today.year, today.month, today.day, h, m, tzinfo=SYDNEY)
