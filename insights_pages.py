@@ -1184,16 +1184,14 @@ PAGE_EXPENSE = _page(
 # ---------------------------------------------------------------------------
 _ISSUERS_BODY = """
 <div id="hero" class="grid grid-cols-2 sm:grid-cols-4 gap-4"></div>
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-  <div class="card">
-    <h2 class="font-semibold text-sm text-slate-300 mb-4">Market Share by FUM</h2>
-    <div class="relative" style="height:280px"><canvas id="chart-share"></canvas></div>
-  </div>
-  <div class="card">
-    <h2 class="font-semibold text-sm text-slate-300 mb-4">ETF Count by Issuer</h2>
-    <div id="bars-count"></div>
-  </div>
+
+<!-- Issuer profiles -->
+<div>
+  <h2 class="font-semibold text-sm text-slate-300 mb-3">Who Are the Issuers?</h2>
+  <div id="profiles" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
 </div>
+
+<!-- Comparison table (moved up) -->
 <div class="card overflow-x-auto">
   <h2 class="font-semibold text-sm text-slate-300 mb-3">Issuer Comparison</h2>
   <table>
@@ -1205,6 +1203,18 @@ _ISSUERS_BODY = """
     <tbody id="tbl-issuers"></tbody>
   </table>
 </div>
+
+<!-- Charts -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+  <div class="card">
+    <h2 class="font-semibold text-sm text-slate-300 mb-4">Market Share by FUM</h2>
+    <div class="relative" style="height:280px"><canvas id="chart-share"></canvas></div>
+  </div>
+  <div class="card">
+    <h2 class="font-semibold text-sm text-slate-300 mb-4">ETF Count by Issuer</h2>
+    <div id="bars-count"></div>
+  </div>
+</div>
 <div class="card">
   <h2 class="font-semibold text-sm text-slate-300 mb-4">Asset Class Mix — by Issuer</h2>
   <div id="mix-chart" class="space-y-3"></div>
@@ -1212,6 +1222,53 @@ _ISSUERS_BODY = """
 """
 
 _ISSUERS_JS = """
+const ISSUER_PROFILES = {
+  'Vanguard': {
+    desc: "The world's second-largest asset manager, founded by index investing pioneer John Bogle. Vanguard's mutual ownership structure means profits flow back to fund investors as lower fees. In Australia since 1996, they dominate by FUM with a focused range of ultra-low-cost broad-market ETFs.",
+    known: 'Ultra-low fees · Broad index funds · Long-term passive investing',
+  },
+  'BetaShares': {
+    desc: "Australia's most prolific ETF issuer by product count, and the first Australian-founded ETF manager (est. 2010). Known for innovation — from currency ETFs and inverse products to the dominant Nasdaq ETF and Australia's largest cash ETF. Now part of the Global Indemnity Group.",
+    known: 'Broadest range · Income & smart beta · Leveraged/inverse · AAA cash ETF',
+  },
+  'iShares': {
+    desc: "iShares is BlackRock's ETF brand — BlackRock being the world's largest asset manager with over US$10 trillion AUM. iShares products are institutional in origin and carry deep liquidity. IVV (S&P 500) is Australia's second-largest ETF by FUM.",
+    known: 'Institutional liquidity · S&P 500 (IVV) · ASX 200 (IOZ) · Global breadth',
+  },
+  'VanEck': {
+    desc: "Dutch-origin specialist ETF manager with a strong emphasis on factor investing, fixed income, and sector strategies. Known for QUAL (quality factor) — one of Australia's largest single ETFs — and a comprehensive range of subordinated debt and hybrid credit products.",
+    known: 'Quality factor (QUAL) · Fixed income depth · Smart beta · Sector ETFs',
+  },
+  'DFA': {
+    desc: "Dimensional Fund Advisors applies academic research (Fama-French factor model) to build systematic, evidence-based equity portfolios. Only six ETFs in Australia but over A$18B in FUM — reflecting the loyalty of fee-based financial advisers who favour Dimensional's approach.",
+    known: 'Evidence-based factor investing · Adviser-distributed · High FUM per product',
+  },
+  'Global X': {
+    desc: "Part of Mirae Asset Global Investments. Global X pioneered thematic ETFs in Australia and manages Australia's largest physical gold ETF (GOLD, A$6.3B). Their range spans precious metals, energy transition, technology themes, and income-oriented covered-call strategies.",
+    known: 'Physical gold (GOLD) · Thematic ETFs · Covered call income · Crypto',
+  },
+  'SPDR': {
+    desc: "SPDR (State Street Global Advisors) created the world's first ETF — the S&P 500 SPDR (SPY) in 1993. STW was Australia's first ASX-listed ETF (2001). The Australian range is deliberately compact, focused on flagship index exposures for institutional and wholesale use.",
+    known: 'Australia\'s first ETF (STW) · Institutional-grade · ASX 200 · Global property',
+  },
+  'Magellan': {
+    desc: "Australian active fund manager founded in 2006. Magellan built one of Australia's largest active equity franchises before a period of significant underperformance and management changes from 2021. Now managing a smaller, restructured range of global equity and infrastructure products.",
+    known: 'Active global equities · Infrastructure · Airlie Australian shares (AASF)',
+  },
+  'Macquarie': {
+    desc: "Macquarie Asset Management offers a range of active and multi-asset ETFs, including the popular Walter Scott Global Equity Active ETF (MQWS). Best known in ETF markets for active management with institutional-grade risk processes.",
+    known: 'Active management · Walter Scott Global Equity (MQWS) · Multi-asset',
+  },
+  'Franklin Templeton': {
+    desc: "US-headquartered global asset manager (est. 1947) with a broad ETF range covering fixed income, equities, and multi-asset strategies. Franklin Templeton entered the Australian ETF market to distribute established active strategies in an ETF wrapper.",
+    known: 'Active fixed income · Global equities · Multi-asset strategies',
+  },
+  'Russell Investments': {
+    desc: "Global investment manager known for multi-asset and diversified portfolio solutions. The Australian ETF range centres on diversified balanced funds and sector-specific exposures, popular with advisers building model portfolios.",
+    known: 'Diversified portfolios · Model portfolio building blocks · Balanced funds',
+  },
+};
+
 async function init() {
   const d = await api('/api/v1/insights/issuers');
   document.getElementById('ts').textContent = new Date().toLocaleTimeString('en-AU');
@@ -1222,34 +1279,46 @@ async function init() {
 
   document.getElementById('hero').innerHTML = [
     ['Total Issuers', d.issuers.length, 'active fund managers'],
-    ['Largest Issuer', top?.issuer || '—', fmtFum(top?.total_fum)],
+    ['Largest Issuer', issLink(top?.issuer) || '—', fmtFum(top?.total_fum)],
     ['Top 3 Market Share', d.issuers.slice(0, 3).reduce((s, r) => s + (r.market_share_pct || 0), 0).toFixed(1) + '%', 'of total FUM'],
     ['Mkt Avg MER', mer(mktAvgMer), 'across all issuers'],
-  ].map(([l, v, s]) => `<div class="card"><div class="sl">${l}</div><div class="sv">${v}</div><div class="ss">${s}</div></div>`).join('');
+  ].map(([l, v, s]) => `<div class="card"><div class="sl">${l}</div><div class="sv text-base">${v}</div><div class="ss">${s}</div></div>`).join('');
 
-  // FUM doughnut
-  const top10 = d.issuers.slice(0, 10);
-  const others = d.issuers.slice(10).reduce((s, r) => s + (r.total_fum || 0), 0);
-  const chartData = [...top10.map(r => r.total_fum), others > 0 ? others : null].filter(v => v);
-  const chartLabels = [...top10.map(r => r.issuer), others > 0 ? 'Others' : null].filter(v => v);
-  const chartColors = [...top10.map(r => issColor(r.issuer)), '#e2e8f0'];
-  new Chart(document.getElementById('chart-share').getContext('2d'), {
-    type: 'doughnut',
-    data: { labels: chartLabels, datasets: [{ data: chartData, backgroundColor: chartColors, borderWidth: 2, borderColor: '#fff', hoverOffset: 6 }] },
-    options: {
-      responsive: true, maintainAspectRatio: false, cutout: '60%',
-      plugins: {
-        legend: { position: 'right', labels: { font: { size: 10 }, padding: 6, boxWidth: 10 } },
-        tooltip: { callbacks: { label: ctx => ' ' + fmtFum(ctx.parsed) + '  (' + top10[ctx.dataIndex]?.market_share_pct + '%)' } },
-      },
-    },
-  });
-
-  // Count bars
-  const cntMax = d.issuers[0]?.etf_count || 1;
-  document.getElementById('bars-count').innerHTML = d.issuers
-    .map(r => hbar(r.issuer, r.etf_count, cntMax, issColor(r.issuer), r.etf_count + ' ETFs', ''))
-    .join('');
+  // Issuer profiles grid
+  document.getElementById('profiles').innerHTML = d.issuers.map(r => {
+    const profile = ISSUER_PROFILES[r.issuer];
+    const primaryAC = Object.entries(r.asset_classes || {}).sort((a, b) => b[1] - a[1])[0]?.[0] || '—';
+    const acEntries = Object.entries(r.asset_classes || {}).sort((a, b) => b[1] - a[1]).slice(0, 3);
+    const acTotal = Object.values(r.asset_classes || {}).reduce((s, v) => s + v, 0) || 1;
+    const acBar = acEntries.map(([ac, cnt]) =>
+      `<div title="${ac}: ${cnt}" style="width:${(cnt/acTotal*100).toFixed(1)}%;background:${acColor(ac)};height:100%;display:inline-block;flex-shrink:0"></div>`
+    ).join('');
+    const topEtfs = r.top_etfs || (r.top_etf ? [r.top_etf] : []);
+    const desc = profile?.desc || `${r.issuer} manages ${r.etf_count} ETF${r.etf_count !== 1 ? 's' : ''} listed on Australian exchanges, with ${fmtFum(r.total_fum)} in total funds under management.`;
+    const known = profile?.known || primaryAC;
+    return `<div class="card flex flex-col gap-3" style="border-top:3px solid ${issColor(r.issuer)}">
+      <div class="flex items-start justify-between gap-2">
+        <a href="/issuers/${slugify(r.issuer)}" class="font-bold text-base hover:underline" style="color:${issColor(r.issuer)}">${r.issuer}</a>
+        <span class="text-xs font-semibold tabular-nums text-slate-300 shrink-0">${fmtFum(r.total_fum)}</span>
+      </div>
+      <p class="text-xs text-slate-400 leading-relaxed">${desc}</p>
+      <div class="text-xs text-slate-500 italic">${known}</div>
+      <div class="flex-1 flex flex-col justify-end gap-2">
+        ${topEtfs.length ? `<div class="text-xs text-slate-500 font-medium uppercase tracking-wide">Top products</div>
+        <div class="flex flex-col gap-1">${topEtfs.map(e => `
+          <div class="flex items-center justify-between gap-2">
+            <a href="/?code=${e.code}" class="font-bold text-blue-400 hover:underline text-xs">${e.code}</a>
+            <span class="text-xs text-slate-400 truncate flex-1 mx-2" title="${e.name || ''}">${(e.name||'').replace(/^(BETASHARES|VANGUARD|ISHARES|VANECK|GLOBAL X|STATE STREET SPDR|SPDR|DIMENSIONAL|MAGELLAN)\s+/i,'')}</span>
+            <span class="text-xs tabular-nums text-slate-300 shrink-0">${fmtFum(e.fund_size_aud_millions)}</span>
+          </div>`).join('')}
+        </div>` : ''}
+        <div class="h-3 rounded overflow-hidden bg-[#1e3860] flex mt-1">${acBar}</div>
+        <div class="flex gap-1 flex-wrap">${acEntries.map(([ac]) =>
+          `<span class="text-[10px] px-1.5 py-0.5 rounded" style="background:${acColor(ac)}22;color:${acColor(ac)}">${ac}</span>`
+        ).join('')}</div>
+      </div>
+    </div>`;
+  }).join('');
 
   // Comparison table
   document.getElementById('tbl-issuers').innerHTML = d.issuers.map((r, i) => {
@@ -1267,13 +1336,41 @@ async function init() {
       <td class="text-right tabular-nums">${r.etf_count}</td>
       <td class="text-right tabular-nums">${mer(r.avg_mer)}</td>
       <td class="text-right font-semibold ${pcls(r.avg_return_1y)} tabular-nums">${pct(r.avg_return_1y, 1)}</td>
-      <td class="font-bold text-green-600 text-xs">${r.top_etf?.code || '—'}<span class="text-slate-500 font-normal ml-1">${fmtFum(r.top_etf?.fund_size_aud_millions)}</span></td>
+      <td class="text-xs">${r.top_etf ? `<a href="/?code=${r.top_etf.code}" class="font-bold text-blue-400 hover:underline">${r.top_etf.code}</a><span class="text-slate-500 ml-1">${fmtFum(r.top_etf.fund_size_aud_millions)}</span>` : '—'}</td>
       <td><span class="badge" style="background:${acColor(primaryAC)}22;color:${acColor(primaryAC)}">${primaryAC}</span></td>
     </tr>`;
   }).join('');
 
+  // FUM doughnut
+  const top10 = d.issuers.slice(0, 10);
+  const others = d.issuers.slice(10).reduce((s, r) => s + (r.total_fum || 0), 0);
+  const chartData = [...top10.map(r => r.total_fum), others > 0 ? others : null].filter(v => v);
+  const chartLabels = [...top10.map(r => r.issuer), others > 0 ? 'Others' : null].filter(v => v);
+  const chartColors = [...top10.map(r => issColor(r.issuer)), '#e2e8f0'];
+  new Chart(document.getElementById('chart-share').getContext('2d'), {
+    type: 'doughnut',
+    data: { labels: chartLabels, datasets: [{ data: chartData, backgroundColor: chartColors, borderWidth: 2, borderColor: '#fff', hoverOffset: 6 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '60%',
+      plugins: {
+        legend: { position: 'right', labels: { font: { size: 10 }, padding: 6, boxWidth: 10 } },
+        tooltip: { callbacks: { label: ctx => ' ' + fmtFum(ctx.parsed) + '  (' + (top10[ctx.dataIndex]?.market_share_pct ?? '') + '%)' } },
+      },
+    },
+  });
+
+  // Count bars — issuer name is a link
+  const cntMax = d.issuers[0]?.etf_count || 1;
+  document.getElementById('bars-count').innerHTML = d.issuers.map(r => {
+    const w = cntMax > 0 ? Math.min(r.etf_count / cntMax * 100, 100).toFixed(1) : 0;
+    return `<div class="hbar-row">
+      <span class="hbar-label">${issLink(r.issuer)}</span>
+      <div class="hbar-track"><div class="hbar-fill" style="width:${w}%;background:${issColor(r.issuer)}"></div></div>
+      <span class="hbar-val">${r.etf_count} ETFs</span>
+    </div>`;
+  }).join('');
+
   // Asset class mix stacked bars
-  const allACs = [...new Set(d.issuers.flatMap(r => Object.keys(r.asset_classes || {})))];
   document.getElementById('mix-chart').innerHTML = d.issuers.slice(0, 15).map(r => {
     const total = Object.values(r.asset_classes || {}).reduce((s, v) => s + v, 0) || 1;
     const segments = Object.entries(r.asset_classes || {})
@@ -1281,7 +1378,7 @@ async function init() {
       .map(([ac, cnt]) => `<div title="${ac}: ${cnt}" style="width:${(cnt/total*100).toFixed(1)}%;background:${acColor(ac)};height:100%;display:inline-block"></div>`)
       .join('');
     return `<div class="flex items-center gap-3">
-      <span class="text-xs font-medium text-slate-300 w-24 shrink-0 truncate"><a href="/issuers/${slugify(r.issuer)}" class="hover:underline" style="color:inherit">${r.issuer}</a></span>
+      <span class="text-xs font-medium text-slate-300 w-24 shrink-0 truncate">${issLink(r.issuer)}</span>
       <div class="flex-1 h-5 rounded overflow-hidden bg-[#1e3860] flex">${segments}</div>
       <span class="text-xs text-slate-500 w-12 text-right">${r.etf_count} ETFs</span>
     </div>`;

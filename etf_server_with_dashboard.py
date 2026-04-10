@@ -1912,10 +1912,16 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
                     "WHERE issuer=? ORDER BY fund_size_aud_millions DESC NULLS LAST LIMIT 1",
                     (iss,)
                 ).fetchone()
+                top_etfs_rows = conn.execute(
+                    "SELECT code, name, fund_size_aud_millions FROM etfs "
+                    "WHERE issuer=? ORDER BY fund_size_aud_millions DESC NULLS LAST LIMIT 3",
+                    (iss,)
+                ).fetchall()
                 d = dict(row)
                 d['market_share_pct'] = round(d['total_fum'] / total_mkt * 100, 2)
                 d['asset_classes'] = {r['asset_class']: r['cnt'] for r in ac_rows}
                 d['top_etf'] = dict(top_etf) if top_etf else None
+                d['top_etfs'] = [dict(r) for r in top_etfs_rows]
                 if d['avg_mer']:       d['avg_mer']       = round(d['avg_mer'], 3)
                 if d['avg_return_1y']: d['avg_return_1y'] = round(d['avg_return_1y'], 2)
                 if d['avg_return_3y']: d['avg_return_3y'] = round(d['avg_return_3y'], 2)
