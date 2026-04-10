@@ -181,6 +181,8 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
                 self.handle_etf_nav_history(code, qs)
             elif sub == 'similar':
                 self.handle_etf_similar(code)
+            elif sub == 'mpi':
+                self.handle_etf_mpi(code)
             else:
                 self.send_json({'error': f'Unknown sub-resource: {sub}'}, 404)
             return
@@ -406,6 +408,38 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
                 "SELECT holdings_disclosure, holdings_as_of FROM etfs WHERE code = ?", (code,)
             ).fetchone()
             resp = {'code': code, 'holdings': [dict(r) for r in rows]}
+            if meta:
+                resp['holdings_disclosure'] = meta['holdings_disclosure']
+                resp['holdings_as_of'] = meta['holdings_as_of']
+            self.send_json(resp)
+        except Exception as e:
+            self.send_json({'error': str(e)}, 500)
+        finally:
+            conn.close()
+
+    # ----- MPI Basket -----
+    def handle_etf_mpi(self, code):
+        conn = get_db()
+        try:
+            # Latest basket date for this ETF
+            latest = conn.execute(
+                "SELECT MAX(basket_date) FROM etf_mpi_basket WHERE etf_code = ?", (code,)
+            ).fetchone()[0]
+            rows = []
+            if latest:
+                rows = conn.execute(
+                    "SELECT ticker, name, weight_pct, isin, sector, country, asset_type, last_updated "
+                    "FROM etf_mpi_basket WHERE etf_code = ? AND basket_date = ? "
+                    "ORDER BY weight_pct DESC", (code, latest)
+                ).fetchall()
+            meta = conn.execute(
+                "SELECT holdings_disclosure, holdings_as_of FROM etfs WHERE code = ?", (code,)
+            ).fetchone()
+            resp = {
+                'code': code,
+                'basket_date': latest,
+                'basket': [dict(r) for r in rows],
+            }
             if meta:
                 resp['holdings_disclosure'] = meta['holdings_disclosure']
                 resp['holdings_as_of'] = meta['holdings_as_of']
@@ -3845,7 +3879,14 @@ async function showTab(tab) {
 
   } else if (tab === 'holdings') {
     el.innerHTML = '<div class="flex justify-center py-10"><div class="spinner"></div></div>';
-    const h = await api('/api/v1/etfs/' + selectedCode + '/holdings');
+    const [h, mpiResp] = await Promise.all([
+      api('/api/v1/etfs/' + selectedCode + '/holdings'),
+      api('/api/v1/etfs/' + selectedCode + '/mpi'),
+    ]);
+    const isQuarterly = h.holdings_disclosure === 'quarterly';
+    const mpiBasket = mpiResp.basket || [];
+    const hasMpi = mpiBasket.length > 0;
+
     if (!h.holdings || !h.holdings.length) {
       el.innerHTML = '<p class="text-gray-400 text-sm text-center py-10">No holdings data available for this ETF.</p>';
       return;
@@ -3858,63 +3899,196 @@ async function showTab(tab) {
     all.forEach(r => { const c = r.country || 'Other'; byCountry[c] = (byCountry[c] || 0) + (r.weight_pct || 0); });
     const topCountries = Object.entries(byCountry).sort((a, b) => b[1] - a[1]).slice(0, 4);
 
-    el.innerHTML = `
-      ${h.holdings_disclosure === 'quarterly' ? `
-      <div class="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3 text-xs text-amber-800">
-        <svg class="shrink-0 mt-0.5" width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>
-        <span><strong>Quarterly disclosure</strong> — This is an active/complex ETF listed on Cboe Australia. Full portfolio holdings are publicly disclosed once per quarter, up to 60 days after quarter-end.${h.holdings_as_of ? ` Holdings shown are as of <strong>${h.holdings_as_of}</strong>.` : ''}</span>
-      </div>` : ''}
-      <div class="flex flex-wrap items-center gap-2 mb-3">
-        <span class="bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full text-xs font-semibold">${all.length} holdings</span>
-        <span class="text-xs text-gray-500">Top 10 concentration:
-          <strong class="text-gray-700">${top10Wt.toFixed(1)}%</strong></span>
-        ${topCountries.length > 1 ? `<span class="text-xs text-gray-400">·</span>
-          <span class="text-xs text-gray-500">${topCountries.map(([c, w]) =>
-            `<strong class="text-gray-600">${c}</strong> ${w.toFixed(0)}%`).join(' &middot; ')}</span>` : ''}
-        ${holdingsTs ? `<span class="ml-auto text-xs text-gray-400" title="Holdings last updated by issuer scraper">As of ${fmtTs(holdingsTs)}</span>` : ''}
-      </div>
-      <input id="holding-filter" type="text" placeholder="Filter by name or ticker…"
-        class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-200">
-      <div class="text-xs text-gray-400 grid gap-x-3 mb-1 pr-1"
-           style="grid-template-columns:3.5rem 1fr 7rem 5rem">
-        <span class="text-right">Ticker</span><span>Name</span><span>Sector</span><span class="hidden sm:block">Country</span>
-      </div>
-      <div id="holdings-list" class="space-y-1 overflow-y-auto" style="max-height:440px">
-        ${all.map((r, i) => `
-          <div class="holding-row flex items-center gap-3 py-0.5 hover:bg-slate-50 rounded ${i >= 50 ? 'hidden extra-holding' : ''}"
-               data-name="${(r.name || '').toLowerCase().replace(/"/g, '')}"
-               data-ticker="${(r.ticker || '').toLowerCase()}">
-            <div class="w-14 text-xs font-mono text-gray-400 shrink-0 text-right">${r.ticker || ''}</div>
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center justify-between mb-0.5">
-                <span class="text-xs font-medium text-gray-700 truncate">${r.name || ''}</span>
-                <span class="text-xs font-bold text-blue-700 ml-2 shrink-0">${r.weight_pct != null ? r.weight_pct.toFixed(2) + '%' : '—'}</span>
-              </div>
-              <div class="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                <div class="h-full bg-blue-400 rounded-full pbar"
-                     style="width:${maxW > 0 ? ((r.weight_pct || 0) / maxW * 100).toFixed(1) : 0}%"></div>
-              </div>
+    function holdingRowsHtml(rows, prefix) {
+      const mxW = Math.max(...rows.map(x => x.weight_pct || 0));
+      return rows.map((r, i) => `
+        <div class="holding-row flex items-center gap-3 py-0.5 hover:bg-slate-50 rounded ${i >= 50 ? 'hidden extra-holding-'+prefix : ''}"
+             data-name="${(r.name || '').toLowerCase().replace(/"/g, '')}"
+             data-ticker="${(r.ticker || '').toLowerCase()}">
+          <div class="w-14 text-xs font-mono text-gray-400 shrink-0 text-right">${r.ticker || ''}</div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between mb-0.5">
+              <span class="text-xs font-medium text-gray-700 truncate">${r.name || ''}</span>
+              <span class="text-xs font-bold text-blue-700 ml-2 shrink-0">${r.weight_pct != null ? r.weight_pct.toFixed(2) + '%' : '—'}</span>
             </div>
-            <div class="text-xs text-gray-400 w-28 shrink-0 truncate">${r.sector || ''}</div>
-            <div class="text-xs text-gray-300 w-20 shrink-0 truncate hidden sm:block">${r.country || ''}</div>
-          </div>`).join('')}
+            <div class="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div class="h-full bg-blue-400 rounded-full" style="width:${mxW > 0 ? ((r.weight_pct || 0) / mxW * 100).toFixed(1) : 0}%"></div>
+            </div>
+          </div>
+          <div class="text-xs text-gray-400 w-28 shrink-0 truncate">${r.sector || ''}</div>
+          <div class="text-xs text-gray-300 w-20 shrink-0 truncate hidden sm:block">${r.country || ''}</div>
+        </div>`).join('');
+    }
+
+    // Build comparison map: name → {portfolio weight, basket weight}
+    function buildComparisonHtml() {
+      const portMap = {};
+      all.forEach(r => { portMap[(r.ticker || r.name).toUpperCase()] = r; });
+      const mpiMap = {};
+      mpiBasket.forEach(r => { mpiMap[(r.ticker || r.name).toUpperCase()] = r; });
+      const allKeys = [...new Set([...Object.keys(portMap), ...Object.keys(mpiMap)])];
+      const rows = allKeys.map(k => ({
+        key: k,
+        name: (portMap[k] || mpiMap[k]).name,
+        ticker: (portMap[k] || mpiMap[k]).ticker || '',
+        portW: portMap[k]?.weight_pct ?? null,
+        mpiW: mpiMap[k]?.weight_pct ?? null,
+        diff: (portMap[k]?.weight_pct ?? 0) - (mpiMap[k]?.weight_pct ?? 0),
+      })).sort((a, b) => (b.portW ?? b.mpiW ?? 0) - (a.portW ?? a.mpiW ?? 0));
+      const mxAny = Math.max(...rows.map(r => Math.max(r.portW || 0, r.mpiW || 0)));
+      return rows.map(r => `
+        <div class="py-1.5 border-b border-slate-50 last:border-0">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-xs font-medium text-gray-700 truncate flex-1">${r.name}${r.ticker ? ` <span class="font-mono text-gray-400">${r.ticker}</span>` : ''}</span>
+            <span class="text-xs ml-3 shrink-0 ${r.diff > 0.5 ? 'text-blue-600' : r.diff < -0.5 ? 'text-amber-600' : 'text-gray-400'}">${r.diff >= 0 ? '+' : ''}${r.diff.toFixed(2)}%</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="text-xs text-gray-400 w-12 text-right shrink-0">Portfolio</span>
+            <div class="flex-1 h-2 bg-blue-100 rounded-full overflow-hidden">
+              <div class="h-full bg-blue-500 rounded-full" style="width:${mxAny > 0 ? ((r.portW || 0) / mxAny * 100).toFixed(1) : 0}%"></div>
+            </div>
+            <span class="text-xs font-semibold text-blue-700 w-12 shrink-0">${r.portW != null ? r.portW.toFixed(2) + '%' : '—'}</span>
+          </div>
+          <div class="flex items-center gap-1.5 mt-0.5">
+            <span class="text-xs text-gray-400 w-12 text-right shrink-0">MPI</span>
+            <div class="flex-1 h-2 bg-amber-100 rounded-full overflow-hidden">
+              <div class="h-full bg-amber-400 rounded-full" style="width:${mxAny > 0 ? ((r.mpiW || 0) / mxAny * 100).toFixed(1) : 0}%"></div>
+            </div>
+            <span class="text-xs font-semibold text-amber-600 w-12 shrink-0">${r.mpiW != null ? r.mpiW.toFixed(2) + '%' : '—'}</span>
+          </div>
+        </div>`).join('');
+    }
+
+    el.innerHTML = `
+      ${isQuarterly ? `
+      <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 mb-4">
+        <div class="flex items-start gap-3">
+          <div class="shrink-0 w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
+            <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" class="text-amber-600"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>
+          </div>
+          <div class="flex-1">
+            <p class="text-sm font-semibold text-amber-900 mb-1">Quarterly portfolio disclosure</p>
+            <p class="text-xs text-amber-800 leading-relaxed">
+              This is an <strong>active complex ETF</strong> listed on Cboe Australia. Under Cboe operating rules, full portfolio
+              holdings are publicly disclosed <strong>once per quarter</strong>, up to 60 days after quarter-end.
+              ${h.holdings_as_of ? `The portfolio shown below reflects holdings as of <strong>${h.holdings_as_of}</strong>.` : ''}
+            </p>
+            <p class="text-xs text-amber-700 mt-2 leading-relaxed">
+              In place of daily holdings, this ETF publishes a <strong>Material Portfolio Information (MPI) basket</strong> —
+              a daily proxy basket designed to allow market makers to hedge their positions without fully revealing the
+              active portfolio strategy.
+              ${hasMpi
+                ? `The latest MPI basket (${mpiResp.basket_date}) is shown below.`
+                : `MPI basket data is not yet available in this system — it is published daily on <a href="https://www.cboe.com/au/" target="_blank" class="underline hover:text-amber-900">cboe.com/au</a>.`
+              }
+            </p>
+          </div>
+        </div>
+      </div>` : ''}
+
+      ${isQuarterly ? `
+      <div class="flex gap-1 mb-4 border-b border-slate-200 pb-0">
+        <button id="htab-portfolio" class="htab-btn px-3 py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-700 -mb-px bg-transparent" data-htab="portfolio">
+          Portfolio Holdings
+          <span class="ml-1.5 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">${all.length}</span>
+        </button>
+        <button id="htab-mpi" class="htab-btn px-3 py-2 text-sm font-medium border-b-2 border-transparent text-slate-500 -mb-px bg-transparent hover:text-slate-700" data-htab="mpi">
+          MPI Basket
+          ${hasMpi ? `<span class="ml-1.5 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">${mpiBasket.length}</span>` : '<span class="ml-1.5 text-xs bg-slate-100 text-slate-400 px-1.5 py-0.5 rounded-full">–</span>'}
+        </button>
+        ${hasMpi ? `<button id="htab-compare" class="htab-btn px-3 py-2 text-sm font-medium border-b-2 border-transparent text-slate-500 -mb-px bg-transparent hover:text-slate-700" data-htab="compare">Compare</button>` : ''}
+      </div>` : ''}
+
+      <!-- Portfolio holdings panel -->
+      <div id="hpanel-portfolio">
+        <div class="flex flex-wrap items-center gap-2 mb-3">
+          <span class="bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full text-xs font-semibold">${all.length} holdings</span>
+          <span class="text-xs text-gray-500">Top 10: <strong class="text-gray-700">${top10Wt.toFixed(1)}%</strong></span>
+          ${topCountries.length > 1 ? `<span class="text-xs text-gray-400">·</span>
+            <span class="text-xs text-gray-500">${topCountries.map(([c, w]) =>
+              `<strong class="text-gray-600">${c}</strong> ${w.toFixed(0)}%`).join(' &middot; ')}</span>` : ''}
+          ${holdingsTs ? `<span class="ml-auto text-xs text-gray-400">As of ${fmtTs(holdingsTs)}</span>` : ''}
+        </div>
+        <input id="holding-filter" type="text" placeholder="Filter by name or ticker…"
+          class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-200">
+        <div class="text-xs text-gray-400 grid gap-x-3 mb-1 pr-1"
+             style="grid-template-columns:3.5rem 1fr 7rem 5rem">
+          <span class="text-right">Ticker</span><span>Name</span><span>Sector</span><span class="hidden sm:block">Country</span>
+        </div>
+        <div id="holdings-list" class="space-y-1 overflow-y-auto" style="max-height:440px">
+          ${holdingRowsHtml(all, 'port')}
+        </div>
+        ${all.length > 50 ? `
+          <button id="show-all-holdings"
+            class="mt-2 w-full text-xs text-blue-600 hover:text-blue-800 hover:underline py-1.5 border-t border-gray-100">
+            Show all ${all.length} holdings ↓
+          </button>` : ''}
       </div>
-      ${all.length > 50 ? `
-        <button id="show-all-holdings"
-          class="mt-2 w-full text-xs text-blue-600 hover:text-blue-800 hover:underline py-1.5 border-t border-gray-100">
-          Show all ${all.length} holdings ↓
-        </button>` : ''}`;
+
+      <!-- MPI basket panel -->
+      <div id="hpanel-mpi" class="hidden">
+        ${hasMpi ? `
+          <div class="flex flex-wrap items-center gap-2 mb-3">
+            <span class="bg-amber-50 text-amber-700 px-2.5 py-1 rounded-full text-xs font-semibold">${mpiBasket.length} constituents</span>
+            <span class="ml-auto text-xs text-gray-400">Basket date: <strong class="text-gray-600">${mpiResp.basket_date}</strong></span>
+          </div>
+          <div class="text-xs text-gray-400 grid gap-x-3 mb-1 pr-1"
+               style="grid-template-columns:3.5rem 1fr 7rem 5rem">
+            <span class="text-right">Ticker</span><span>Name</span><span>Sector</span><span class="hidden sm:block">Country</span>
+          </div>
+          <div class="space-y-1 overflow-y-auto" style="max-height:440px">
+            ${holdingRowsHtml(mpiBasket, 'mpi')}
+          </div>` : `
+          <div class="flex flex-col items-center justify-center py-12 text-center">
+            <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mb-3">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" class="text-slate-400"><path stroke-linecap="round" stroke-linejoin="round" d="M9 13h2m-1-4v-2m9 3a8 8 0 11-16 0 8 8 0 0116 0z"/></svg>
+            </div>
+            <p class="text-sm font-medium text-slate-600 mb-1">MPI basket not yet available</p>
+            <p class="text-xs text-slate-400 max-w-xs leading-relaxed">
+              The daily MPI basket is published by the issuer on Cboe Australia. Once scraping support is added, it will appear here automatically.
+            </p>
+            <a href="https://www.cboe.com/au/" target="_blank"
+               class="mt-4 text-xs text-blue-600 hover:underline">View on Cboe Australia →</a>
+          </div>`}
+      </div>
+
+      <!-- Comparison panel -->
+      ${hasMpi ? `
+      <div id="hpanel-compare" class="hidden">
+        <p class="text-xs text-slate-500 mb-3 leading-relaxed">
+          Comparing portfolio holdings (as of <strong>${h.holdings_as_of || 'latest'}</strong>) against
+          MPI basket (${mpiResp.basket_date}). Differences &gt;0.5% are highlighted.
+        </p>
+        <div class="overflow-y-auto" style="max-height:500px">
+          ${buildComparisonHtml()}
+        </div>
+      </div>` : ''}`;
 
     document.getElementById('holding-filter')?.addEventListener('input', function () {
       const q = this.value.trim().toLowerCase();
-      document.querySelectorAll('.holding-row').forEach(row => {
+      document.querySelectorAll('#hpanel-portfolio .holding-row').forEach(row => {
         const vis = !q || row.dataset.name.includes(q) || row.dataset.ticker.includes(q);
         row.classList.toggle('hidden', !vis);
       });
     });
     document.getElementById('show-all-holdings')?.addEventListener('click', function () {
-      document.querySelectorAll('.extra-holding').forEach(r => r.classList.remove('hidden', 'extra-holding'));
+      document.querySelectorAll('.extra-holding-port').forEach(r => r.classList.remove('hidden', 'extra-holding-port'));
       this.remove();
+    });
+    document.querySelectorAll('.htab-btn').forEach(btn => {
+      btn.addEventListener('click', function () {
+        const target = this.dataset.htab;
+        document.querySelectorAll('.htab-btn').forEach(b => {
+          b.classList.remove('border-blue-600', 'text-blue-700');
+          b.classList.add('border-transparent', 'text-slate-500');
+        });
+        this.classList.add('border-blue-600', 'text-blue-700');
+        this.classList.remove('border-transparent', 'text-slate-500');
+        ['portfolio', 'mpi', 'compare'].forEach(p => {
+          const panel = document.getElementById('hpanel-' + p);
+          if (panel) panel.classList.toggle('hidden', p !== target);
+        });
+      });
     });
 
   } else if (tab === 'sectors') {
