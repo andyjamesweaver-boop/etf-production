@@ -2366,113 +2366,45 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Australian ETF Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.3.1/dist/chartjs-adapter-luxon.umd.min.js"></script>
 <style>
-  /* ── Dark Navy Theme ── */
-  html, body { background: #1a2e4a !important; color: #e2e8f0 !important; }
-
-  /* Backgrounds */
-  .bg-white                { background: #233d66 !important; }
-  .bg-gray-50, .bg-slate-50 { background: #1e3354 !important; }
-  .bg-gray-100, .bg-slate-100, .bg-slate-200 { background: #1a2e4a !important; }
-  .bg-blue-50              { background: #1e3878 !important; }
-  .bg-green-50             { background: #1e4030 !important; }
-  .bg-red-50               { background: #3e1818 !important; }
-  .bg-amber-50             { background: #302c00 !important; }
-  .bg-sky-50               { background: #1c3860 !important; }
-
-  /* Text */
-  .text-gray-900, .text-gray-800, .text-gray-700 { color: #e2e8f0 !important; }
-  .text-gray-600, .text-gray-500                 { color: #a8c4e0 !important; }
-  .text-gray-400, .text-gray-300                 { color: #7fa3c8 !important; }
-  .text-slate-800, .text-slate-700               { color: #e2e8f0 !important; }
-  .text-slate-600, .text-slate-500               { color: #a8c4e0 !important; }
-  .text-slate-400                                { color: #7fa3c8 !important; }
-  .text-blue-900, .text-blue-800                 { color: #93c5fd !important; }
-  .text-blue-700, .text-blue-600                 { color: #60a5fa !important; }
-  .text-blue-500                                 { color: #3b82f6 !important; }
-  .text-green-800, .text-green-700               { color: #4ade80 !important; }
-  .text-red-800, .text-red-700                   { color: #f87171 !important; }
-  .text-indigo-800, .text-indigo-700             { color: #a5b4fc !important; }
-  .text-purple-800                               { color: #c4b5fd !important; }
-  .text-amber-800                                { color: #fcd34d !important; }
-  .text-teal-800                                 { color: #5eead4 !important; }
-  .text-orange-800                               { color: #fb923c !important; }
-
-  /* Borders */
-  .border-gray-100, .border-gray-200, .border-gray-300 { border-color: #2e5285 !important; }
-  .border-slate-100, .border-slate-200                 { border-color: #2e5285 !important; }
-  .divide-gray-50, .divide-gray-100                    { --tw-divide-opacity: 1; }
-  .divide-y > * + * { border-color: #2e5285 !important; }
-
-  /* Badge chips */
-  .bg-blue-50  { background: #1e3878 !important; }
-  .bg-blue-100 { background: #1e3878 !important; }
-  .bg-green-100 { background: #1e4030 !important; }
-  .bg-red-100  { background: #3e1818 !important; }
-  .bg-purple-100 { background: #2e2060 !important; }
-  .bg-amber-100  { background: #302a00 !important; }
-  .bg-teal-100   { background: #183830 !important; }
-  .bg-orange-100 { background: #302000 !important; }
-  .bg-gray-100, .bg-gray-200 { background: #2c4d78 !important; }
-  .bg-indigo-100 { background: #202858 !important; }
-  .bg-sky-100    { background: #183358 !important; }
-
-  /* Inputs & forms */
-  input[type=text], input[type=number], input[type=search], select, textarea {
-    background: #1e3354 !important;
-    border-color: #2e5285 !important;
-    color: #e2e8f0 !important;
-  }
-  input::placeholder { color: #7fa3c8 !important; }
-  select option { background: #233d66; color: #e2e8f0; }
-
-  /* Cards with shadow */
-  .shadow, .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl {
-    box-shadow: 0 4px 24px rgba(0,0,0,.5) !important;
-  }
-
-  /* Hover states on rows/cards */
-  .hover\:bg-blue-50:hover   { background: #2c4d78 !important; }
-  .hover\:bg-gray-50:hover   { background: #2c4d78 !important; }
-  .hover\:bg-slate-50:hover  { background: #2c4d78 !important; }
-  .hover\:text-blue-600:hover, .hover\:text-blue-700:hover { color: #60a5fa !important; }
-
-  /* Range input */
-  input[type=range] { accent-color: #3b82f6; }
+  /* ── Clean White Theme ── */
+  html, body { background: #f8fafc !important; color: #0f172a !important; font-family: 'Inter', system-ui, -apple-system, sans-serif !important; }
 
   /* Exchange badges */
-  .badge-asx  { background: #2d55cc; color: #fff; }
-  .badge-cboe { background: #5b21b6; color: #fff; }
+  .badge-asx  { background: #2563eb; color: #fff; }
+  .badge-cboe { background: #7c3aed; color: #fff; }
 
   /* Asset class colour chips */
-  .ac-au   { background: #1e3878; color: #93c5fd; }
-  .ac-int  { background: #1e4030; color: #4ade80; }
-  .ac-fi   { background: #302a00; color: #fcd34d; }
-  .ac-prop { background: #3e1830; color: #f9a8d4; }
-  .ac-com  { background: #302800; color: #fde68a; }
-  .ac-div  { background: #202858; color: #a5b4fc; }
-  .ac-alt  { background: #142030; color: #94a3b8; }
+  .ac-au   { background: #dbeafe; color: #1d4ed8; }
+  .ac-int  { background: #dcfce7; color: #166534; }
+  .ac-fi   { background: #fef3c7; color: #92400e; }
+  .ac-prop { background: #fae8ff; color: #7e22ce; }
+  .ac-com  { background: #fff7ed; color: #c2410c; }
+  .ac-div  { background: #e0f2fe; color: #075985; }
+  .ac-alt  { background: #f1f5f9; color: #475569; }
 
   /* Table rows */
-  #etf-table tr { border-bottom: 1px solid #2e5285; transition: background .1s; }
-  #etf-table tr:hover { background: #2c4d78 !important; }
-  #etf-table tr.row-selected { background: #345590 !important; }
+  #etf-table tr { border-bottom: 1px solid #f1f5f9; transition: background .1s; }
+  #etf-table tr:hover { background: #f8fafc !important; }
+  #etf-table tr.row-selected { background: #eff6ff !important; }
 
   /* Detail tabs */
-  .dtab { color: #7fa3c8; padding-bottom: 10px; font-weight: 500; transition: color .15s; border-bottom: 2px solid transparent; }
-  .dtab:hover { color: #60a5fa; }
-  .tab-active { color: #3b82f6 !important; border-bottom-color: #3b82f6; }
+  .dtab { color: #64748b; padding-bottom: 10px; font-weight: 500; transition: color .15s; border-bottom: 2px solid transparent; }
+  .dtab:hover { color: #2563eb; }
+  .tab-active { color: #2563eb !important; border-bottom-color: #2563eb; }
 
   /* Search dropdown */
   #search-results { position: absolute; z-index: 50; top: calc(100% + 6px); left: 0; right: 0; }
-  #search-results .bg-white { background: #233d66 !important; }
 
   /* Spinner */
-  .spinner { border: 3px solid #2e5285; border-top-color: #3b82f6; border-radius: 50%;
+  .spinner { border: 3px solid #e2e8f0; border-top-color: #2563eb; border-radius: 50%;
              width: 28px; height: 28px; animation: spin .7s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -2481,91 +2413,91 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
 
   /* Scrollbar */
   ::-webkit-scrollbar { width: 5px; height: 5px; }
-  ::-webkit-scrollbar-track { background: #1a2e4a; }
-  ::-webkit-scrollbar-thumb { background: #2e5285; border-radius: 4px; }
+  ::-webkit-scrollbar-track { background: #f1f5f9; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
 
   /* Stat card hover lift */
   .stat-card { transition: transform .15s, box-shadow .15s; }
-  .stat-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,.4); }
+  .stat-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,.1); }
 
   /* Main view tabs */
-  .main-tab { color: #7fa3c8; padding: 10px 0; font-weight: 500; transition: color .15s;
-              border-bottom: 2px solid transparent; white-space: nowrap; }
-  .main-tab:hover { color: #60a5fa; }
-  .main-tab.active { color: #3b82f6; border-bottom-color: #3b82f6; }
-
-  /* Tab bar background */
-  .border-b { border-color: #2e5285 !important; }
+  .main-tab { color: #64748b; padding: 10px 0; font-weight: 500; transition: color .15s;
+              border-bottom: 2px solid transparent; white-space: nowrap; font-size: .875rem; }
+  .main-tab:hover { color: #2563eb; }
+  .main-tab.active { color: #2563eb; border-bottom-color: #2563eb; }
 
   /* Screener */
   .sc-check-list { max-height: 130px; overflow-y: auto; }
   .sc-check-list label { display: flex; align-items: center; gap: 6px; padding: 3px 0;
-                         cursor: pointer; font-size: .8125rem; color: #a8c4e0; }
-  .sc-check-list label:hover { color: #60a5fa; }
+                         cursor: pointer; font-size: .8125rem; color: #475569; }
+  .sc-check-list label:hover { color: #2563eb; }
 
   /* Compare mini-bars */
   .cmp-bar-wrap { display: flex; align-items: center; gap: 4px; }
-  .cmp-bar { height: 6px; border-radius: 3px; background: #3b82f6; min-width: 2px; }
-  .cmp-bar-neg { background: #ef4444; }
+  .cmp-bar { height: 6px; border-radius: 3px; background: #2563eb; min-width: 2px; }
+  .cmp-bar-neg { background: #dc2626; }
 
   /* Screener table rows */
-  #screener-table tr { border-bottom: 1px solid #2e5285; transition: background .1s; }
-  #screener-table tr:hover { background: #2c4d78 !important; }
+  #screener-table tr { border-bottom: 1px solid #f1f5f9; transition: background .1s; }
+  #screener-table tr:hover { background: #f8fafc !important; }
 
   /* Holdings table */
-  #holdings-table tr { border-bottom: 1px solid #2e5285; }
-  #holdings-table tr:hover { background: #2c4d78 !important; }
+  #holdings-table tr { border-bottom: 1px solid #f1f5f9; }
+  #holdings-table tr:hover { background: #f8fafc !important; }
 
   /* Data freshness tooltip trigger */
   .dated { cursor: help; }
-  .dated:hover { border-bottom: 1px dotted #7fa3c8; }
+  .dated:hover { border-bottom: 1px dotted #94a3b8; }
 
   /* Article/content pages */
-  .prose, .prose p, .prose h2, .prose h3 { color: #e2e8f0 !important; }
-  table th { background: #1e3354 !important; color: #a8c4e0 !important; border-color: #2e5285 !important; }
-  table td { border-color: #2e5285 !important; }
-  .chart-box { background: #233d66; border: 1px solid #2e5285; border-radius: 8px; padding: 16px; margin: 16px 0; }
+  .prose p, .prose h2, .prose h3 { color: #0f172a; }
+  table th { background: #f8fafc !important; color: #64748b !important; border-color: #e2e8f0 !important; }
+  table td { border-color: #f1f5f9 !important; }
+  .chart-box { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 16px 0; }
 
   /* Positive / negative text (returns) */
-  .pos { color: #4ade80 !important; }
-  .neg { color: #f87171 !important; }
+  .pos { color: #16a34a !important; }
+  .neg { color: #dc2626 !important; }
 
   /* Buttons */
   .bg-blue-600 { background: #2563eb !important; }
   .bg-blue-600:hover, .hover\:bg-blue-700:hover { background: #1d4ed8 !important; }
+
+  /* Range input */
+  input[type=range] { accent-color: #2563eb; }
 </style>
 </head>
-<body class="bg-[#1a2e4a] min-h-screen text-sm text-slate-100 antialiased">
+<body class="bg-[#f8fafc] min-h-screen text-sm text-slate-900 antialiased">
 
 <!-- ── Header ── -->
-<header class="bg-gradient-to-r from-[#071422] to-[#0d2860] shadow-xl">
+<header class="bg-white border-b border-slate-200">
   <div class="max-w-[1400px] mx-auto px-5 py-3 flex flex-wrap items-center gap-4">
     <div class="flex-1 min-w-[180px]">
-      <h1 class="text-lg font-bold text-white tracking-tight leading-tight">
+      <h1 class="text-base font-bold text-slate-900 tracking-tight leading-tight">
         Australian ETF Dashboard
       </h1>
-      <p id="subtitle" class="text-slate-300 text-xs mt-0.5">Loading market data…</p>
+      <p id="subtitle" class="text-slate-500 text-xs mt-0.5">Loading market data…</p>
     </div>
 
     <!-- Search -->
     <div class="relative w-80">
-      <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 pointer-events-none"
+      <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none"
            fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
               d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
       </svg>
       <input id="search" type="text" placeholder="Search code or name…"
              autocomplete="off"
-             class="w-full bg-white/10 border border-white/20 text-white placeholder-slate-300
+             class="w-full bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400
                     rounded-xl pl-9 pr-3 py-2 text-sm outline-none
-                    focus:ring-2 focus:ring-white/40 focus:bg-white/20">
+                    focus:ring-2 focus:ring-blue-200 focus:border-blue-400 focus:bg-white">
       <div id="search-results"
-           class="hidden bg-white border border-gray-200 rounded-xl shadow-2xl max-h-72 overflow-y-auto"></div>
+           class="hidden bg-white border border-slate-200 rounded-xl shadow-lg max-h-72 overflow-y-auto"></div>
     </div>
 
     <!-- Live indicator -->
-    <div class="flex items-center gap-2 text-xs text-slate-300">
-      <span class="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></span>
+    <div class="flex items-center gap-2 text-xs text-slate-500">
+      <span class="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
       <span id="last-refresh">Live</span>
     </div>
   </div>
@@ -2577,74 +2509,74 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
 
     <!-- Tile 1: Market Size -->
-    <div class="stat-card bg-[#233d66] rounded-xl border border-[#2e5285] p-5 cursor-pointer" onclick="goCard('fum')">
-      <p class="text-xs font-semibold uppercase tracking-wider" style="color:#7fa3c8">MARKET SIZE</p>
-      <p id="c-fum" class="text-2xl font-bold text-white mt-1 leading-tight">—</p>
-      <hr class="border-[#2e5285] my-2">
-      <div class="flex items-center justify-between text-xs" style="color:#a8c4e0">
+    <div class="stat-card bg-white rounded-xl border border-slate-200 p-5 cursor-pointer shadow-sm" onclick="goCard('fum')">
+      <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">MARKET SIZE</p>
+      <p id="c-fum" class="text-2xl font-bold text-slate-900 mt-1 leading-tight">—</p>
+      <hr class="border-slate-100 my-2">
+      <div class="flex items-center justify-between text-xs text-slate-500">
         <span>Largest ETF</span>
         <span id="c-largest-etf" class="tabular-nums font-medium">—</span>
       </div>
-      <div class="flex items-center justify-between text-xs mt-2" style="color:#7fa3c8">
+      <div class="flex items-center justify-between text-xs mt-2 text-slate-400">
         <span id="c-largest-issuer">—</span>
         <span>›</span>
       </div>
     </div>
 
     <!-- Tile 2: Listings -->
-    <div class="stat-card bg-[#233d66] rounded-xl border border-[#2e5285] p-5 cursor-pointer" onclick="goCard('listings')">
-      <p class="text-xs font-semibold uppercase tracking-wider" style="color:#7fa3c8">LISTINGS</p>
-      <p id="c-count" class="text-2xl font-bold text-white mt-1 leading-tight">—</p>
-      <hr class="border-[#2e5285] my-2">
-      <div class="flex items-center justify-between text-xs" style="color:#a8c4e0">
+    <div class="stat-card bg-white rounded-xl border border-slate-200 p-5 cursor-pointer shadow-sm" onclick="goCard('listings')">
+      <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">LISTINGS</p>
+      <p id="c-count" class="text-2xl font-bold text-slate-900 mt-1 leading-tight">—</p>
+      <hr class="border-slate-100 my-2">
+      <div class="flex items-center justify-between text-xs text-slate-500">
         <span id="c-upcoming-count">—</span>
         <span>coming soon</span>
       </div>
-      <div class="flex items-center justify-between text-xs mt-2" style="color:#7fa3c8">
+      <div class="flex items-center justify-between text-xs mt-2 text-slate-400">
         <span id="c-exchange-split">—</span>
         <span>›</span>
       </div>
     </div>
 
     <!-- Tile 3: Performance -->
-    <div class="stat-card bg-[#233d66] rounded-xl border border-[#2e5285] p-5 cursor-pointer" onclick="goCard('returns')">
-      <p class="text-xs font-semibold uppercase tracking-wider" style="color:#7fa3c8">PERFORMANCE</p>
+    <div class="stat-card bg-white rounded-xl border border-slate-200 p-5 cursor-pointer shadow-sm" onclick="goCard('returns')">
+      <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">PERFORMANCE</p>
       <p id="c-ret" class="text-2xl font-bold mt-1 leading-tight">—</p>
-      <hr class="border-[#2e5285] my-2">
-      <div class="flex items-center justify-between text-xs" style="color:#a8c4e0">
+      <hr class="border-slate-100 my-2">
+      <div class="flex items-center justify-between text-xs text-slate-500">
         <span>Best:</span>
-        <span id="c-top" class="font-bold text-blue-400 tabular-nums">—</span>
+        <span id="c-top" class="font-bold text-blue-600 tabular-nums">—</span>
       </div>
-      <div class="flex items-center justify-between text-xs mt-2" style="color:#7fa3c8">
+      <div class="flex items-center justify-between text-xs mt-2 text-slate-400">
         <span>market avg 1Y return</span>
         <span>›</span>
       </div>
     </div>
 
     <!-- Tile 4: Costs -->
-    <div class="stat-card bg-[#233d66] rounded-xl border border-[#2e5285] p-5 cursor-pointer" onclick="goCard('expense')">
-      <p class="text-xs font-semibold uppercase tracking-wider" style="color:#7fa3c8">COSTS</p>
-      <p id="c-exp" class="text-2xl font-bold text-white mt-1 leading-tight">—</p>
-      <hr class="border-[#2e5285] my-2">
-      <div class="flex items-center justify-between text-xs" style="color:#a8c4e0">
+    <div class="stat-card bg-white rounded-xl border border-slate-200 p-5 cursor-pointer shadow-sm" onclick="goCard('expense')">
+      <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">COSTS</p>
+      <p id="c-exp" class="text-2xl font-bold text-slate-900 mt-1 leading-tight">—</p>
+      <hr class="border-slate-100 my-2">
+      <div class="flex items-center justify-between text-xs text-slate-500">
         <span>Avg spread</span>
         <span id="c-nav" class="tabular-nums font-medium">—</span>
       </div>
-      <div class="flex items-center justify-between text-xs mt-2" style="color:#7fa3c8">
+      <div class="flex items-center justify-between text-xs mt-2 text-slate-400">
         <span>fee + implicit trading cost</span>
         <span>›</span>
       </div>
     </div>
 
     <!-- Tile 5: Issuers -->
-    <div class="stat-card bg-[#233d66] rounded-xl border border-[#2e5285] p-5 cursor-pointer" onclick="goCard('issuers')">
-      <p class="text-xs font-semibold uppercase tracking-wider" style="color:#7fa3c8">ISSUERS</p>
-      <p id="c-issuers" class="text-2xl font-bold text-white mt-1 leading-tight">—</p>
-      <hr class="border-[#2e5285] my-2">
-      <div class="flex items-center justify-between text-xs" style="color:#a8c4e0">
+    <div class="stat-card bg-white rounded-xl border border-slate-200 p-5 cursor-pointer shadow-sm" onclick="goCard('issuers')">
+      <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">ISSUERS</p>
+      <p id="c-issuers" class="text-2xl font-bold text-slate-900 mt-1 leading-tight">—</p>
+      <hr class="border-slate-100 my-2">
+      <div class="flex items-center justify-between text-xs text-slate-500">
         <span id="c-most-fum-issuer">—</span>
       </div>
-      <div class="flex items-center justify-between text-xs mt-2" style="color:#7fa3c8">
+      <div class="flex items-center justify-between text-xs mt-2 text-slate-400">
         <span id="c-most-etfs-issuer">—</span>
         <span>›</span>
       </div>
@@ -3269,6 +3201,7 @@ const ISSUER_COLORS = {
   'iShares':         '#009CDE',
   'VanEck':          '#1A3C8F',
   'State Street Investment Management': '#1a9dd9',
+  'StateStreet':     '#1a9dd9',
   'SPDR':            '#1a9dd9',
   'Global X':        '#00A651',
   'Magellan':        '#E8712A',
@@ -3784,7 +3717,7 @@ function renderOverviewTab(d) {
   const docLinks = [['PDS',d.pds_url],['TMD',d.tmd_url],['Fact Sheet',d.factsheet_url]].filter(([,u])=>u);
   const docHtml = docLinks.length ? `<div class="flex flex-wrap gap-2 mb-3">
     ${docLinks.map(([lbl,url])=>`<a href="${url}" target="_blank" rel="noopener"
-       class="inline-flex items-center gap-1 px-3 py-1.5 bg-[#233d66] border border-[#2e5285] rounded-full text-xs font-medium text-slate-300 hover:border-blue-400 hover:text-blue-400 transition-colors">&#128196; ${lbl}</a>`).join('')}
+       class="inline-flex items-center gap-1 px-3 py-1.5 bg-white border border-slate-200 rounded-full text-xs font-medium text-slate-600 hover:border-blue-400 hover:text-blue-600 transition-colors">&#128196; ${lbl}</a>`).join('')}
   </div>` : '';
 
   // Benchmark
@@ -4243,7 +4176,7 @@ async function loadPerfData(code, period) {
       const col = BENCHMARK_COLORS[b] || '#6b7280';
       return `<button data-bmark="${b}"
         class="perf-bmark px-2.5 py-1 text-xs rounded-lg border font-medium transition-colors
-               ${active ? 'text-white' : 'text-slate-300 bg-[#233d66] border-[#2e5285] hover:border-blue-500'}"
+               ${active ? 'text-white' : 'text-slate-600 bg-white border-slate-200 hover:border-blue-400'}"
         style="${active ? `background:${col};border-color:${col}` : ''}">
         ${BENCHMARK_LABELS[b] || b}
       </button>`;
@@ -4259,10 +4192,10 @@ async function loadPerfData(code, period) {
         const col = BENCHMARK_COLORS[b] || '#6b7280';
         if (activeBmarks.has(b)) {
           btn.style.background = col; btn.style.borderColor = col; btn.classList.add('text-white');
-          btn.classList.remove('text-slate-300', 'bg-[#233d66]', 'border-[#2e5285]', 'hover:border-blue-500');
+          btn.classList.remove('text-slate-600', 'bg-white', 'border-slate-200', 'hover:border-blue-400');
         } else {
           btn.style.background = ''; btn.style.borderColor = ''; btn.classList.remove('text-white');
-          btn.classList.add('text-slate-300', 'bg-[#233d66]', 'border-[#2e5285]', 'hover:border-blue-500');
+          btn.classList.add('text-slate-600', 'bg-white', 'border-slate-200', 'hover:border-blue-400');
         }
       });
     });
@@ -5387,7 +5320,7 @@ function makeStackedArea(canvasId, dates, series, colors) {
       scales: {
         x: { ticks: { maxTicksLimit: 12, font: { size: 10 } }, grid: { display: false } },
         y: { stacked: true, ticks: { font: { size: 10 },
-             callback: v => '$' + v.toFixed(0) + 'B' }, grid: { color: '#2e5285' } }
+             callback: v => '$' + v.toFixed(0) + 'B' }, grid: { color: '#f1f5f9' } }
       }
     }
   });
@@ -5408,7 +5341,7 @@ function makeLineChart(canvasId, labels, datasets, yLabel, inlinePlugins) {
       plugins: { legend: { display: datasets.length > 1, position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
       scales: {
         x: { ticks: { maxTicksLimit: 12, font: { size: 10 } }, grid: { display: false } },
-        y: { ticks: { font: { size: 10 } }, grid: { color: '#2e5285' } }
+        y: { ticks: { font: { size: 10 } }, grid: { color: '#f1f5f9' } }
       }
     },
     plugins: inlinePlugins || []
@@ -5429,7 +5362,7 @@ function makeBarChart(canvasId, labels, datasets) {
       plugins: { legend: { display: datasets.length > 1, position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
       scales: {
         x: { ticks: { font: { size: 10 } }, grid: { display: false } },
-        y: { ticks: { font: { size: 10 } }, grid: { color: '#2e5285' } }
+        y: { ticks: { font: { size: 10 } }, grid: { color: '#f1f5f9' } }
       }
     }
   });
@@ -5572,7 +5505,7 @@ async function loadHistIndustry() {
         const pad = 6, bh = 15, bw = tw + pad * 2;
         const bx = Math.min(Math.max(x - bw / 2, 2), chart.width - bw - 2);
         const by = y - lineH - bh - 2;
-        ctx.fillStyle = '#2e5285';
+        ctx.fillStyle = '#1e40af';
         ctx.beginPath();
         ctx.roundRect(bx, by, bw, bh, 4);
         ctx.fill();
@@ -5609,7 +5542,7 @@ async function loadHistIndustry() {
   if (c) {
     c.options.scales = {
       x: { ticks: { maxTicksLimit: 12, font: { size: 10 } }, grid: { display: false } },
-      yCount: { type: 'linear', position: 'left',  ticks: { font: { size: 10 } }, grid: { color: '#2e5285' } },
+      yCount: { type: 'linear', position: 'left',  ticks: { font: { size: 10 } }, grid: { color: '#f1f5f9' } },
       yFlow:  { type: 'linear', position: 'right', ticks: { font: { size: 10 } }, grid: { display: false } }
     };
     c.update();
@@ -6046,22 +5979,25 @@ def _articles_head(title):
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{title} — Australian ETF Market</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
-  body {{ font-family: Inter, system-ui, -apple-system, sans-serif; background: #1a2e4a; color: #e2e8f0; }}
-  article h2 {{ font-size: 1.15rem; font-weight: 700; margin: 1.5rem 0 .6rem; color: #e2e8f0; }}
-  article p  {{ margin-bottom: 1rem; line-height: 1.7; font-size: .9rem; color: #c8ddf0; }}
+  body {{ font-family: 'Inter', system-ui, -apple-system, sans-serif; background: #f8fafc; color: #0f172a; }}
+  article h2 {{ font-size: 1.15rem; font-weight: 700; margin: 1.5rem 0 .6rem; color: #0f172a; }}
+  article p  {{ margin-bottom: 1rem; line-height: 1.75; font-size: .9rem; color: #374151; }}
   article table {{ width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: .82rem; }}
-  article th {{ text-align: left; padding: .4rem .7rem; background: #1e3354; border-bottom: 1px solid #2e5285;
-                font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #a8c4e0; }}
-  article td {{ padding: .4rem .7rem; border-bottom: 1px solid #2e5285; vertical-align: middle; color: #e2e8f0; }}
+  article th {{ text-align: left; padding: .4rem .7rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+                font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #64748b; }}
+  article td {{ padding: .4rem .7rem; border-bottom: 1px solid #f1f5f9; vertical-align: middle; color: #0f172a; }}
   article tr:last-child td {{ border-bottom: none; }}
-  article tr:hover td {{ background: #2c4d78; }}
-  .pos {{ color: #4ade80; font-weight: 600; }}
-  .neg {{ color: #f87171; font-weight: 600; }}
-  .chart-box {{ background: #233d66; border: 1px solid #2e5285; border-radius: .75rem; padding: 1.25rem; margin: 1.5rem 0; }}
-  .chart-box h3 {{ font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #7fa3c8; margin-bottom: .75rem; }}
+  article tr:hover td {{ background: #f8fafc; }}
+  .pos {{ color: #16a34a; font-weight: 600; }}
+  .neg {{ color: #dc2626; font-weight: 600; }}
+  .chart-box {{ background: #fff; border: 1px solid #e2e8f0; border-radius: .75rem; padding: 1.25rem; margin: 1.5rem 0; box-shadow: 0 1px 3px rgba(0,0,0,.06); }}
+  .chart-box h3 {{ font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #64748b; margin-bottom: .75rem; }}
   .chart-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1.5rem 0; }}
   @media (max-width: 640px) {{ .chart-grid {{ grid-template-columns: 1fr; }} }}
 </style>
@@ -6070,14 +6006,14 @@ def _articles_head(title):
 
 def _articles_nav(active_slug=None):
     return """
-<header class="bg-gradient-to-r from-[#071422] to-[#0d2860] shadow-xl">
+<header class="bg-white border-b border-slate-200">
   <div class="max-w-4xl mx-auto px-5 py-3 flex items-center gap-4">
-    <a href="/dashboard" class="text-white/70 hover:text-white text-sm flex items-center gap-1.5">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+    <a href="/dashboard" class="text-slate-500 hover:text-blue-600 text-sm flex items-center gap-1.5 transition-colors">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
       Dashboard
     </a>
-    <span class="text-white/30">|</span>
-    <a href="/articles" class="text-white font-semibold text-sm">Articles</a>
+    <span class="text-slate-300">|</span>
+    <a href="/articles" class="text-slate-900 font-semibold text-sm">Articles</a>
   </div>
 </header>"""
 
@@ -6087,13 +6023,13 @@ def _handle_articles_list(self):
     articles = get_all_articles()
 
     CAT_COLORS = {
-        'Performance':    ('bg-green-900/50',  'text-green-300'),
-        'Market Trends':  ('bg-blue-900/50',   'text-blue-300'),
-        'Thematic':       ('bg-purple-900/50', 'text-purple-300'),
-        'Research':       ('bg-amber-900/50',  'text-amber-300'),
-        'Education':      ('bg-teal-900/50',   'text-teal-300'),
-        'Issuer Profile': ('bg-orange-900/50', 'text-orange-300'),
-        'Annual Report':  ('bg-amber-900/50',  'text-amber-300'),
+        'Performance':    ('bg-green-100',  'text-green-700'),
+        'Market Trends':  ('bg-blue-100',   'text-blue-700'),
+        'Thematic':       ('bg-purple-100', 'text-purple-700'),
+        'Research':       ('bg-amber-100',  'text-amber-700'),
+        'Education':      ('bg-teal-100',   'text-teal-700'),
+        'Issuer Profile': ('bg-orange-100', 'text-orange-700'),
+        'Annual Report':  ('bg-amber-100',  'text-amber-700'),
     }
 
     NEWS_CATS    = {'Performance', 'Market Trends', 'Thematic', 'Research'}
@@ -6118,14 +6054,14 @@ def _handle_articles_list(self):
     )
 
     def card(a, wide=False):
-        bg, fg = CAT_COLORS.get(a['category'], ('bg-slate-800', 'text-slate-300'))
+        bg, fg = CAT_COLORS.get(a['category'], ('bg-slate-100', 'text-slate-600'))
         cols = 'sm:col-span-2' if wide else ''
         return f"""
-    <a href="/articles/{a['slug']}" class="block {cols} bg-[#233d66] rounded-xl border border-[#2e5285] hover:border-blue-500/50 transition-colors p-5">
+    <a href="/articles/{a['slug']}" class="block {cols} bg-white rounded-xl border border-slate-200 hover:border-blue-400 hover:shadow-sm transition-all p-5">
       <span class="inline-block {bg} {fg} text-xs font-semibold px-2 py-0.5 rounded mb-2">{a['category']}</span>
-      <h2 class="text-base font-bold text-slate-100 leading-snug mb-1">{a['title']}</h2>
-      <p class="text-sm text-slate-400 line-clamp-2">{a['subtitle']}</p>
-      <p class="text-xs text-slate-500 mt-3">{a['date']}</p>
+      <h2 class="text-base font-bold text-slate-900 leading-snug mb-1">{a['title']}</h2>
+      <p class="text-sm text-slate-500 line-clamp-2">{a['subtitle']}</p>
+      <p class="text-xs text-slate-400 mt-3">{a['date']}</p>
     </a>"""
 
     def section(heading, subheading, arts, cols=2, wide_first=False):
@@ -6136,8 +6072,8 @@ def _handle_articles_list(self):
         return f"""
   <section class="mb-10">
     <div class="mb-4">
-      <h2 class="text-lg font-bold text-slate-100">{heading}</h2>
-      <p class="text-sm text-slate-400 mt-0.5">{subheading}</p>
+      <h2 class="text-lg font-bold text-slate-900">{heading}</h2>
+      <p class="text-sm text-slate-500 mt-0.5">{subheading}</p>
     </div>
     <div class="grid {grid_cols} gap-4">{cards_html}</div>
   </section>"""
@@ -6152,10 +6088,10 @@ def _handle_articles_list(self):
                            issuer_arts, cols=2)
 
     html = _articles_head('Articles') + _articles_nav() + f"""
-<body class="bg-[#1a2e4a] min-h-screen">
+<body class="bg-[#f8fafc] min-h-screen">
 <main class="max-w-5xl mx-auto px-5 py-8">
-  <h1 class="text-2xl font-bold text-slate-100 mb-1">Articles</h1>
-  <p class="text-sm text-slate-400 mb-8">Analysis, education and issuer profiles for the Australian ETF market.</p>
+  <h1 class="text-2xl font-bold text-slate-900 mb-1">Articles</h1>
+  <p class="text-sm text-slate-500 mb-8">Analysis, education and issuer profiles for the Australian ETF market.</p>
   {news_html}
   {annual_html}
   {basics_html}
@@ -6174,30 +6110,30 @@ def _handle_article_detail(self, slug):
         return
 
     category_colors = {
-        'Performance':    ('bg-green-900/50',  'text-green-300'),
-        'Market Trends':  ('bg-blue-900/50',   'text-blue-300'),
-        'Thematic':       ('bg-purple-900/50', 'text-purple-300'),
-        'Research':       ('bg-amber-900/50',  'text-amber-300'),
-        'Education':      ('bg-teal-900/50',   'text-teal-300'),
-        'Issuer Profile': ('bg-orange-900/50', 'text-orange-300'),
-        'Annual Report':  ('bg-amber-900/50',  'text-amber-300'),
+        'Performance':    ('bg-green-100',  'text-green-700'),
+        'Market Trends':  ('bg-blue-100',   'text-blue-700'),
+        'Thematic':       ('bg-purple-100', 'text-purple-700'),
+        'Research':       ('bg-amber-100',  'text-amber-700'),
+        'Education':      ('bg-teal-100',   'text-teal-700'),
+        'Issuer Profile': ('bg-orange-100', 'text-orange-700'),
+        'Annual Report':  ('bg-amber-100',  'text-amber-700'),
     }
-    bg, fg = category_colors.get(a['category'], ('bg-slate-800', 'text-slate-300'))
+    bg, fg = category_colors.get(a['category'], ('bg-slate-100', 'text-slate-600'))
 
     html = _articles_head(a['title']) + _articles_nav(slug) + f"""
-<body class="bg-[#1a2e4a] min-h-screen">
+<body class="bg-[#f8fafc] min-h-screen">
 <main class="max-w-4xl mx-auto px-5 py-8">
-  <div class="bg-[#233d66] rounded-xl border border-[#2e5285] p-7">
+  <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-7">
     <span class="inline-block {bg} {fg} text-xs font-semibold px-2 py-0.5 rounded mb-3">{a['category']}</span>
-    <h1 class="text-2xl font-bold text-slate-100 leading-tight mb-2">{a['title']}</h1>
-    <p class="text-slate-400 text-sm mb-1">{a['subtitle']}</p>
-    <p class="text-xs text-slate-500 mb-6">{a['date']}</p>
+    <h1 class="text-2xl font-bold text-slate-900 leading-tight mb-2">{a['title']}</h1>
+    <p class="text-slate-500 text-sm mb-1">{a['subtitle']}</p>
+    <p class="text-xs text-slate-400 mb-6">{a['date']}</p>
     <article>
       {a['body']}
     </article>
   </div>
   <div class="mt-5">
-    <a href="/articles" class="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1">
+    <a href="/articles" class="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
       Back to all articles
     </a>

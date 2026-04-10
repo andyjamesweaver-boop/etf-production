@@ -14,37 +14,43 @@ _HEAD = """<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{title} — Australian ETF Market</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
-  body { font-family: Inter, system-ui, -apple-system, sans-serif; background: #0a1628; color: #e2e8f0; }
-  .card { background: #0f2040; border-radius: 12px; box-shadow: 0 1px 6px rgba(0,0,0,.35); border: 1px solid #1e3860; padding: 1.25rem; }
+  body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: #f8fafc; color: #0f172a; }
+  .card { background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04); border: 1px solid #e2e8f0; padding: 1.25rem; }
   table { width: 100%; border-collapse: collapse; }
   th { text-align: left; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
-       color: #7fa3c8; padding: .45rem .75rem; background: #0d1c35; border-bottom: 1px solid #1e3860; }
-  td { padding: .45rem .75rem; font-size: .8rem; border-bottom: 1px solid #1a3050; vertical-align: middle; color: #e2e8f0; }
+       color: #64748b; padding: .45rem .75rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+  td { padding: .45rem .75rem; font-size: .8rem; border-bottom: 1px solid #f1f5f9; vertical-align: middle; color: #0f172a; }
   tr:last-child td { border-bottom: none; }
-  tr:hover td { background: #142850; }
-  .bar-track { height: 6px; background: #1e3860; border-radius: 3px; overflow: hidden; }
+  tr:hover td { background: #f8fafc; }
+  .bar-track { height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; }
   .bar-fill  { height: 100%; border-radius: 3px; transition: width .5s ease; }
   .badge { display: inline-block; padding: .15rem .45rem; border-radius: 4px; font-size: .68rem; font-weight: 600; }
-  .spinner { width: 28px; height: 28px; border: 3px solid #1e3860; border-top-color: #3b82f6;
+  .spinner { width: 28px; height: 28px; border: 3px solid #e2e8f0; border-top-color: #2563eb;
              border-radius: 50%; animation: spin .7s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .sv { font-size: 1.9rem; font-weight: 800; line-height: 1; color: #e2e8f0; }
-  .sl { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #7fa3c8; }
-  .ss { font-size: .73rem; color: #7fa3c8; margin-top: .2rem; }
-  .pos { color: #4ade80; } .neg { color: #f87171; }
+  .sv { font-size: 1.9rem; font-weight: 800; line-height: 1; color: #0f172a; }
+  .sl { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #64748b; }
+  .ss { font-size: .73rem; color: #64748b; margin-top: .2rem; }
+  .pos { color: #16a34a; } .neg { color: #dc2626; }
   .hbar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-  .hbar-label { font-size: .75rem; color: #c8ddf0; font-weight: 500; width: 110px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .hbar-track { flex: 1; height: 16px; background: #1e3860; border-radius: 4px; overflow: hidden; }
+  .hbar-label { font-size: .75rem; color: #0f172a; font-weight: 500; width: 110px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hbar-track { flex: 1; height: 16px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
   .hbar-fill  { height: 100%; border-radius: 4px; transition: width .6s ease; }
-  .hbar-val   { font-size: .73rem; color: #a8c4e0; width: 52px; text-align: right; flex-shrink: 0; }
-  .hbar-sub   { font-size: .65rem; color: #7fa3c8; width: 32px; text-align: right; flex-shrink: 0; }
+  .hbar-val   { font-size: .73rem; color: #475569; width: 52px; text-align: right; flex-shrink: 0; }
+  .hbar-sub   { font-size: .65rem; color: #94a3b8; width: 32px; text-align: right; flex-shrink: 0; }
   .dim-btn { font-size: .72rem; font-weight: 600; padding: .3rem .75rem; border-radius: 6px;
-             border: 1px solid #1e3860; background: #0f2040; color: #a8c4e0; cursor: pointer; transition: all .15s; }
-  .dim-btn:hover { border-color: #3b82f6; color: #60a5fa; }
-  .dim-btn.active-dim { background: #3b82f6; border-color: #3b82f6; color: #fff; }
+             border: 1px solid #e2e8f0; background: #fff; color: #475569; cursor: pointer; transition: all .15s; }
+  .dim-btn:hover { border-color: #2563eb; color: #2563eb; background: #eff6ff; }
+  .dim-btn.active-dim { background: #2563eb; border-color: #2563eb; color: #fff; }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: #f1f5f9; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
 </style>
 </head>"""
 
@@ -145,14 +151,18 @@ function issLink(name) {
 def _page(title, subtitle, body_html, init_js):
     return f"""{_HEAD.replace('{title}', title)}
 <body>
-<header class="bg-gradient-to-r from-[#071422] to-[#0d2860] shadow-xl">
-  <div class="max-w-7xl mx-auto px-5 py-4 flex items-center gap-5">
-    <a href="/dashboard" class="text-[#a8c4e0] hover:text-white text-sm font-medium transition-colors shrink-0">&#8592; Dashboard</a>
+<header class="bg-white border-b border-slate-200">
+  <div class="max-w-7xl mx-auto px-5 py-3 flex items-center gap-5">
+    <a href="/dashboard" class="text-slate-500 hover:text-blue-600 text-sm font-medium transition-colors shrink-0 flex items-center gap-1">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      Dashboard
+    </a>
+    <div class="w-px h-5 bg-slate-200 shrink-0"></div>
     <div class="flex-1 min-w-0">
-      <h1 class="text-xl font-bold text-white">{title}</h1>
-      <p class="text-[#7fa3c8] text-xs mt-0.5">{subtitle}</p>
+      <h1 class="text-base font-bold text-slate-900">{title}</h1>
+      <p class="text-slate-500 text-xs mt-0.5">{subtitle}</p>
     </div>
-    <span id="ts" class="text-[#7fa3c8] text-xs shrink-0"></span>
+    <span id="ts" class="text-slate-400 text-xs shrink-0"></span>
   </div>
 </header>
 <main class="max-w-7xl mx-auto px-4 py-6">
@@ -176,16 +186,16 @@ _FUM_BODY = """
 <div id="hero" class="grid grid-cols-2 sm:grid-cols-4 gap-4"></div>
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
   <div class="card">
-    <h2 class="font-semibold text-sm text-slate-300 mb-4">Issuers by FUM</h2>
+    <h2 class="font-semibold text-sm text-slate-700 mb-4">Issuers by FUM</h2>
     <div id="issuer-bars"></div>
   </div>
   <div class="card">
-    <h2 class="font-semibold text-sm text-slate-300 mb-4">Asset Classes by FUM</h2>
+    <h2 class="font-semibold text-sm text-slate-700 mb-4">Asset Classes by FUM</h2>
     <div class="relative" style="height:260px"><canvas id="chart-ac"></canvas></div>
   </div>
 </div>
 <div class="card">
-  <h2 class="font-semibold text-sm text-slate-300 mb-3">Top ETFs by FUM</h2>
+  <h2 class="font-semibold text-sm text-slate-700 mb-3">Top ETFs by FUM</h2>
   <div class="overflow-x-auto"><table>
     <thead><tr>
       <th>#</th><th>Code</th><th>Name</th><th>Issuer</th><th>Asset Class</th>
@@ -195,11 +205,11 @@ _FUM_BODY = """
   </table></div>
 </div>
 <div class="card">
-  <h2 class="font-semibold text-sm text-slate-300 mb-4">Top 5 ETFs by FUM — per Asset Class</h2>
+  <h2 class="font-semibold text-sm text-slate-700 mb-4">Top 5 ETFs by FUM — per Asset Class</h2>
   <div id="per-class" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
 </div>
 <div class="card">
-  <h2 class="font-semibold text-sm text-slate-300 mb-4">Top 5 ETFs by FUM — per Issuer</h2>
+  <h2 class="font-semibold text-sm text-slate-700 mb-4">Top 5 ETFs by FUM — per Issuer</h2>
   <div id="per-issuer" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
 </div>
 """
@@ -234,7 +244,7 @@ async function init() {
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' ' + fmtFum(ctx.parsed.y) + '  (' + ac[ctx.dataIndex].pct + '%)' } } },
-      scales: { x: { ticks: { font: { size: 10 } } }, y: { ticks: { callback: v => fmtFum(v), font: { size: 10 } }, grid: { color: '#1e3860' } } },
+      scales: { x: { ticks: { font: { size: 10 } } }, y: { ticks: { callback: v => fmtFum(v), font: { size: 10 } }, grid: { color: '#f1f5f9' } } },
     },
   });
 
@@ -243,7 +253,7 @@ async function init() {
   document.getElementById('fum-table').innerHTML = d.top_etfs.map((e, i) => `<tr>
     <td class="text-slate-500 tabular-nums">${i + 1}</td>
     <td class="font-bold text-green-600">${e.code}</td>
-    <td class="text-slate-300 max-w-xs" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.name}">${e.name}</td>
+    <td class="text-slate-700 max-w-xs" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.name}">${e.name}</td>
     <td class="text-slate-400">${e.issuer || '—'}</td>
     <td><span class="badge" style="background:${acColor(e.asset_class)}22;color:${acColor(e.asset_class)}">${e.asset_class || '—'}</span></td>
     <td class="text-right font-semibold tabular-nums">${fmtFum(e.fum)}</td>
@@ -252,13 +262,13 @@ async function init() {
   </tr>`).join('');
 
   // Per class mini tables
-  const classCard = (ac_name, etfs) => `<div class="border border-[#1e3860] rounded-lg p-3 bg-[#0d1c35]">
+  const classCard = (ac_name, etfs) => `<div class="border border-slate-200 rounded-lg p-3 bg-slate-50">
     <div class="text-xs font-bold uppercase mb-2" style="color:${acColor(ac_name)}">${ac_name}</div>
-    ${etfs.map((e, i) => `<div class="flex items-center gap-2 py-1 ${i < etfs.length - 1 ? 'border-b border-[#1a3050]' : ''}">
+    ${etfs.map((e, i) => `<div class="flex items-center gap-2 py-1 ${i < etfs.length - 1 ? 'border-b border-slate-100' : ''}">
       <span class="text-slate-500 text-xs w-3 tabular-nums">${i + 1}</span>
       <span class="font-bold text-green-600 text-xs w-10">${e.code}</span>
       <span class="flex-1 text-xs text-slate-400 truncate" title="${e.name}">${e.name}</span>
-      <span class="text-xs font-semibold text-slate-300 ml-1 tabular-nums">${fmtFum(e.fum)}</span>
+      <span class="text-xs font-semibold text-slate-700 ml-1 tabular-nums">${fmtFum(e.fum)}</span>
     </div>`).join('')}
   </div>`;
 
@@ -266,13 +276,13 @@ async function init() {
     Object.entries(d.top_per_asset_class).map(([ac_name, etfs]) => classCard(ac_name, etfs)).join('');
 
   document.getElementById('per-issuer').innerHTML =
-    Object.entries(d.top_per_issuer).map(([iss_name, etfs]) => `<div class="border border-[#1e3860] rounded-lg p-3 bg-[#0d1c35]">
+    Object.entries(d.top_per_issuer).map(([iss_name, etfs]) => `<div class="border border-slate-200 rounded-lg p-3 bg-slate-50">
       <div class="text-xs font-bold uppercase mb-2"><a href="/issuers/${slugify(iss_name)}" style="color:${issColor(iss_name)}" class="hover:underline">${iss_name}</a></div>
-      ${etfs.map((e, i) => `<div class="flex items-center gap-2 py-1 ${i < etfs.length - 1 ? 'border-b border-[#1a3050]' : ''}">
+      ${etfs.map((e, i) => `<div class="flex items-center gap-2 py-1 ${i < etfs.length - 1 ? 'border-b border-slate-100' : ''}">
         <span class="text-slate-500 text-xs w-3 tabular-nums">${i + 1}</span>
         <span class="font-bold text-green-600 text-xs w-10">${e.code}</span>
         <span class="flex-1 text-xs text-slate-400 truncate" title="${e.name}">${e.name}</span>
-        <span class="text-xs font-semibold text-slate-300 ml-1 tabular-nums">${fmtFum(e.fum)}</span>
+        <span class="text-xs font-semibold text-slate-700 ml-1 tabular-nums">${fmtFum(e.fum)}</span>
       </div>`).join('')}
     </div>`).join('');
 
@@ -298,7 +308,7 @@ _LISTINGS_BODY = """
 <!-- Year chart with filters -->
 <div class="card">
   <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-    <h2 class="font-semibold text-sm text-slate-300">ETFs Listed by Year</h2>
+    <h2 class="font-semibold text-sm text-slate-700">ETFs Listed by Year</h2>
     <div id="dim-tabs" class="flex flex-wrap gap-1">
       <button data-dim="all"          class="dim-btn active-dim">All</button>
       <button data-dim="exchange"     class="dim-btn">Exchange</button>
@@ -312,14 +322,14 @@ _LISTINGS_BODY = """
 
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
   <div class="card">
-    <h2 class="font-semibold text-sm text-slate-300 mb-3">Most Recent Listings</h2>
+    <h2 class="font-semibold text-sm text-slate-700 mb-3">Most Recent Listings</h2>
     <div class="overflow-x-auto"><table>
       <thead><tr><th>Code</th><th>Name</th><th>Issuer</th><th>Inception</th></tr></thead>
       <tbody id="tbl-recent"></tbody>
     </table></div>
   </div>
   <div class="card">
-    <h2 class="font-semibold text-sm text-slate-300 mb-1">Longest Running ETFs</h2>
+    <h2 class="font-semibold text-sm text-slate-700 mb-1">Longest Running ETFs</h2>
     <p class="text-xs text-slate-500 mb-3">STW and SFY were Australia's first ETFs, both listed on 27 August 2001.</p>
     <div class="overflow-x-auto"><table>
       <thead><tr><th>Code</th><th>Name</th><th>Issuer</th><th>Inception</th><th></th></tr></thead>
@@ -330,19 +340,19 @@ _LISTINGS_BODY = """
 
 <div class="grid grid-cols-1 lg:grid-cols-4 gap-5">
   <div class="card">
-    <h2 class="font-semibold text-sm text-slate-300 mb-4">By Issuer</h2>
+    <h2 class="font-semibold text-sm text-slate-700 mb-4">By Issuer</h2>
     <div id="bars-issuer"></div>
   </div>
   <div class="card">
-    <h2 class="font-semibold text-sm text-slate-300 mb-4">By Asset Class</h2>
+    <h2 class="font-semibold text-sm text-slate-700 mb-4">By Asset Class</h2>
     <div id="bars-asset"></div>
   </div>
   <div class="card">
-    <h2 class="font-semibold text-sm text-slate-300 mb-4">By Exchange</h2>
+    <h2 class="font-semibold text-sm text-slate-700 mb-4">By Exchange</h2>
     <div id="bars-exchange"></div>
   </div>
   <div class="card">
-    <h2 class="font-semibold text-sm text-slate-300 mb-4">By Investment Style</h2>
+    <h2 class="font-semibold text-sm text-slate-700 mb-4">By Investment Style</h2>
     <div id="bars-fundtype"></div>
   </div>
 </div>
@@ -350,7 +360,7 @@ _LISTINGS_BODY = """
 <!-- Upcoming & recent new issues -->
 <div class="card">
   <div class="flex items-center justify-between mb-4">
-    <h2 class="font-semibold text-sm text-slate-300">Upcoming & Recent Issues</h2>
+    <h2 class="font-semibold text-sm text-slate-700">Upcoming & Recent Issues</h2>
     <a href="/insights/upcoming" class="text-xs text-blue-400 hover:text-blue-300">Full new listings view ›</a>
   </div>
   <div id="listings-upcoming" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
@@ -427,12 +437,12 @@ async function init() {
     const upEl = document.getElementById('listings-upcoming');
     if (upcoming.length) {
       upEl.innerHTML = upcoming.map(u => `
-        <div class="border border-[#1e3860] rounded-lg p-3 bg-[#0d1c35]">
+        <div class="border border-slate-200 rounded-lg p-3 bg-slate-50">
           <div class="flex items-center justify-between mb-1">
             <span class="font-bold text-blue-400 text-sm">${u.code || '—'}</span>
             <span class="text-xs text-indigo-400 font-semibold">Coming Soon</span>
           </div>
-          <div class="text-xs text-slate-300 font-medium leading-snug mb-1">${u.name || '—'}</div>
+          <div class="text-xs text-slate-700 font-medium leading-snug mb-1">${u.name || '—'}</div>
           <div class="text-xs text-slate-500">${u.issuer ? `<a href="/issuers/${slugify(u.issuer)}" style="color:inherit" class="hover:underline">${u.issuer}</a>` : ''}</div>
           ${u.expected_date ? `<div class="text-xs text-slate-500 mt-1">Expected: ${u.expected_date}</div>` : ''}
         </div>`).join('');
@@ -447,8 +457,8 @@ async function init() {
     }).slice(0, 15);
     document.getElementById('listings-recent-new').innerHTML = recent30.map(r => `<tr>
       <td class="font-bold text-blue-400">${r.code}</td>
-      <td class="text-slate-300" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.name||'—'}</td>
-      <td class="text-slate-400 text-xs">${r.issuer ? `<a href="/issuers/${slugify(r.issuer)}" style="color:#a8c4e0" class="hover:underline">${r.issuer}</a>` : '—'}</td>
+      <td class="text-slate-700" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.name||'—'}</td>
+      <td class="text-slate-400 text-xs">${r.issuer ? `<a href="/issuers/${slugify(r.issuer)}" style="color:#475569" class="hover:underline">${r.issuer}</a>` : '—'}</td>
       <td class="text-slate-400 text-xs">${r.asset_class||'—'}</td>
       <td class="text-slate-500 tabular-nums text-xs">${r.inception_date||'—'}</td>
       <td class="text-right text-slate-400 tabular-nums text-xs">${r.management_fee ? r.management_fee.toFixed(2)+'%' : '—'}</td>
@@ -519,7 +529,7 @@ function renderYearChart() {
       },
       scales: {
         x: { stacked: true, ticks: { font: { size: 10 } }, grid: { display: false } },
-        y: { stacked: true, ticks: { font: { size: 10 }, stepSize: 5 }, grid: { color: '#1e3860' } },
+        y: { stacked: true, ticks: { font: { size: 10 }, stepSize: 5 }, grid: { color: '#f1f5f9' } },
       },
     },
   });
@@ -538,7 +548,7 @@ function renderTables() {
     const badge = note ? `<span class="badge ${note.cls}">${note.label}</span>` : '';
     return `<tr>
       <td class="font-bold text-green-600">${e.code}</td>
-      <td class="text-slate-300" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.name||''}">${e.name||'—'}</td>
+      <td class="text-slate-700" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.name||''}">${e.name||'—'}</td>
       <td class="text-slate-400">${e.issuer||'—'}</td>
       <td class="text-slate-500 tabular-nums text-xs">${e.inception_date||'—'}</td>
       <td>${badge}</td>
@@ -583,24 +593,24 @@ _RETURNS_BODY = """
 <div id="hero" class="grid grid-cols-2 sm:grid-cols-4 gap-4"></div>
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
   <div class="card">
-    <h2 class="font-semibold text-sm text-slate-300 mb-4">1Y Return Distribution</h2>
+    <h2 class="font-semibold text-sm text-slate-700 mb-4">1Y Return Distribution</h2>
     <div class="relative" style="height:220px"><canvas id="chart-dist"></canvas></div>
   </div>
   <div class="card">
-    <h2 class="font-semibold text-sm text-slate-300 mb-4">Average 1Y Return — by Asset Class</h2>
+    <h2 class="font-semibold text-sm text-slate-700 mb-4">Average 1Y Return — by Asset Class</h2>
     <div id="bars-ac"></div>
   </div>
 </div>
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
   <div class="card">
-    <h2 class="font-semibold text-sm text-slate-300 mb-3">Top Performers — 1Y Return</h2>
+    <h2 class="font-semibold text-sm text-slate-700 mb-3">Top Performers — 1Y Return</h2>
     <div class="overflow-x-auto"><table>
       <thead><tr><th>#</th><th>Code</th><th>Name</th><th>Issuer</th><th class="text-right">1Y</th><th class="text-right">3Y</th><th class="text-right">5Y</th><th class="text-right">FUM</th></tr></thead>
       <tbody id="tbl-top"></tbody>
     </table></div>
   </div>
   <div class="card">
-    <h2 class="font-semibold text-sm text-slate-300 mb-3">Worst Performers — 1Y Return</h2>
+    <h2 class="font-semibold text-sm text-slate-700 mb-3">Worst Performers — 1Y Return</h2>
     <div class="overflow-x-auto"><table>
       <thead><tr><th>#</th><th>Code</th><th>Name</th><th>Issuer</th><th class="text-right">1Y</th><th class="text-right">3Y</th><th class="text-right">5Y</th><th class="text-right">FUM</th></tr></thead>
       <tbody id="tbl-bot"></tbody>
@@ -608,7 +618,7 @@ _RETURNS_BODY = """
   </div>
 </div>
 <div class="card">
-  <h2 class="font-semibold text-sm text-slate-300 mb-4">Average 1Y Return — by Issuer</h2>
+  <h2 class="font-semibold text-sm text-slate-700 mb-4">Average 1Y Return — by Issuer</h2>
   <div id="bars-issuer"></div>
 </div>
 """
@@ -643,7 +653,7 @@ async function init() {
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' ' + ctx.parsed.y + ' ETFs' } } },
-      scales: { x: { ticks: { font: { size: 9 }, maxRotation: 45 } }, y: { ticks: { font: { size: 10 }, stepSize: 5 }, grid: { color: '#1e3860' } } },
+      scales: { x: { ticks: { font: { size: 9 }, maxRotation: 45 } }, y: { ticks: { font: { size: 10 }, stepSize: 5 }, grid: { color: '#f1f5f9' } } },
     },
   });
 
@@ -661,7 +671,7 @@ async function init() {
   const perfRow = (e, i) => `<tr>
     <td class="text-slate-500 tabular-nums">${i + 1}</td>
     <td class="font-bold text-green-600">${e.code}</td>
-    <td class="text-slate-300" style="max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.name}">${e.name}</td>
+    <td class="text-slate-700" style="max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.name}">${e.name}</td>
     <td class="text-slate-400 text-xs">${issLink(e.issuer)}</td>
     <td class="text-right font-semibold ${pcls(e.return_1y)} tabular-nums">${pct(e.return_1y, 1)}</td>
     <td class="text-right text-slate-400 tabular-nums">${pct(e.return_3y, 1)}</td>
@@ -703,37 +713,37 @@ _EXPENSE_BODY = """
 
 <!-- Cost explainer -->
 <div class="card">
-  <h2 class="font-semibold text-sm text-slate-300 mb-3">Understanding ETF Costs</h2>
+  <h2 class="font-semibold text-sm text-slate-700 mb-3">Understanding ETF Costs</h2>
   <p class="text-xs text-slate-400 mb-4 leading-relaxed">
     The total cost of holding an ETF is made up of several components — some visible, some less so.
     Even small differences in fees compound significantly over time: a 0.50% annual cost difference
     on a $100,000 portfolio costs roughly $5,000 extra over 10 years, before any performance drag.
   </p>
   <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-    <div class="rounded-lg p-3 bg-[#081929] border border-[#1e3860]">
+    <div class="rounded-lg p-3 bg-slate-50 border border-slate-200">
       <div class="text-xs font-bold uppercase text-blue-400 mb-1.5">Management Expense Ratio (MER)</div>
       <p class="text-xs text-slate-400 leading-relaxed">
         The annual fee charged by the fund manager, expressed as a percentage of your investment. It covers
         portfolio management, custody, administration, and legal costs. Deducted daily from the fund's NAV —
-        you never see a bill, but the return is reduced by this amount every year. <span class="text-slate-300">This is the most
+        you never see a bill, but the return is reduced by this amount every year. <span class="text-slate-700">This is the most
         commonly quoted cost.</span>
       </p>
     </div>
-    <div class="rounded-lg p-3 bg-[#081929] border border-[#1e3860]">
+    <div class="rounded-lg p-3 bg-slate-50 border border-slate-200">
       <div class="text-xs font-bold uppercase text-amber-400 mb-1.5">Bid/Ask Spread</div>
       <p class="text-xs text-slate-400 leading-relaxed">
         When you buy an ETF on the ASX, you pay the <em>ask</em> (offer) price; when you sell, you receive
         the <em>bid</em> price. The gap between these — the spread — is a per-transaction cost paid to
-        market makers for providing liquidity. <span class="text-slate-300">Spreads are larger for illiquid or thinly traded ETFs</span>
+        market makers for providing liquidity. <span class="text-slate-700">Spreads are larger for illiquid or thinly traded ETFs</span>
         and matter more for frequent traders than long-term holders.
       </p>
     </div>
-    <div class="rounded-lg p-3 bg-[#081929] border border-[#1e3860]">
+    <div class="rounded-lg p-3 bg-slate-50 border border-slate-200">
       <div class="text-xs font-bold uppercase text-emerald-400 mb-1.5">Premium / Discount to NAV</div>
       <p class="text-xs text-slate-400 leading-relaxed">
         An ETF's market price can diverge from its underlying net asset value (NAV). If you buy at a premium,
         you pay more than the basket of assets is worth; a discount works in your favour. For most large,
-        liquid ETFs premiums and discounts are tiny (under 0.10%). <span class="text-slate-300">They can be larger for
+        liquid ETFs premiums and discounts are tiny (under 0.10%). <span class="text-slate-700">They can be larger for
         ETFs holding illiquid assets</span> (e.g. fixed income, small caps) or those tracking overseas markets
         outside trading hours.
       </p>
@@ -750,21 +760,21 @@ _EXPENSE_BODY = """
 <!-- Cost ranking (moved above distribution charts) -->
 <div class="card">
   <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
-    <h2 class="font-semibold text-sm text-slate-300">ETF Cost Ranking — Top 20</h2>
+    <h2 class="font-semibold text-sm text-slate-700">ETF Cost Ranking — Top 20</h2>
     <div class="flex flex-wrap gap-2">
-      <div class="flex rounded-lg overflow-hidden border border-[#1e3860] text-xs font-medium">
+      <div class="flex rounded-lg overflow-hidden border border-slate-200 text-xs font-medium">
         <button id="rank-cheapest" onclick="setRankDir('cheapest')"
           class="px-3 py-1.5 bg-blue-600 text-white transition-colors">Cheapest</button>
         <button id="rank-priciest" onclick="setRankDir('priciest')"
-          class="px-3 py-1.5 text-slate-400 hover:text-slate-200 transition-colors">Most Expensive</button>
+          class="px-3 py-1.5 text-slate-400 hover:text-slate-900 transition-colors">Most Expensive</button>
       </div>
-      <div class="flex rounded-lg overflow-hidden border border-[#1e3860] text-xs font-medium">
+      <div class="flex rounded-lg overflow-hidden border border-slate-200 text-xs font-medium">
         <button id="metric-mer" onclick="setMetric('mer')"
           class="px-3 py-1.5 bg-blue-600 text-white transition-colors">MER</button>
         <button id="metric-spread" onclick="setMetric('spread')"
-          class="px-3 py-1.5 text-slate-400 hover:text-slate-200 transition-colors">Bid/Ask Spread</button>
+          class="px-3 py-1.5 text-slate-400 hover:text-slate-900 transition-colors">Bid/Ask Spread</button>
         <button id="metric-combined" onclick="setMetric('combined')"
-          class="px-3 py-1.5 text-slate-400 hover:text-slate-200 transition-colors">MER + Spread</button>
+          class="px-3 py-1.5 text-slate-400 hover:text-slate-900 transition-colors">MER + Spread</button>
       </div>
     </div>
   </div>
@@ -774,7 +784,7 @@ _EXPENSE_BODY = """
     <div id="ac-pills" class="flex flex-wrap gap-1"></div>
     <span class="text-xs text-slate-500 shrink-0 ml-2">Issuer:</span>
     <select id="issuer-select" onchange="setIssuer(this.value)"
-      class="text-xs bg-[#0d2137] border border-[#1e3860] text-slate-300 rounded px-2 py-1 focus:outline-none focus:border-blue-500">
+      class="text-xs bg-white border border-slate-200 text-slate-700 rounded px-2 py-1 focus:outline-none focus:border-blue-500">
       <option value="">All issuers</option>
     </select>
     <span id="rank-count" class="text-xs text-slate-500 ml-auto"></span>
@@ -799,30 +809,30 @@ _EXPENSE_BODY = """
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
   <div class="card">
     <div class="flex items-center justify-between mb-3">
-      <h2 class="font-semibold text-sm text-slate-300">Market Premium/Discount (90 days)</h2>
+      <h2 class="font-semibold text-sm text-slate-700">Market Premium/Discount (90 days)</h2>
       <a href="/insights/nav" class="text-xs text-blue-400 hover:text-blue-300">Full NAV analysis ›</a>
     </div>
     <div class="relative" style="height:180px"><canvas id="cost-nav-chart"></canvas></div>
   </div>
   <div class="card">
-    <h2 class="font-semibold text-sm text-slate-300 mb-3">Today's Spread Distribution</h2>
+    <h2 class="font-semibold text-sm text-slate-700 mb-3">Today's Spread Distribution</h2>
     <div class="relative" style="height:180px"><canvas id="cost-nav-dist"></canvas></div>
   </div>
 </div>
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
   <div class="card">
-    <h2 class="font-semibold text-sm text-slate-300 mb-4">MER Distribution</h2>
+    <h2 class="font-semibold text-sm text-slate-700 mb-4">MER Distribution</h2>
     <div class="relative" style="height:220px"><canvas id="chart-dist"></canvas></div>
   </div>
   <div class="card">
-    <h2 class="font-semibold text-sm text-slate-300 mb-1">Average MER — by Asset Class</h2>
+    <h2 class="font-semibold text-sm text-slate-700 mb-1">Average MER — by Asset Class</h2>
     <p class="text-xs text-slate-500 mb-3">Simple avg · FUM-weighted avg per class</p>
     <div id="bars-ac"></div>
   </div>
 </div>
 
 <div class="card">
-  <h2 class="font-semibold text-sm text-slate-300 mb-1">MER by Issuer — Simple vs FUM-Weighted</h2>
+  <h2 class="font-semibold text-sm text-slate-700 mb-1">MER by Issuer — Simple vs FUM-Weighted</h2>
   <p class="text-xs text-slate-500 mb-4">FUM-weighted MER reflects what investors actually pay on average, weighted by fund size.</p>
   <div class="overflow-x-auto">
     <table>
@@ -836,7 +846,7 @@ _EXPENSE_BODY = """
   </div>
 </div>
 <div class="card">
-  <h2 class="font-semibold text-sm text-slate-300 mb-4">FUM-Weighted MER — by Issuer</h2>
+  <h2 class="font-semibold text-sm text-slate-700 mb-4">FUM-Weighted MER — by Issuer</h2>
   <div class="relative" style="height:300px"><canvas id="chart-issuer"></canvas></div>
 </div>
 """
@@ -881,7 +891,7 @@ async function init() {
         plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${c.parsed.y>0?'+':''}${c.parsed.y.toFixed(3)}%`}}},
         scales:{
           x:{ticks:{font:{size:10}, maxTicksLimit:8, callback:(v,i)=> i%step===0 ? fmtD(hist[i]?.date||'') : null}, grid:{display:false}},
-          y:{ticks:{font:{size:10},callback:v=>(v>0?'+':'')+v.toFixed(2)+'%'},grid:{color:'#1e3860'}},
+          y:{ticks:{font:{size:10},callback:v=>(v>0?'+':'')+v.toFixed(2)+'%'},grid:{color:'#f1f5f9'}},
         }
       },
     });
@@ -904,7 +914,7 @@ async function init() {
     new Chart(document.getElementById('cost-nav-dist').getContext('2d'), {
       type:'bar',
       data:{labels:Object.keys(buckets),datasets:[{label:'ETFs',data:Object.values(buckets),backgroundColor:bColors,borderRadius:3}]},
-      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.parsed.y} ETFs`}}},scales:{x:{ticks:{font:{size:9}}},y:{ticks:{font:{size:10},stepSize:5},grid:{color:'#1e3860'}}}},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.parsed.y} ETFs`}}},scales:{x:{ticks:{font:{size:9}}},y:{ticks:{font:{size:10},stepSize:5},grid:{color:'#f1f5f9'}}}},
     });
   } catch(e) { console.warn('NAV section error:', e); }
 
@@ -927,7 +937,7 @@ async function init() {
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' ' + ctx.parsed.y + ' ETFs' } } },
-      scales: { x: { ticks: { font: { size: 10 }, maxRotation: 30 } }, y: { ticks: { font: { size: 10 }, stepSize: 10 }, grid: { color: '#1e3860' } } },
+      scales: { x: { ticks: { font: { size: 10 }, maxRotation: 30 } }, y: { ticks: { font: { size: 10 }, stepSize: 10 }, grid: { color: '#f1f5f9' } } },
     },
   });
 
@@ -936,8 +946,8 @@ async function init() {
   document.getElementById('bars-ac').innerHTML = d.by_asset_class.map(r => `
     <div class="mb-3">
       <div class="flex items-center justify-between mb-0.5">
-        <span class="text-xs font-medium text-slate-300" style="min-width:150px">${r.asset_class}</span>
-        <span class="text-xs text-slate-500 tabular-nums">${mer(r.avg_mer)} avg · <span class="font-semibold text-slate-300">${mer(r.fum_weighted_mer)}</span> wtd</span>
+        <span class="text-xs font-medium text-slate-700" style="min-width:150px">${r.asset_class}</span>
+        <span class="text-xs text-slate-500 tabular-nums">${mer(r.avg_mer)} avg · <span class="font-semibold text-slate-700">${mer(r.fum_weighted_mer)}</span> wtd</span>
       </div>
       <div class="flex gap-1">
         <div class="bar-track flex-1" title="Simple avg: ${mer(r.avg_mer)}">
@@ -964,7 +974,7 @@ async function init() {
     ['', ...allAC].map(ac => `<button
       id="ac-pill-${ac.replace(/\s+/g,'_')}"
       onclick='setAC(${JSON.stringify(ac)})'
-      class="px-2 py-0.5 rounded text-xs border transition-colors ${ac==='' ? 'bg-blue-600 text-white border-blue-600' : 'border-[#1e3860] text-slate-400 hover:text-slate-200'}"
+      class="px-2 py-0.5 rounded text-xs border transition-colors ${ac==='' ? 'bg-blue-600 text-white border-blue-600' : 'border-slate-200 text-slate-500 hover:text-slate-900 bg-white'}"
     >${ac || 'All'}</button>`).join('');
 
   function _filteredETFs() {
@@ -1042,8 +1052,8 @@ async function init() {
           x: {
             stacked: metric==='combined',
             ticks: { font:{size:10}, callback: v => v.toFixed(2)+'%' },
-            grid: { color:'#1e3860' },
-            title: { display:true, text: metric==='spread' ? '% per transaction' : '% p.a.', font:{size:10}, color:'#7fa3c8' },
+            grid: { color:'#f1f5f9' },
+            title: { display:true, text: metric==='spread' ? '% per transaction' : '% p.a.', font:{size:10}, color:'#64748b' },
           },
           y: { stacked: metric==='combined', ticks:{font:{size:11}}, grid:{display:false} },
         },
@@ -1057,7 +1067,7 @@ async function init() {
       return `<tr>
         <td class="text-slate-500 tabular-nums">${i+1}</td>
         <td><a href="/?code=${e.code}" class="font-bold text-blue-400 hover:underline">${e.code}</a></td>
-        <td class="text-slate-300" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.name}">${e.name}</td>
+        <td class="text-slate-700" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.name}">${e.name}</td>
         <td class="text-slate-400 text-xs">${e.issuer||'—'}</td>
         <td class="text-right tabular-nums">${mer(e.effective_mer)}</td>
         <td class="text-right tabular-nums text-amber-400">${e.spread>0 ? e.spread.toFixed(4)+'%' : '—'}</td>
@@ -1100,7 +1110,7 @@ async function init() {
         pill.classList.toggle('text-white',     a===ac);
         pill.classList.toggle('border-blue-600',a===ac);
         pill.classList.toggle('text-slate-400', a!==ac);
-        pill.classList.toggle('border-[#1e3860]',a!==ac);
+        pill.classList.toggle('border-slate-200',a!==ac);
       }
     });
     // "All" pill
@@ -1110,7 +1120,7 @@ async function init() {
       allPill.classList.toggle('text-white',      ac==='');
       allPill.classList.toggle('border-blue-600', ac==='');
       allPill.classList.toggle('text-slate-400',  ac!=='');
-      allPill.classList.toggle('border-[#1e3860]',ac!=='');
+      allPill.classList.toggle('border-slate-200',ac!=='');
     }
     _refreshIssuerDropdown();
     window.renderRanking();
@@ -1162,7 +1172,7 @@ async function init() {
       },
       scales: {
         x: { ticks: { font: { size: 10 }, maxRotation: 40 } },
-        y: { ticks: { font: { size: 10 }, callback: v => v.toFixed(2) + '%' }, grid: { color: '#1e3860' }, beginAtZero: true },
+        y: { ticks: { font: { size: 10 }, callback: v => v.toFixed(2) + '%' }, grid: { color: '#f1f5f9' }, beginAtZero: true },
       },
     },
   });
@@ -1188,13 +1198,13 @@ _ISSUERS_BODY = """
 
 <!-- Issuer profiles -->
 <div>
-  <h2 class="font-semibold text-sm text-slate-300 mb-3">Who Are the Issuers?</h2>
+  <h2 class="font-semibold text-sm text-slate-700 mb-3">Who Are the Issuers?</h2>
   <div id="profiles" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
 </div>
 
 <!-- Comparison table (moved up) -->
 <div class="card overflow-x-auto">
-  <h2 class="font-semibold text-sm text-slate-300 mb-3">Issuer Comparison</h2>
+  <h2 class="font-semibold text-sm text-slate-700 mb-3">Issuer Comparison</h2>
   <table>
     <thead><tr>
       <th>#</th><th>Issuer</th><th class="text-right">FUM</th><th class="text-right">Mkt Share</th>
@@ -1208,16 +1218,16 @@ _ISSUERS_BODY = """
 <!-- Charts -->
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
   <div class="card">
-    <h2 class="font-semibold text-sm text-slate-300 mb-4">Market Share by FUM</h2>
+    <h2 class="font-semibold text-sm text-slate-700 mb-4">Market Share by FUM</h2>
     <div class="relative" style="height:280px"><canvas id="chart-share"></canvas></div>
   </div>
   <div class="card">
-    <h2 class="font-semibold text-sm text-slate-300 mb-4">ETF Count by Issuer</h2>
+    <h2 class="font-semibold text-sm text-slate-700 mb-4">ETF Count by Issuer</h2>
     <div id="bars-count"></div>
   </div>
 </div>
 <div class="card">
-  <h2 class="font-semibold text-sm text-slate-300 mb-4">Asset Class Mix — by Issuer</h2>
+  <h2 class="font-semibold text-sm text-slate-700 mb-4">Asset Class Mix — by Issuer</h2>
   <div id="mix-chart" class="space-y-3"></div>
 </div>
 """
@@ -1300,7 +1310,7 @@ async function init() {
     return `<div class="card flex flex-col gap-3" style="border-top:3px solid ${issColor(r.issuer)}">
       <div class="flex items-start justify-between gap-2">
         <a href="/issuers/${slugify(r.issuer)}" class="font-bold text-base hover:underline" style="color:${issColor(r.issuer)}">${r.issuer}</a>
-        <span class="text-xs font-semibold tabular-nums text-slate-300 shrink-0">${fmtFum(r.total_fum)}</span>
+        <span class="text-xs font-semibold tabular-nums text-slate-700 shrink-0">${fmtFum(r.total_fum)}</span>
       </div>
       <p class="text-xs text-slate-400 leading-relaxed">${desc}</p>
       <div class="text-xs text-slate-500 italic">${known}</div>
@@ -1310,10 +1320,10 @@ async function init() {
           <div class="flex items-center justify-between gap-2">
             <a href="/?code=${e.code}" class="font-bold text-blue-400 hover:underline text-xs">${e.code}</a>
             <span class="text-xs text-slate-400 truncate flex-1 mx-2" title="${e.name || ''}">${(e.name||'').replace(/^(BETASHARES|VANGUARD|ISHARES|VANECK|GLOBAL X|STATE STREET INVESTMENT MANAGEMENT|STATE STREET SPDR|STATE STREET|SPDR|DIMENSIONAL|MAGELLAN)\s+/i,'')}</span>
-            <span class="text-xs tabular-nums text-slate-300 shrink-0">${fmtFum(e.fund_size_aud_millions)}</span>
+            <span class="text-xs tabular-nums text-slate-700 shrink-0">${fmtFum(e.fund_size_aud_millions)}</span>
           </div>`).join('')}
         </div>` : ''}
-        <div class="h-3 rounded overflow-hidden bg-[#1e3860] flex mt-1">${acBar}</div>
+        <div class="h-3 rounded overflow-hidden bg-slate-200 flex mt-1">${acBar}</div>
         <div class="flex gap-1 flex-wrap">${acEntries.map(([ac]) =>
           `<span class="text-[10px] px-1.5 py-0.5 rounded" style="background:${acColor(ac)}22;color:${acColor(ac)}">${ac}</span>`
         ).join('')}</div>
@@ -1379,8 +1389,8 @@ async function init() {
       .map(([ac, cnt]) => `<div title="${ac}: ${cnt}" style="width:${(cnt/total*100).toFixed(1)}%;background:${acColor(ac)};height:100%;display:inline-block"></div>`)
       .join('');
     return `<div class="flex items-center gap-3">
-      <span class="text-xs font-medium text-slate-300 w-24 shrink-0 truncate">${issLink(r.issuer)}</span>
-      <div class="flex-1 h-5 rounded overflow-hidden bg-[#1e3860] flex">${segments}</div>
+      <span class="text-xs font-medium text-slate-700 w-24 shrink-0 truncate">${issLink(r.issuer)}</span>
+      <div class="flex-1 h-5 rounded overflow-hidden bg-slate-200 flex">${segments}</div>
       <span class="text-xs text-slate-500 w-12 text-right">${r.etf_count} ETFs</span>
     </div>`;
   }).join('');
@@ -1409,13 +1419,13 @@ _NAV_BODY = """
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
   <div class="card lg:col-span-2">
     <div class="flex items-center justify-between mb-3">
-      <h2 class="font-semibold text-sm text-slate-300">Market-wide Premium/Discount — Last 90 Days</h2>
+      <h2 class="font-semibold text-sm text-slate-700">Market-wide Premium/Discount — Last 90 Days</h2>
       <span class="text-xs text-slate-500">Average across all ETFs with NAV data</span>
     </div>
     <div class="relative" style="height:220px"><canvas id="chart-hist"></canvas></div>
   </div>
   <div class="card">
-    <h2 class="font-semibold text-sm text-slate-300 mb-3">Today's Distribution</h2>
+    <h2 class="font-semibold text-sm text-slate-700 mb-3">Today's Distribution</h2>
     <div class="relative" style="height:220px"><canvas id="chart-dist"></canvas></div>
   </div>
 </div>
@@ -1423,11 +1433,11 @@ _NAV_BODY = """
 <!-- By asset class + by issuer -->
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
   <div class="card">
-    <h2 class="font-semibold text-sm text-slate-300 mb-3">Avg Premium/Discount by Asset Class</h2>
+    <h2 class="font-semibold text-sm text-slate-700 mb-3">Avg Premium/Discount by Asset Class</h2>
     <div id="ac-bars"></div>
   </div>
   <div class="card">
-    <h2 class="font-semibold text-sm text-slate-300 mb-3">Avg Premium/Discount by Issuer</h2>
+    <h2 class="font-semibold text-sm text-slate-700 mb-3">Avg Premium/Discount by Issuer</h2>
     <div id="iss-bars"></div>
   </div>
 </div>
@@ -1435,11 +1445,11 @@ _NAV_BODY = """
 <!-- Historical explorer for individual ETF -->
 <div class="card">
   <div class="flex flex-wrap items-center gap-3 mb-4">
-    <h2 class="font-semibold text-sm text-slate-300">Historical Premium/Discount Explorer</h2>
-    <select id="etf-picker" class="border border-[#1e3860] rounded-lg px-2.5 py-1.5 text-sm bg-[#0d1c35] text-slate-200 focus:ring-2 focus:ring-blue-800 outline-none min-w-[200px]">
+    <h2 class="font-semibold text-sm text-slate-700">Historical Premium/Discount Explorer</h2>
+    <select id="etf-picker" class="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm bg-slate-50 text-slate-700 focus:ring-2 focus:ring-blue-300 outline-none min-w-[200px]">
       <option value="">— select an ETF —</option>
     </select>
-    <select id="period-picker" class="border border-[#1e3860] rounded-lg px-2.5 py-1.5 text-sm bg-[#0d1c35] text-slate-200 focus:ring-2 focus:ring-blue-800 outline-none">
+    <select id="period-picker" class="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm bg-slate-50 text-slate-700 focus:ring-2 focus:ring-blue-300 outline-none">
       <option value="3m">3 months</option>
       <option value="1y" selected>1 year</option>
       <option value="3y">3 years</option>
@@ -1453,11 +1463,11 @@ _NAV_BODY = """
 <!-- Today's full snapshot table -->
 <div class="card">
   <div class="flex items-center justify-between mb-3">
-    <h2 class="font-semibold text-sm text-slate-300">Today's Snapshot — All ETFs</h2>
+    <h2 class="font-semibold text-sm text-slate-700">Today's Snapshot — All ETFs</h2>
     <div class="flex items-center gap-2">
       <input id="snap-search" type="text" placeholder="Filter by code or name…"
-             class="border border-[#1e3860] rounded-lg px-2.5 py-1.5 text-sm bg-[#0d1c35] text-slate-200 focus:ring-2 focus:ring-blue-800 outline-none w-52">
-      <select id="snap-sort" class="border border-[#1e3860] rounded-lg px-2.5 py-1.5 text-sm bg-[#0d1c35] text-slate-200 focus:ring-2 focus:ring-blue-800 outline-none">
+             class="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm bg-slate-50 text-slate-700 focus:ring-2 focus:ring-blue-300 outline-none w-52">
+      <select id="snap-sort" class="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm bg-slate-50 text-slate-700 focus:ring-2 focus:ring-blue-300 outline-none">
         <option value="pd-desc">Largest premium first</option>
         <option value="pd-asc">Largest discount first</option>
         <option value="fum-desc">FUM (largest first)</option>
@@ -1599,7 +1609,7 @@ function renderHistChart() {
         x: { ticks: { maxTicksLimit: 8, font: { size: 10 } }, grid: { display: false } },
         y: {
           ticks: { font: { size: 10 }, callback: v => fmtPd(v) },
-          grid: { color: '#1e3860' },
+          grid: { color: '#f1f5f9' },
         }
       }
     }
@@ -1636,7 +1646,7 @@ function renderDistChart() {
                                 label: ctx => ctx.parsed.y + ' ETFs' } } },
       scales: {
         x: { ticks: { font: { size: 9 }, maxRotation: 45 }, grid: { display: false } },
-        y: { ticks: { font: { size: 10 }, stepSize: 1 }, grid: { color: '#1e3860' } }
+        y: { ticks: { font: { size: 10 }, stepSize: 1 }, grid: { color: '#f1f5f9' } }
       }
     }
   });
@@ -1651,7 +1661,7 @@ function renderAcBars() {
     const pct = maxAbs > 0 ? (Math.abs(v) / maxAbs * 100).toFixed(1) : 0;
     const col = v >= 0 ? '#16a34a' : '#dc2626';
     return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
-      <span style="font-size:.73rem;color:#c8ddf0;width:160px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.asset_class}">${r.asset_class || 'Unknown'}</span>
+      <span style="font-size:.73rem;color:#374151;width:160px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.asset_class}">${r.asset_class || 'Unknown'}</span>
       <div style="flex:1;height:14px;background:#f1f5f9;border-radius:4px;overflow:hidden">
         <div style="width:${pct}%;height:100%;background:${col};border-radius:4px"></div>
       </div>
@@ -1670,7 +1680,7 @@ function renderIssBars() {
     const pct = maxAbs > 0 ? (Math.abs(v) / maxAbs * 100).toFixed(1) : 0;
     const col = v >= 0 ? '#16a34a' : '#dc2626';
     return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
-      <span style="font-size:.73rem;color:#c8ddf0;width:120px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.issuer}"><a href="/issuers/${slugify(r.issuer)}" style="color:inherit" class="hover:underline">${r.issuer}</a></span>
+      <span style="font-size:.73rem;color:#374151;width:120px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.issuer}"><a href="/issuers/${slugify(r.issuer)}" style="color:inherit" class="hover:underline">${r.issuer}</a></span>
       <div style="flex:1;height:14px;background:#f1f5f9;border-radius:4px;overflow:hidden">
         <div style="width:${pct}%;height:100%;background:${col};border-radius:4px"></div>
       </div>
@@ -1755,7 +1765,7 @@ async function loadEtfHistory() {
         x: { ticks: { maxTicksLimit: 10, font: { size: 10 } }, grid: { display: false } },
         y: {
           ticks: { font: { size: 10 }, callback: v => fmtPd(v) },
-          grid: { color: '#1e3860' }
+          grid: { color: '#f1f5f9' }
         }
       }
     }
@@ -1779,11 +1789,11 @@ function renderSnapTable() {
     const v = r.premium_discount_pct;
     const maxAbs = 1.0;
     const pct = v != null ? Math.min(Math.abs(v) / maxAbs * 100, 100).toFixed(1) : 0;
-    const col = v != null ? (v >= 0 ? '#4ade80' : '#f87171') : '#7fa3c8';
+    const col = v != null ? (v >= 0 ? '#16a34a' : '#dc2626') : '#94a3b8';
     return `<tr>
       <td><span style="font-weight:700;font-family:monospace">${r.code}</span></td>
       <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.name||''}">${r.name||'—'}</td>
-      <td style="color:#a8c4e0">${r.issuer ? `<a href="/issuers/${slugify(r.issuer)}" style="color:#7fa3c8" class="hover:underline">${r.issuer}</a>` : '—'}</td>
+      <td style="color:#475569">${r.issuer ? `<a href="/issuers/${slugify(r.issuer)}" style="color:#64748b" class="hover:underline">${r.issuer}</a>` : '—'}</td>
       <td>${r.asset_class||'—'}</td>
       <td style="text-align:right;font-family:monospace">${r.nav != null ? '$'+r.nav.toFixed(4) : '—'}</td>
       <td style="text-align:right;font-family:monospace">${r.close_price != null ? '$'+r.close_price.toFixed(4) : '—'}</td>
@@ -1840,7 +1850,7 @@ _UPCOMING_BODY = """
 <div class="card mb-5">
   <div class="flex items-center justify-between mb-4">
     <div>
-      <h2 class="text-base font-bold text-slate-200">Coming Soon</h2>
+      <h2 class="text-base font-bold text-slate-800">Coming Soon</h2>
       <p class="text-xs text-slate-500 mt-0.5">
         Sourced from ASIC Offer Notice Board — PDS lodgements with 7-day exposure period complete.
         Expected dates are approximate; actual listing may vary.
@@ -1859,13 +1869,13 @@ _UPCOMING_BODY = """
 <!-- Recently Listed -->
 <div class="card">
   <div class="flex items-center justify-between mb-3">
-    <h2 class="text-base font-bold text-slate-200">Recently Listed <span class="text-slate-500 font-normal text-sm">(last 90 days)</span></h2>
+    <h2 class="text-base font-bold text-slate-800">Recently Listed <span class="text-slate-500 font-normal text-sm">(last 90 days)</span></h2>
     <div class="flex items-center gap-2">
       <input id="recent-q" type="text" placeholder="Search…"
              oninput="renderRecent()"
-             class="border border-[#1e3860] rounded-lg px-2.5 py-1.5 text-xs w-40 bg-[#0d1c35] text-slate-200">
+             class="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs w-40 bg-slate-50 text-slate-800">
       <select id="recent-exchange" onchange="renderRecent()"
-              class="border border-[#1e3860] rounded-lg px-2 py-1.5 text-xs bg-[#0d1c35] text-slate-200">
+              class="border border-slate-200 rounded-lg px-2 py-1.5 text-xs bg-slate-50 text-slate-800">
         <option value="">All exchanges</option>
         <option value="ASX">ASX</option>
         <option value="CXA">Cboe</option>
@@ -1941,11 +1951,11 @@ function renderUpcoming() {
     if (r.asic_detail_url) links.push(`<a href="${r.asic_detail_url}" target="_blank" style="color:#6366f1;font-size:.7rem">ASIC notice ↗</a>`);
     if (r.offer_doc_url)   links.push(`<a href="${r.offer_doc_url}" target="_blank" style="color:#6366f1;font-size:.7rem">Offer doc ↗</a>`);
     return `
-    <div style="border:1px solid #2e5285;border-radius:10px;padding:1rem;background:#1e3354">
+    <div style="border:1px solid #e2e8f0;border-radius:10px;padding:1rem;background:#fff">
       <div class="flex items-start justify-between gap-2 mb-2">
         <div class="flex-1 min-w-0">
-          <div style="font-weight:700;font-size:.82rem;line-height:1.3;color:#e2e8f0">${r.name || '—'}</div>
-          <div style="font-size:.7rem;color:#7fa3c8;margin-top:.2rem">${r.issuer || '—'}</div>
+          <div style="font-weight:700;font-size:.82rem;line-height:1.3;color:#0f172a">${r.name || '—'}</div>
+          <div style="font-size:.7rem;color:#64748b;margin-top:.2rem">${r.issuer || '—'}</div>
         </div>
         <div class="flex flex-col items-end gap-1 shrink-0">
           ${exchangeBadge(r.exchange)}
@@ -1953,7 +1963,7 @@ function renderUpcoming() {
         </div>
       </div>
       ${r.fund_type ? `<div style="font-size:.68rem;color:#94a3b8;margin-bottom:.5rem">${r.fund_type}</div>` : ''}
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.25rem;font-size:.7rem;color:#a8c4e0;margin-bottom:.75rem">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.25rem;font-size:.7rem;color:#475569;margin-bottom:.75rem">
         <div><span style="color:#94a3b8">Expected:</span> ${dateStr}</div>
         <div><span style="color:#94a3b8">PDS lodged:</span> ${lodgedStr}</div>
         ${r.arsn ? `<div style="grid-column:span 2"><span style="color:#94a3b8">ARSN:</span> ${r.arsn}</div>` : ''}
@@ -1994,7 +2004,7 @@ function renderRecent() {
         ${daysAgo !== null ? newBadge(daysAgo) : ''}
       </td>
       <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.name||''}">${r.name||'—'}</td>
-      <td style="color:#a8c4e0;font-size:.75rem">${r.issuer ? `<a href="/issuers/${slugify(r.issuer)}" style="color:#7fa3c8" class="hover:underline">${r.issuer}</a>` : '—'}</td>
+      <td style="color:#64748b;font-size:.75rem">${r.issuer ? `<a href="/issuers/${slugify(r.issuer)}" style="color:#64748b" class="hover:underline">${r.issuer}</a>` : '—'}</td>
       <td>${r.asset_class||'—'}</td>
       <td style="white-space:nowrap"><span style="font-family:monospace">${dateStr}</span><br><span style="font-size:.65rem;color:#94a3b8">${daysStr}</span></td>
       <td style="text-align:right;font-family:monospace">${mer}</td>
@@ -2044,17 +2054,17 @@ _AC_BODY = """
 <div id="lens-asset">
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
     <div class="card lg:col-span-2">
-      <h2 class="font-semibold text-sm text-slate-300 mb-3">Market AUM by Asset Class</h2>
+      <h2 class="font-semibold text-sm text-slate-700 mb-3">Market AUM by Asset Class</h2>
       <div style="position:relative;height:320px"><canvas id="ac-fum-chart"></canvas></div>
     </div>
     <div class="card">
-      <h2 class="font-semibold text-sm text-slate-300 mb-3">1Y Return by Asset Class</h2>
+      <h2 class="font-semibold text-sm text-slate-700 mb-3">1Y Return by Asset Class</h2>
       <div style="position:relative;height:320px"><canvas id="ac-ret-chart"></canvas></div>
     </div>
   </div>
   <div class="card">
     <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
-      <h2 class="font-semibold text-sm text-slate-300" id="ac-drill-title">Click an asset class above to drill into sub-categories</h2>
+      <h2 class="font-semibold text-sm text-slate-700" id="ac-drill-title">Click an asset class above to drill into sub-categories</h2>
       <button id="ac-clear" class="text-xs text-blue-400 hover:text-blue-300 hidden">← All classes</button>
     </div>
     <div id="ac-subcats" class="mb-4"></div>
@@ -2076,12 +2086,12 @@ _AC_BODY = """
 <div id="lens-sector" class="hidden">
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
     <div class="card lg:col-span-2">
-      <h2 class="font-semibold text-sm text-slate-300 mb-1">Market Exposure by GICS Sector</h2>
+      <h2 class="font-semibold text-sm text-slate-700 mb-1">Market Exposure by GICS Sector</h2>
       <p class="text-xs text-slate-500 mb-3">FUM-weighted sector allocation across all ETFs with holdings data. Click a sector to see which ETFs offer the most targeted exposure.</p>
       <div style="position:relative;height:420px"><canvas id="sector-chart"></canvas></div>
     </div>
     <div class="card">
-      <h2 class="font-semibold text-sm text-slate-300 mb-1" id="sector-drill-title">Select a sector →</h2>
+      <h2 class="font-semibold text-sm text-slate-700 mb-1" id="sector-drill-title">Select a sector →</h2>
       <p class="text-xs text-slate-500 mb-3">ETFs with highest allocation to selected sector</p>
       <div id="sector-etf-list"></div>
     </div>
@@ -2092,12 +2102,12 @@ _AC_BODY = """
 <div id="lens-country" class="hidden">
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
     <div class="card lg:col-span-2">
-      <h2 class="font-semibold text-sm text-slate-300 mb-1">Geographic Exposure — FUM-Weighted</h2>
+      <h2 class="font-semibold text-sm text-slate-700 mb-1">Geographic Exposure — FUM-Weighted</h2>
       <p class="text-xs text-slate-500 mb-3">Aggregated country weights across all ETFs with holdings data, weighted by FUM. Click a country to see targeted ETFs.</p>
       <div style="position:relative;height:480px"><canvas id="country-chart"></canvas></div>
     </div>
     <div class="card">
-      <h2 class="font-semibold text-sm text-slate-300 mb-1" id="country-drill-title">Select a country →</h2>
+      <h2 class="font-semibold text-sm text-slate-700 mb-1" id="country-drill-title">Select a country →</h2>
       <p class="text-xs text-slate-500 mb-3">ETFs with highest allocation to selected country</p>
       <div id="country-etf-list"></div>
     </div>
@@ -2109,11 +2119,11 @@ _AC_BODY = """
   <div id="factor-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-5"></div>
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
     <div class="card">
-      <h2 class="font-semibold text-sm text-slate-300 mb-3">Factor Return Comparison</h2>
+      <h2 class="font-semibold text-sm text-slate-700 mb-3">Factor Return Comparison</h2>
       <div style="position:relative;height:280px"><canvas id="factor-ret-chart"></canvas></div>
     </div>
     <div class="card">
-      <h2 class="font-semibold text-sm text-slate-300 mb-1" id="factor-table-title">Factor ETF List</h2>
+      <h2 class="font-semibold text-sm text-slate-700 mb-1" id="factor-table-title">Factor ETF List</h2>
       <p class="text-xs text-slate-500 mb-3" id="factor-table-sub">Click a factor card to filter</p>
       <div class="overflow-x-auto" style="max-height:260px;overflow-y:auto">
         <table>
@@ -2138,7 +2148,7 @@ let _activeFactor = null;
 // ── Lens styles ────────────────────────────────────────────────────────────
 const LENS_BTN_BASE   = 'lens-btn px-4 py-2 rounded-lg text-sm font-semibold border transition-colors';
 const LENS_BTN_ACTIVE = 'bg-blue-600 border-blue-600 text-white';
-const LENS_BTN_IDLE   = 'bg-[#0f2040] border-[#1e3860] text-slate-300 hover:border-blue-500/60';
+const LENS_BTN_IDLE   = 'bg-white border-slate-200 text-slate-600 hover:border-blue-400 hover:text-blue-600';
 
 // ── Factor definitions (Fama-French inspired) ──────────────────────────────
 const FACTORS = [
@@ -2188,7 +2198,7 @@ const GICS_PALETTE = {
 };
 function acColor(n)     { return AC_PALETTE[n]   || '#64748b'; }
 function gicsColor(n)   { return GICS_PALETTE[n] || '#64748b'; }
-function retColor(v)    { return v == null ? '#64748b' : v >= 0 ? '#4ade80' : '#f87171'; }
+function retColor(v)    { return v == null ? '#64748b' : v >= 0 ? '#16a34a' : '#dc2626'; }
 function factorColor(id){ return (FACTORS.find(f=>f.id===id)||{}).color || '#64748b'; }
 
 // ── Init ───────────────────────────────────────────────────────────────────
@@ -2255,7 +2265,7 @@ function renderAssetLens() {
       plugins: { legend:{display:false}, tooltip:{ callbacks:{ label: c => fmtFum(c.raw) } } },
       scales: {
         x: { ticks:{ font:{size:9}, maxRotation:35 }, grid:{display:false} },
-        y: { ticks:{ font:{size:10}, callback: v => fmtFum(v) }, grid:{color:'#1e3860'} }
+        y: { ticks:{ font:{size:10}, callback: v => fmtFum(v) }, grid:{color:'#f1f5f9'} }
       },
       onClick: (_, els) => { if (els[0]) drillAssetClass(acs[els[0].index].name); }
     }
@@ -2269,15 +2279,15 @@ function renderAssetLens() {
     data: {
       labels: acs.map(a=>a.name),
       datasets:[{ label:'Avg 1Y Return', data: acs.map(a=>a.avg_1y),
-        backgroundColor: acs.map(a => a.avg_1y >= 0 ? '#4ade8066' : '#f8717166'),
-        borderColor: acs.map(a => a.avg_1y >= 0 ? '#4ade80' : '#f87171'),
+        backgroundColor: acs.map(a => a.avg_1y >= 0 ? '#16a34a33' : '#dc262633'),
+        borderColor: acs.map(a => a.avg_1y >= 0 ? '#16a34a' : '#dc2626'),
         borderWidth:1, borderRadius:4 }]
     },
     options:{
       responsive:true, maintainAspectRatio:false, indexAxis:'y',
       plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>c.parsed.x != null ? c.parsed.x.toFixed(1)+'%' : '—'}}},
       scales:{
-        x:{ticks:{font:{size:10},callback:v=>v+'%'}, grid:{color:'#1e3860'}},
+        x:{ticks:{font:{size:10},callback:v=>v+'%'}, grid:{color:'#f1f5f9'}},
         y:{ticks:{font:{size:9}}, grid:{display:false}}
       }
     }
@@ -2309,7 +2319,7 @@ function renderACSubcats(ac) {
   const maxFum = Math.max(...subs.map(s => s.total_fum || 0), 1);
   document.getElementById('ac-subcats').innerHTML = subs.length
     ? `<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">${
-        subs.map(s => `<div class="border border-[#1e3860] rounded-lg p-3 bg-[#0d1c35] cursor-pointer hover:border-blue-500/60"
+        subs.map(s => `<div class="border border-slate-200 rounded-lg p-3 bg-slate-50 cursor-pointer hover:border-blue-500/60"
           onclick="renderACTable('${ac}','${(s.sub_category||'').replace(/'/g,"\\'")}')">
           <div class="text-xs text-slate-400 font-medium mb-1 truncate" title="${s.sub_category||''}">${s.sub_category||'—'}</div>
           <div class="text-base font-bold text-slate-100">${fmtFum(s.total_fum)}</div>
@@ -2329,10 +2339,10 @@ function renderACTable(ac, subcat) {
   etfs = etfs.slice(0, 50);
   document.getElementById('ac-etf-table').innerHTML = etfs.map(e => `<tr>
     <td class="font-bold" style="color:${acColor(e.asset_class)}">${e.code}</td>
-    <td class="text-slate-300" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.name||''}">${e.name||'—'}</td>
+    <td class="text-slate-700" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.name||''}">${e.name||'—'}</td>
     <td class="text-slate-400 text-xs">${e.issuer||'—'}</td>
     <td class="text-slate-500 text-xs">${e.sub_category||'—'}</td>
-    <td class="text-right tabular-nums text-slate-300">${fmtFum(e.fum)}</td>
+    <td class="text-right tabular-nums text-slate-700">${fmtFum(e.fum)}</td>
     <td class="text-right tabular-nums text-xs ${e.return_1y>=0?'text-green-400':'text-red-400'}">${e.return_1y!=null?(e.return_1y>=0?'+':'')+e.return_1y.toFixed(1)+'%':'—'}</td>
     <td class="text-right tabular-nums text-xs text-slate-400">${e.return_3y!=null?(e.return_3y>=0?'+':'')+e.return_3y.toFixed(1)+'%':'—'}</td>
     <td class="text-right tabular-nums text-xs text-slate-400">${e.return_5y!=null?(e.return_5y>=0?'+':'')+e.return_5y.toFixed(1)+'%':'—'}</td>
@@ -2363,7 +2373,7 @@ function renderSectorLens() {
       responsive: true, maintainAspectRatio: false, indexAxis: 'y',
       plugins: { legend:{display:false}, tooltip:{ callbacks:{ label: c => '$' + (c.raw/1000).toFixed(1) + 'B exposure' } } },
       scales: {
-        x: { ticks:{font:{size:10}, callback: v => '$'+(v/1000).toFixed(0)+'B'}, grid:{color:'#1e3860'} },
+        x: { ticks:{font:{size:10}, callback: v => '$'+(v/1000).toFixed(0)+'B'}, grid:{color:'#f1f5f9'} },
         y: { ticks:{font:{size:10}}, grid:{display:false} }
       },
       onClick: (_, els) => { if (els[0]) drillSector(sectors[els[0].index].sector_norm); }
@@ -2379,13 +2389,13 @@ function drillSector(sector) {
     .sort((a,b) => b.weight_pct - a.weight_pct)
     .slice(0, 10);
   document.getElementById('sector-etf-list').innerHTML = etfs.length
-    ? etfs.map(e => `<div class="flex items-center justify-between py-2 border-b border-[#1a3050] last:border-0">
+    ? etfs.map(e => `<div class="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
         <div class="min-w-0">
           <span class="font-bold text-sm" style="color:${gicsColor(sector)}">${e.etf_code}</span>
           <span class="text-xs text-slate-400 ml-2 truncate">${(e.name||'').substring(0,30)}</span>
         </div>
         <div class="text-right shrink-0 ml-2">
-          <div class="text-sm font-semibold text-slate-200">${e.weight_pct.toFixed(1)}%</div>
+          <div class="text-sm font-semibold text-slate-800">${e.weight_pct.toFixed(1)}%</div>
           <div class="text-xs text-slate-500">${fmtFum(e.fum)}</div>
         </div>
       </div>`).join('')
@@ -2415,7 +2425,7 @@ function renderCountryLens() {
       responsive: true, maintainAspectRatio: false, indexAxis: 'y',
       plugins: { legend:{display:false}, tooltip:{ callbacks:{ label: c => '$' + (c.raw/1000).toFixed(1) + 'B exposure · ' + (_d.countries.find(x=>x.country_norm===countries[c.dataIndex].country_norm)||{}).etf_count + ' ETFs' } } },
       scales: {
-        x: { ticks:{font:{size:10}, callback: v => '$'+(v/1000).toFixed(0)+'B'}, grid:{color:'#1e3860'} },
+        x: { ticks:{font:{size:10}, callback: v => '$'+(v/1000).toFixed(0)+'B'}, grid:{color:'#f1f5f9'} },
         y: { ticks:{font:{size:9}}, grid:{display:false} }
       },
       onClick: (_, els) => { if (els[0]) drillCountry(countries[els[0].index].country_norm); }
@@ -2431,13 +2441,13 @@ function drillCountry(country) {
     .sort((a,b) => b.total_weight_pct - a.total_weight_pct)
     .slice(0, 10);
   document.getElementById('country-etf-list').innerHTML = etfs.length
-    ? etfs.map(e => `<div class="flex items-center justify-between py-2 border-b border-[#1a3050] last:border-0">
+    ? etfs.map(e => `<div class="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
         <div class="min-w-0">
           <span class="font-bold text-sm text-blue-400">${e.etf_code}</span>
           <span class="text-xs text-slate-400 ml-2 truncate">${(e.name||'').substring(0,28)}</span>
         </div>
         <div class="text-right shrink-0 ml-2">
-          <div class="text-sm font-semibold text-slate-200">${e.total_weight_pct.toFixed(1)}%</div>
+          <div class="text-sm font-semibold text-slate-800">${e.total_weight_pct.toFixed(1)}%</div>
           <div class="text-xs text-slate-500">${fmtFum(e.fum)}</div>
         </div>
       </div>`).join('')
@@ -2499,7 +2509,7 @@ function renderFactorLens() {
       plugins:{ legend:{position:'bottom',labels:{font:{size:10},boxWidth:12}}, tooltip:{callbacks:{label:c=>c.dataset.label+': '+(c.parsed.y!=null?(c.parsed.y>=0?'+':'')+c.parsed.y.toFixed(1)+'%':'—')}}},
       scales:{
         x:{ticks:{font:{size:8},maxRotation:35},grid:{display:false}},
-        y:{ticks:{font:{size:10},callback:v=>v+'%'},grid:{color:'#1e3860'}}
+        y:{ticks:{font:{size:10},callback:v=>v+'%'},grid:{color:'#f1f5f9'}}
       },
       onClick:(_, els) => { if(els[0]) drillFactor(FACTORS[els[0].index].id); }
     }
@@ -2522,8 +2532,8 @@ function drillFactor(fid) {
   document.getElementById('factor-table-sub').textContent = etfs.length + ' ETFs matched';
   document.getElementById('factor-etf-table').innerHTML = etfs.slice(0,40).map(e=>`<tr>
     <td class="font-bold text-xs" style="color:${f.color}">${e.code}</td>
-    <td class="text-slate-300 text-xs" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.name||'—'}</td>
-    <td class="text-right tabular-nums text-xs text-slate-300">${fmtFum(e.fum)}</td>
+    <td class="text-slate-700 text-xs" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.name||'—'}</td>
+    <td class="text-right tabular-nums text-xs text-slate-700">${fmtFum(e.fum)}</td>
     <td class="text-right tabular-nums text-xs ${e.return_1y>=0?'text-green-400':'text-red-400'}">${e.return_1y!=null?(e.return_1y>=0?'+':'')+e.return_1y.toFixed(1)+'%':'—'}</td>
     <td class="text-right tabular-nums text-xs text-slate-400">${e.return_3y!=null?(e.return_3y>=0?'+':'')+e.return_3y.toFixed(1)+'%':'—'}</td>
     <td class="text-right tabular-nums text-xs text-slate-500">${e.mer!=null?e.mer.toFixed(2)+'%':'—'}</td>
@@ -2553,9 +2563,9 @@ _ISSUER_BODY = """
           Visit website &#8599;
         </a>
       </div>
-      <p id="issuer-meta" class="text-sm text-[#7fa3c8] mt-1"></p>
+      <p id="issuer-meta" class="text-sm text-slate-500 mt-1"></p>
     </div>
-    <a href="/insights/issuers" class="text-xs text-[#7fa3c8] hover:text-white shrink-0">
+    <a href="/insights/issuers" class="text-xs text-slate-500 hover:text-blue-600 shrink-0">
       ← All issuers
     </a>
   </div>
@@ -2565,25 +2575,25 @@ _ISSUER_BODY = """
 
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
   <div class="card">
-    <h2 class="font-semibold text-sm text-slate-300 mb-4">AUM by Asset Class</h2>
+    <h2 class="font-semibold text-sm text-slate-700 mb-4">AUM by Asset Class</h2>
     <div class="relative" style="height:260px"><canvas id="chart-ac"></canvas></div>
   </div>
   <div class="card">
-    <h2 class="font-semibold text-sm text-slate-300 mb-4">ETFs by Asset Class</h2>
+    <h2 class="font-semibold text-sm text-slate-700 mb-4">ETFs by Asset Class</h2>
     <div id="ac-count-bars" class="space-y-1 mt-2"></div>
   </div>
 </div>
 
 <div class="card">
   <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
-    <h2 class="font-semibold text-sm text-slate-300">All Products</h2>
+    <h2 class="font-semibold text-sm text-slate-700">All Products</h2>
     <div class="flex items-center gap-2">
       <input id="etf-search" type="text" placeholder="Filter…"
-             class="border border-[#1e3860] rounded-lg px-2.5 py-1.5 text-sm
-                    bg-[#0d1c35] text-slate-200 focus:ring-2 focus:ring-blue-800 outline-none w-44">
+             class="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm
+                    bg-slate-50 text-slate-700 focus:ring-2 focus:ring-blue-300 outline-none w-44">
       <select id="etf-ac-filter"
-              class="border border-[#1e3860] rounded-lg px-2.5 py-1.5 text-sm
-                     bg-[#0d1c35] text-slate-200 focus:ring-2 focus:ring-blue-800 outline-none">
+              class="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm
+                     bg-slate-50 text-slate-700 focus:ring-2 focus:ring-blue-300 outline-none">
         <option value="">All asset classes</option>
       </select>
     </div>
@@ -2591,7 +2601,7 @@ _ISSUER_BODY = """
   <div class="overflow-x-auto">
     <table class="w-full text-sm">
       <thead>
-        <tr class="text-left text-xs text-slate-400 border-b border-[#1e3860]">
+        <tr class="text-left text-xs text-slate-400 border-b border-slate-200">
           <th class="pb-2 pr-3 font-semibold">Code</th>
           <th class="pb-2 pr-3 font-semibold">Name</th>
           <th class="pb-2 pr-3 font-semibold">Asset Class</th>
@@ -2610,7 +2620,7 @@ _ISSUER_BODY = """
 </div>
 
 <div id="articles-section" class="card hidden">
-  <h2 class="font-semibold text-sm text-slate-300 mb-4">Related Articles</h2>
+  <h2 class="font-semibold text-sm text-slate-700 mb-4">Related Articles</h2>
   <div id="articles-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
 </div>
 """
@@ -2669,7 +2679,7 @@ async function init() {
         ctx.save();
         const cx = left+width/2, cy = top+height/2;
         ctx.textAlign='center'; ctx.textBaseline='middle';
-        ctx.font='bold 13px Inter,sans-serif'; ctx.fillStyle='#e2e8f0';
+        ctx.font='bold 13px Inter,sans-serif'; ctx.fillStyle='#0f172a';
         ctx.fillText(fmtFum(totalFum), cx, cy-7);
         ctx.font='10px Inter,sans-serif'; ctx.fillStyle='#94a3b8';
         ctx.fillText('Total AUM', cx, cy+8);
@@ -2681,7 +2691,7 @@ async function init() {
       datasets: [{
         data: acData.map(r => r.fum),
         backgroundColor: acData.map(r => acColor(r.ac)),
-        borderWidth: 2, borderColor: '#0f2040',
+        borderWidth: 2, borderColor: '#fff',
         hoverOffset: 6,
       }]
     },
@@ -2725,12 +2735,12 @@ async function init() {
   if (d.related_articles && d.related_articles.length) {
     document.getElementById('articles-section').classList.remove('hidden');
     document.getElementById('articles-grid').innerHTML = d.related_articles.map(a => `
-      <a href="/articles/${a.slug}" class="block rounded-lg border border-[#1e3860]
-         hover:border-blue-500/50 transition-colors p-4" style="background:#142850">
-        <span class="text-xs font-semibold" style="color:#93c5fd">${a.category}</span>
-        <h3 class="text-sm font-bold text-slate-100 mt-1.5 leading-snug line-clamp-2">${a.title}</h3>
-        <p class="text-xs text-slate-400 mt-1 line-clamp-2">${a.subtitle||''}</p>
-        <p class="text-xs text-slate-500 mt-2">${a.date}</p>
+      <a href="/articles/${a.slug}" class="block rounded-lg border border-slate-200
+         hover:border-blue-400 hover:shadow-sm transition-all p-4 bg-white">
+        <span class="text-xs font-semibold text-blue-600">${a.category}</span>
+        <h3 class="text-sm font-bold text-slate-900 mt-1.5 leading-snug line-clamp-2">${a.title}</h3>
+        <p class="text-xs text-slate-500 mt-1 line-clamp-2">${a.subtitle||''}</p>
+        <p class="text-xs text-slate-400 mt-2">${a.date}</p>
       </a>`).join('');
   }
 
@@ -2749,10 +2759,10 @@ function renderETFTable() {
   tbody.innerHTML = etfs.map(e => {
     const mer_v = e.expense_ratio;
     const flow = e.fund_flow_1m;
-    return `<tr class="border-b border-[#1a2e4a] hover:bg-[#142850] cursor-pointer"
+    return `<tr class="border-b border-slate-100 hover:bg-slate-50 cursor-pointer"
                 onclick="window.location='/dashboard#etf=${e.code}'">
       <td class="py-2 pr-3 font-bold text-blue-400 font-mono text-xs">${e.code}</td>
-      <td class="py-2 pr-3 text-xs text-slate-300" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.name||''}">${e.name||'—'}</td>
+      <td class="py-2 pr-3 text-xs text-slate-700" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.name||''}">${e.name||'—'}</td>
       <td class="py-2 pr-3"><span class="text-xs px-1.5 py-0.5 rounded font-medium" style="background:${acColor(e.asset_class)}22;color:${acColor(e.asset_class)}">${e.asset_class||'—'}</span></td>
       <td class="py-2 pr-3 text-right tabular-nums text-sm font-semibold text-white">${fmtFum(e.fund_size_aud_millions)}</td>
       <td class="py-2 pr-3 text-right tabular-nums text-xs text-slate-400">${mer_v!=null?mer_v.toFixed(2)+'%':'—'}</td>
@@ -2793,7 +2803,7 @@ _TM_BODY = """
   <div class="card mb-5">
     <div class="flex items-start justify-between flex-wrap gap-3 mb-4">
       <div>
-        <h2 class="font-semibold text-slate-200 mb-0.5">Australian ETF Market — Historical AUM</h2>
+        <h2 class="font-semibold text-slate-800 mb-0.5">Australian ETF Market — Historical AUM</h2>
         <p class="text-xs text-slate-400">Monthly ASX-listed ETF market cap since July 2013. Cboe Australia data is current-month only (not in ASX monthly report).</p>
       </div>
       <p class="text-xs text-slate-500" id="tm-ts"></p>
@@ -2802,7 +2812,7 @@ _TM_BODY = """
   </div>
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
     <div class="card">
-      <h2 class="font-semibold text-slate-200 text-sm mb-1">Current Market Cap by Exchange</h2>
+      <h2 class="font-semibold text-slate-800 text-sm mb-1">Current Market Cap by Exchange</h2>
       <p class="text-xs text-slate-400 mb-4">Live FUM from ETF database</p>
       <div style="height:240px" class="flex items-center justify-center">
         <canvas id="tm-exch-donut" style="max-height:240px"></canvas>
@@ -2817,12 +2827,12 @@ _TM_BODY = """
 <!-- ASSET CLASS -->
 <div id="tm-assetclass" class="hidden">
   <div class="card mb-5">
-    <h2 class="font-semibold text-slate-200 mb-1">Market AUM by Asset Class — Historical</h2>
+    <h2 class="font-semibold text-slate-800 mb-1">Market AUM by Asset Class — Historical</h2>
     <p class="text-xs text-slate-400 mb-4">Stacked monthly market cap by broad asset class since July 2013</p>
     <div style="height:380px"><canvas id="tm-ac-hist"></canvas></div>
   </div>
   <div class="card">
-    <h2 class="font-semibold text-slate-200 text-sm mb-4">Current Snapshot</h2>
+    <h2 class="font-semibold text-slate-800 text-sm mb-4">Current Snapshot</h2>
     <div id="tm-ac-bars" class="space-y-2"></div>
   </div>
 </div>
@@ -2830,12 +2840,12 @@ _TM_BODY = """
 <!-- GEOGRAPHY -->
 <div id="tm-geography" class="hidden">
   <div class="card mb-5">
-    <h2 class="font-semibold text-slate-200 mb-1">Market AUM by Geographic Focus — Historical</h2>
+    <h2 class="font-semibold text-slate-800 mb-1">Market AUM by Geographic Focus — Historical</h2>
     <p class="text-xs text-slate-400 mb-4">Stacked monthly market cap by geographic investment mandate since July 2013</p>
     <div style="height:380px"><canvas id="tm-geo-hist"></canvas></div>
   </div>
   <div class="card">
-    <h2 class="font-semibold text-slate-200 text-sm mb-4">Current Snapshot</h2>
+    <h2 class="font-semibold text-slate-800 text-sm mb-4">Current Snapshot</h2>
     <div id="tm-geo-bars" class="space-y-2"></div>
   </div>
 </div>
@@ -2843,12 +2853,12 @@ _TM_BODY = """
 <!-- STRATEGY & FACTORS -->
 <div id="tm-strategy" class="hidden">
   <div class="card mb-5">
-    <h2 class="font-semibold text-slate-200 mb-1">Market AUM by Strategy — Historical</h2>
+    <h2 class="font-semibold text-slate-800 mb-1">Market AUM by Strategy — Historical</h2>
     <p class="text-xs text-slate-400 mb-4">Stacked monthly market cap by investment style and factor strategy since July 2013</p>
     <div style="height:380px"><canvas id="tm-strat-hist"></canvas></div>
   </div>
   <div class="card">
-    <h2 class="font-semibold text-slate-200 text-sm mb-4">Current Snapshot</h2>
+    <h2 class="font-semibold text-slate-800 text-sm mb-4">Current Snapshot</h2>
     <div id="tm-strat-bars" class="space-y-2"></div>
   </div>
 </div>
@@ -2861,7 +2871,7 @@ const TM_PALETTE = [
 ];
 
 const TM_BTN_ACTIVE = 'active-tm bg-blue-600 border-blue-600 text-white';
-const TM_BTN_IDLE   = 'bg-[#0f2040] border-[#1e3860] text-slate-300 hover:border-blue-500/60';
+const TM_BTN_IDLE   = 'bg-white border-slate-200 text-slate-600 hover:border-blue-400 hover:text-blue-600';
 
 function setTmBtns(active) {{
   document.querySelectorAll('.tm-btn').forEach(b => {{
@@ -2926,12 +2936,12 @@ function makeStackedArea(canvasId, dates, series) {{
         x: {{
           type: 'time', time: {{ unit: 'year', displayFormats: {{ year: 'yyyy' }} }},
           ticks: {{ font: {{ size: 10 }}, color: '#64748b', maxTicksLimit: 12 }},
-          grid: {{ color: '#1e3860' }}
+          grid: {{ color: '#f1f5f9' }}
         }},
         y: {{
           stacked: true,
           ticks: {{ font: {{ size: 10 }}, color: '#64748b', callback: v => 'A$' + v + 'B' }},
-          grid: {{ color: '#1e3860' }}
+          grid: {{ color: '#f1f5f9' }}
         }}
       }}
     }}
@@ -2950,10 +2960,10 @@ function renderHBars(containerId, series, dates) {{
       <div class="w-3 h-3 rounded-sm shrink-0" style="background:${{x.color}}"></div>
       <div class="flex-1 min-w-0">
         <div class="flex justify-between text-xs mb-1">
-          <span class="text-slate-300 truncate">${{x.name}}</span>
-          <span class="text-slate-200 font-semibold ml-2 shrink-0">A$${{x.val.toFixed(1)}}B <span class="text-slate-500 font-normal">${{(x.val/total*100).toFixed(1)}}%</span></span>
+          <span class="text-slate-700 truncate">${{x.name}}</span>
+          <span class="text-slate-800 font-semibold ml-2 shrink-0">A$${{x.val.toFixed(1)}}B <span class="text-slate-500 font-normal">${{(x.val/total*100).toFixed(1)}}%</span></span>
         </div>
-        <div class="h-1.5 bg-[#1e3860] rounded-full overflow-hidden">
+        <div class="h-1.5 bg-slate-200 rounded-full overflow-hidden">
           <div class="h-full rounded-full" style="width:${{(x.val/total*100).toFixed(1)}}%;background:${{x.color}}"></div>
         </div>
       </div>
@@ -2988,9 +2998,9 @@ async function loadTmExchange() {{
         }},
         scales: {{
           x: {{ type: 'time', time: {{ unit: 'year', displayFormats: {{ year: 'yyyy' }} }},
-               ticks: {{ font: {{ size: 10 }}, color: '#64748b' }}, grid: {{ color: '#1e3860' }} }},
+               ticks: {{ font: {{ size: 10 }}, color: '#64748b' }}, grid: {{ color: '#f1f5f9' }} }},
           y: {{ ticks: {{ font: {{ size: 10 }}, color: '#64748b', callback: v => 'A$' + v + 'B' }},
-               grid: {{ color: '#1e3860' }} }}
+               grid: {{ color: '#f1f5f9' }} }}
         }}
       }}
     }});
@@ -3005,7 +3015,7 @@ async function loadTmExchange() {{
     const ctx2 = document.getElementById('tm-exch-donut').getContext('2d');
     new Chart(ctx2, {{
       type: 'doughnut',
-      data: {{ labels, datasets: [{{ data: fums, backgroundColor: COLORS.slice(0, exchanges.length), borderWidth: 2, borderColor: '#0f2040' }}] }},
+      data: {{ labels, datasets: [{{ data: fums, backgroundColor: COLORS.slice(0, exchanges.length), borderWidth: 2, borderColor: '#fff' }}] }},
       options: {{
         responsive: true, maintainAspectRatio: false, cutout: '62%',
         plugins: {{
@@ -3021,13 +3031,13 @@ async function loadTmExchange() {{
       return `
         <div>
           <div class="flex items-baseline justify-between mb-1">
-            <span class="flex items-center gap-2"><span class="w-3 h-3 rounded-sm shrink-0 inline-block" style="background:${{COLORS[i]}}"></span><span class="text-sm font-semibold text-slate-200">${{label}}</span></span>
+            <span class="flex items-center gap-2"><span class="w-3 h-3 rounded-sm shrink-0 inline-block" style="background:${{COLORS[i]}}"></span><span class="text-sm font-semibold text-slate-800">${{label}}</span></span>
             <span class="text-sm font-bold text-slate-100">A$${{fum}}B</span>
           </div>
           <div class="flex justify-between text-xs text-slate-400 mb-1.5">
             <span>${{e.etf_count}} ETFs</span><span>${{pct_v}}% of market</span>
           </div>
-          <div class="h-1.5 bg-[#1e3860] rounded-full overflow-hidden">
+          <div class="h-1.5 bg-slate-200 rounded-full overflow-hidden">
             <div class="h-full rounded-full" style="width:${{pct_v}}%;background:${{COLORS[i]}}"></div>
           </div>
         </div>`;
