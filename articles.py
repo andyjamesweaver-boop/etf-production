@@ -8,6 +8,136 @@ ARTICLES = [
     # ── Weekly Wrap ────────────────────────────────────────────────────────────
 
     {
+        "slug": "weekly-wrap-10-april-2026",
+        "title": "Weekly Wrap: The Whipsaw — Tariff Pause Sparks a Relief Rally, But the Damage is Done",
+        "subtitle": "One of the most volatile weeks in years saw crude oil surge 56%, bear ETFs deliver their best month in memory, and infrastructure funds continue to outperform — while digital assets found a fragile floor.",
+        "date": "2026-04-10",
+        "category": "Market Trends",
+        "summary": "The week ending 10 April 2026 delivered some of the most extreme intraday moves since the COVID era. After markets digested the Liberation Day tariff shock, the Trump administration announced a 90-day pause on reciprocal tariffs for most trading partners on 9 April — triggering one of the largest single-day rallies in US equities in decades. The exception was China, where tariffs were escalated to 125%. For Australian ETF investors, the net result over the month is a landscape defined by dispersion: infrastructure and hedged real assets continue to lead, crude oil surged on supply disruption fears, bear ETFs had their best month in years, and digital assets — despite a partial recovery late in the week — remain deeply negative on a monthly basis. The Australian market stands at A$339B under management across 475 products.",
+        "body": """
+<h2>A Week Like No Other</h2>
+<p>The week of 3–10 April 2026 tested the nerve of even experienced investors. Monday opened with global markets still absorbing the Liberation Day tariff shock from the prior week — the S&amp;P 500 and Nasdaq futures pointed sharply lower at Sunday's open, with US equity circuit breakers testing early. Through Tuesday and Wednesday, selling deepened as major trading partners began announcing retaliatory measures, and credit markets — particularly high-yield spreads — widened meaningfully. By Wednesday close, the Nasdaq had declined over 11% from its pre-Liberation Day level.</p>
+<p>Then came Thursday 9 April. Shortly before the US market open, the Trump administration announced a 90-day pause on the reciprocal tariffs for all trading partners <em>except China</em>, where rates were simultaneously escalated to <strong>125%</strong>. The reversal triggered one of the largest single-session rallies in US equities since the depths of the COVID pandemic — the S&amp;P 500 rose over 9% on the day, and the Nasdaq more than 12%. By Friday's close, much of the week's damage had been clawed back in US markets, though the underlying uncertainty remained elevated.</p>
+<p>For Australian ETF investors, the week illustrated two recurring themes: the value of geographic and structural diversification, and the material difference between hedged and unhedged international exposure during periods of sharp AUD/USD movement. The month's best performers were not the usual suspects — they were crude oil, inverse equity ETFs, and currency-hedged infrastructure funds.</p>
+
+<h2>Asset Class Scorecard</h2>
+<p>Infrastructure and property ETFs were the strongest asset class over the month to 10 April, averaging <strong>+3.1%</strong> across 17 products — with the best performers reaching +9%. Fixed income and cash provided exactly the stability they are designed for, averaging <strong>+0.3%</strong> across 102 products. International equities as a group averaged <strong>–1.0%</strong>, but this aggregate conceals enormous dispersion: Korea and energy-related funds gained 10–18%, while US technology funds and gold miners lost 15–20%.</p>
+<p>Australian equities averaged <strong>–0.7%</strong> for the month — a modest negative that reflects the ASX's initial sell-off in the Liberation Day aftermath, partially offset by the recovery in domestic financials and energy. The ASX bear ETF (BBOZ) gaining +19.3% is the clearest signal of how the month played out: equities fell sharply, then partially recovered, but the net return over the period remained negative for most broad-market products.</p>
+<p>Digital assets averaged <strong>–14.6%</strong> for the month, though this was a meaningful improvement from –23% in the prior week's data, suggesting the relief rally of 9 April reached crypto markets too.</p>
+
+<div class="chart-box">
+  <h3>Average 1-Month Return by Asset Class — Month to 10 April 2026</h3>
+  <div style="position:relative;height:260px"><canvas id="chart-ac-1m"></canvas></div>
+</div>
+<script>
+(function() {
+  const labels = ['Infrastructure','Property','Fixed Income','Cash','Currency','Diversified','Commodities','Aust Equities','Intl Equities','Thematic','Alternatives','Digital Assets'];
+  const data   = [4.10, 3.14, 0.32, 0.31, 1.76, -0.55, -0.49, -0.68, -0.98, -2.62, -4.79, -14.64];
+  const colors = data.map(v => v >= 0 ? '#16a34a20' : '#dc262620');
+  const borders = data.map(v => v >= 0 ? '#16a34a' : '#dc2626');
+  new Chart(document.getElementById('chart-ac-1m'), {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Avg 1M Return %', data, backgroundColor: colors, borderColor: borders, borderWidth: 1, borderRadius: 3, borderSkipped: false }] },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.x.toFixed(1) + '%' } } },
+      scales: {
+        x: { ticks: { font: { size: 10 }, callback: v => v + '%' }, grid: { color: '#e2e8f0' } },
+        y: { ticks: { font: { size: 10 } }, grid: { display: false } }
+      }
+    }
+  });
+})();
+</script>
+
+<h2>Crude Oil's Extraordinary Run</h2>
+<p>The standout performer across the entire Australian ETF market for the month was BetaShares Crude Oil Index Currency Hedged Complex ETF (<strong>OOO</strong>), which gained an extraordinary <strong>+55.9%</strong>. The twelve-month return has now reached <strong>+62.8%</strong>, making OOO the strongest performer in the market over that horizon among liquid ETFs.</p>
+<p>The crude oil surge reflects a confluence of geopolitical and supply factors operating independently of the tariff situation. OPEC+ production discipline has been tighter than many expected, Libyan supply disruptions added further pressure, and the tariff-driven economic uncertainty has paradoxically boosted oil through a "buy real assets" risk-off dynamic. OOO is a leveraged complex ETF that provides leveraged exposure to the price of crude oil futures — investors should note that its returns include a significant currency hedge benefit, and that daily leverage resetting means its long-run performance will diverge from simple spot oil moves. But for the month in question, conditions aligned nearly perfectly.</p>
+<p>BetaShares Global Energy Companies Currency Hedged (FUEL) gained <strong>+11.8%</strong>, providing a less volatile expression of the same theme through equities in integrated oil and gas majors. At A$270M in assets, FUEL is now one of the larger thematic products in the market and has returned <strong>+38.3%</strong> over twelve months.</p>
+
+<h2>Bear ETFs: Rare Positive Ground</h2>
+<p>BetaShares Australian Equities Strong Bear (BBOZ) gained <strong>+19.3%</strong> for the month — its strongest performance in years. BBOZ provides leveraged inverse exposure to the S&P/ASX 200, so its outperformance is a direct read on how severely the Australian equity market fell during the peak tariff-fear period. Investors using BBOZ as a tactical hedge during the Liberation Day selloff would have significantly offset losses in their long equity positions. The twelve-month return remains deeply negative (–20.0%), a reminder that inverse and leveraged products are timing instruments rather than long-term holdings.</p>
+<p>BetaShares US Equities Strong Bear Currency Hedged (BBUS) gained <strong>+12.3%</strong> for the month, reflecting the severity of the Nasdaq and S&P 500 drawdown before the April 9 relief rally. The currency hedge in BBUS means its return was also influenced by AUD appreciation: as the AUD rose against the USD during the selloff, a hedged short US equities product would have benefited on both legs.</p>
+<p>For most investors, the lesson from this month is not to rush into inverse products — the whipsaw nature of the tariff situation made timing extremely difficult, and those who bought BBOZ after the initial fall on Liberation Day would have given most of the gains back on April 9. But for investors who had pre-positioned tactical hedges, the month vindicated the approach.</p>
+
+<h2>Infrastructure: The Persistent Winner</h2>
+<p>For the second consecutive weekly wrap, currency-hedged global infrastructure funds are the standout equity-category performers. Magellan Infrastructure Fund Currency Hedged (MICH) gained <strong>+9.0%</strong>, ClearBridge Global Infrastructure Value Hedged (CIVH) gained <strong>+9.0%</strong>, Lazard Global Listed Infrastructure Active (GIFL) gained <strong>+8.5%</strong>, and ClearBridge Global Infrastructure Income Hedged (CIIH) gained <strong>+8.5%</strong>.</p>
+<p>The pattern is consistent: it is the <em>currency-hedged</em> variant of these products that is doing the work. The AUD appreciated meaningfully against the USD through the tariff selloff as investors reduced US exposure, and hedged products benefit twice — from stable underlying real asset cash flows and from the hedge gain as the AUD rises. The four largest infrastructure ETFs (GIFL at A$3.1B, CIIH at A$1.3B, CIVH at A$1.1B, MICH at A$0.5B) collectively hold over A$6B in assets and have averaged approximately <strong>+8.8%</strong> for the month.</p>
+<p>The infrastructure theme also has a fundamental support story independent of currency effects: global fiscal spending on energy transition, data centre power, ports and transport is accelerating, driven by governments responding to supply chain concerns raised by exactly the kind of tariff environment we are now in. The sector is benefiting from the same policy impulse that is creating the tariff uncertainty in the first place.</p>
+
+<div class="chart-box">
+  <h3>Top Performers — Month to 10 April 2026</h3>
+  <div style="position:relative;height:240px"><canvas id="chart-top-1m"></canvas></div>
+</div>
+<script>
+(function() {
+  const labels = ['OOO','BBOZ','IKO','BBUS','FUEL','MVB','OZF','MICH','CIVH','GIFL'];
+  const data   = [55.9, 19.3, 18.5, 12.3, 11.8, 10.5, 9.0, 9.0, 9.0, 8.5];
+  new Chart(document.getElementById('chart-top-1m'), {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Return %', data, backgroundColor: '#16a34a20', borderColor: '#16a34a', borderWidth: 1, borderRadius: 3, borderSkipped: false }] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => '+' + c.parsed.y.toFixed(1) + '%' } } },
+      scales: {
+        x: { ticks: { font: { size: 10 } }, grid: { display: false } },
+        y: { ticks: { font: { size: 10 }, callback: v => v + '%' }, grid: { color: '#e2e8f0' } }
+      }
+    }
+  });
+})();
+</script>
+
+<h2>Korean Equities: Tariff Headwind, Strong Returns</h2>
+<p>iShares MSCI South Korea ETF (IKO) gained <strong>+18.5%</strong> for the month, making it the third-best performer in the market. South Korea was explicitly targeted in the Liberation Day tariff announcement with a substantial levy on exports — yet Korean equities rallied strongly, driven by semiconductor demand upgrades (Samsung, SK Hynix) and a domestic fiscal stimulus response. This counterintuitive outcome illustrates a recurring pattern in tariff cycles: markets often price in the worst rapidly, and then recover as actual economic data proves more resilient. IKO has now returned <strong>+148%</strong> over twelve months, the highest one-year return of any equity ETF in the Australian market.</p>
+<p>The South Korea performance also continued to show a disconnect between prices and flows — as noted in last week's wrap, IKO saw significant outflows despite strong returns. Investors appear to be using the performance strength as an exit opportunity rather than an entry signal, which may reflect concern about IKO's tariff sensitivity in the medium term.</p>
+
+<h2>Digital Assets: A Partial Recovery</h2>
+<p>After averaging –23% in the prior month's data, digital assets have partially recovered. BetaShares Ethereum ETF (QETH) is now showing a <strong>+13.3%</strong> one-month return in the most recent data, reflecting the sharp recovery in crypto assets following the April 9 relief rally. However, most bitcoin ETFs remain in deeply negative territory: VanEck Bitcoin (VBTC, –19.7%), Monochrome Bitcoin (IBTC, –19.2%), DigitalX Bitcoin (BTXX, –20.6%), and BetaShares Global Ethereum (EETH, –26.8%) all continue to show substantial monthly losses.</p>
+<p>The divergence between QETH's positive reading and the broadly negative bitcoin ETF data likely reflects timing differences in when price data was last updated across different products. The underlying pattern is clear: crypto assets fell sharply during the risk-off period and have recovered partially but remain under pressure on a monthly basis. With tariff uncertainty unresolved and the China/US trade conflict likely to remain a dominant macro theme, the crypto market is unlikely to find a sustained tailwind in the near term.</p>
+<p>Gold, despite its safe-haven status, also disappointed in recent sessions. Global X Physical Gold (GOLD, A$6.3B) returned <strong>–2.0%</strong> for the month in AUD terms, as did Perth Mint Gold (PMGOLD, –2.2%). The twelve-month returns remain extraordinary — both products are up approximately <strong>+58%</strong> — but the reversal from gold's prior highs reflects profit-taking and a stronger AUD eroding USD-denominated gold gains for Australian investors. Hedged gold miners (MNRS, –19.6%) were hit harder, as equity risk premia rose more than the gold price.</p>
+
+<h2>Australian Banks: Domestic Resilience</h2>
+<p>Among Australian equities, the domestic financials story remains intact. VanEck Australian Banks ETF (MVB) gained <strong>+10.5%</strong> for the month, and State Street S&amp;P/ASX 200 Financials ex A-REIT (OZF) gained <strong>+9.0%</strong>. Vanguard Australian Shares High Yield (VHY, which has heavy bank weighting) gained <strong>+7.2%</strong>, and the broad ASX 200 products — STW, IOZ, VAS — all delivered returns of approximately <strong>+4%</strong>.</p>
+<p>Australian banks benefit from a specific dynamic in the current environment: they are domestic earnings stories with limited direct US tariff exposure, strong net interest margins in the current rate environment, and high dividend yields that provide a return floor. As global investors reduce US equity allocation, Australian financials represent a high-quality, liquid alternative with visible earnings and a credible dividend stream.</p>
+
+<h2>Fund Flows: A$4.4 Billion Despite the Noise</h2>
+<p>Monthly flows for the period ending late February 2026 (the most recent full data available) totalled <strong>A$4.4 billion</strong> — slightly below January's A$5.1B but still robust. The flow patterns tell a consistent story: systematic accumulation into broad passive products dominates, with pockets of tactical activity around specific themes.</p>
+<p>VGS attracted the largest inflow at <strong>+A$504M</strong>, reinforcing its position as the market's go-to vehicle for broad international equity exposure. The continued strong inflow into VGS despite its flat-to-negative returns speaks to the disciplined approach of its investor base — these are largely accumulation-phase retail investors on regular contribution schedules who do not alter their behaviour based on short-term market moves. Core domestic equity products — IOZ (+A$229M), VAS (+A$203M), A200 (+A$203M) — continue their consistent inflow pattern.</p>
+<p>The most notable outflow was Magellan Global Fund Open Class (MGOC), which shed <strong>–A$209M</strong> for the month. MGOC's twelve-month underperformance relative to peers continues to drive redemptions at a pace that could see the fund's AUM decline materially through 2026. The gap between MGOC's performance and the passive alternatives it competes against has widened further in the current environment: VGS, despite its own negative monthly return, has produced better outcomes over three and five years at a fraction of the fee.</p>
+
+<div class="chart-box">
+  <h3>Largest Fund Inflows — Month to Late February 2026 (A$M)</h3>
+  <div style="position:relative;height:220px"><canvas id="chart-flows"></canvas></div>
+</div>
+<script>
+(function() {
+  const labels = ['VGS','IOZ','VAS','A200','QUAL','VHY','ATEC','VEU','CRED','MONY'];
+  const data   = [504, 229, 203, 203, 170, 115, 114, 107, 105, 100];
+  new Chart(document.getElementById('chart-flows'), {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'A$M', data, backgroundColor: '#2563eb20', borderColor: '#2563eb', borderWidth: 1, borderRadius: 3, borderSkipped: false }] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => '+A$' + c.parsed.y + 'M' } } },
+      scales: {
+        x: { ticks: { font: { size: 10 } }, grid: { display: false } },
+        y: { ticks: { font: { size: 10 }, callback: v => 'A$' + v + 'M' }, grid: { color: '#e2e8f0' } }
+      }
+    }
+  });
+})();
+</script>
+
+<h2>The Industry at A$339 Billion</h2>
+<p>The Australian ETF industry now stands at <strong>A$339.2 billion</strong> under management across <strong>475 products</strong>. The top five issuers — Vanguard (A$94.1B), BetaShares (A$64.3B), iShares (A$56.3B), VanEck (A$31.7B), and Dimensional (A$18.6B) — collectively manage 78% of industry assets, a concentration that has been broadly stable despite the market's continued expansion. The largest single ETF remains Vanguard Australian Shares Index (VAS) at A$24.5B, followed by Vanguard MSCI International (VGS, A$14.8B) and iShares S&amp;P 500 (IVV, A$12.0B).</p>
+<p>International equities is by far the largest asset class at A$163B, nearly double the A$83.5B in Australian equities. Fixed income holds A$42.5B, with property at A$15.4B and commodities at A$14.9B. Digital assets, despite their outsized performance volatility, represent just A$681M — less than 0.2% of total industry assets — suggesting that even after several years of product launches and regulatory clarity, institutional and retail adoption of crypto ETFs remains limited relative to the broader market.</p>
+
+<h2>What to Watch Next Week</h2>
+<p>The 90-day tariff pause creates a defined window of uncertainty: markets are not pricing a permanent resolution, but they have stepped back from pricing a worst-case escalation with all trading partners simultaneously. The key question is whether US/China trade tension — which was specifically excluded from the pause and actively escalated to 125% tariffs — continues to deteriorate, or whether a bilateral negotiation pathway emerges. ETFs to watch in either direction: CNEW and ASIA (China/Asia exposure) for escalation signals, and IVV/NDQ for whether US tech equities can recover meaningfully on the pause news.</p>
+<p>The RBA's May meeting is increasingly being watched for any dovish signal in response to global growth headwinds. If the bank indicates a rate cut is on the table, duration-sensitive fixed income ETFs — VAF, IAF, VGB — would be the primary beneficiaries. Australian bank ETFs (MVB, QFN) have already priced in much of the benign rate environment, so the more interesting question is whether they can continue to outperform if the rate cycle actually turns.</p>
+<p>For infrastructure investors, the consistency of the sector's performance through two consecutive volatile weeks is worth noting as a potential regime shift. GIFL, CIIH, CIVH and MICH have collectively delivered an average of nearly <strong>+9%</strong> in a month where broad equities were broadly flat. If this reflects a genuine allocation shift by institutional investors toward real-asset income rather than a one-off currency effect, the sector's FUM could grow significantly over the coming quarters. Watch the unit issuance data for these products as the strongest signal of whether institutional flows are driving or just amplifying the returns.</p>
+""",
+    },
+
+    {
         "slug": "weekly-wrap-3-april-2026",
         "title": "Weekly Wrap: Liberation Day Tariffs Rattle Markets, Australia Holds Its Ground",
         "subtitle": "Trump's sweeping global tariffs announced on 2 April triggered sharp falls in US-facing equity ETFs, while Australian equities, infrastructure, and currency-hedged funds provided relative shelter.",
