@@ -73,7 +73,7 @@ ISSUER_URLS = {
         'fund_page': 'https://www.blackrock.com/au/individual/products/{product_id}/',
         'api': 'https://www.blackrock.com/au/individual/products/fund-list',
     },
-    'SPDR': {
+    'State Street Investment Management': {
         # Fund finder is JS-rendered; individual fund pages work
         'fund_list': 'https://www.ssga.com/au/en_gb/intermediary/etfs/fund-finder',
         'fund_page': 'https://www.ssga.com/au/en_gb/intermediary/etfs/funds/{slug}',
@@ -233,9 +233,10 @@ ISSUER_ALIASES = {
     'blackrock': 'iShares',
     'vaneck': 'VanEck',
     'van eck': 'VanEck',
-    'spdr': 'SPDR',
-    'state street': 'SPDR',
-    'state street global advisors': 'SPDR',
+    'spdr': 'State Street Investment Management',
+    'state street': 'State Street Investment Management',
+    'state street global advisors': 'State Street Investment Management',
+    'state street investment management': 'State Street Investment Management',
     'global x': 'Global X',
     'magellan': 'Magellan',
     'dimensional': 'Dimensional',

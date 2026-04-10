@@ -1729,7 +1729,7 @@ def scrape_spdr(db_path=None) -> int:
         etf = {
             'code': code,
             'name': name,
-            'issuer': 'SPDR',
+            'issuer': 'State Street Investment Management',
             'expense_ratio': mer,
             'management_fee': mer,
             'inception_date': inception,
@@ -1790,7 +1790,7 @@ def scrape_statestreet(db_path=None) -> int:
 
     # Fetch known StateStreet codes from DB (may be more than the hardcoded list)
     db_codes = [r[0] for r in conn.execute(
-        "SELECT code FROM etfs WHERE issuer='StateStreet' ORDER BY code"
+        "SELECT code FROM etfs WHERE issuer='State Street Investment Management' ORDER BY code"
     ).fetchall()]
     codes = db_codes or _STATESTREET_AU_CODES
 

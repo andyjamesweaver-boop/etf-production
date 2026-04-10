@@ -3268,7 +3268,8 @@ const ISSUER_COLORS = {
   'Vanguard':        '#8B1A1A',
   'iShares':         '#009CDE',
   'VanEck':          '#1A3C8F',
-  'SPDR':            '#CC1122',
+  'State Street Investment Management': '#1a9dd9',
+  'SPDR':            '#1a9dd9',
   'Global X':        '#00A651',
   'Magellan':        '#E8712A',
   'Dimensional':     '#005B8E',
@@ -3292,6 +3293,7 @@ const ISSUER_DOMAINS = {
   'Vanguard':        'vanguard.com.au',
   'iShares':         'blackrock.com',
   'VanEck':          'vaneck.com.au',
+  'State Street Investment Management': 'ssga.com',
   'SPDR':            'ssga.com',
   'Global X':        'globalxetfs.com.au',
   'Magellan':        'magellangroup.com.au',
@@ -4542,8 +4544,8 @@ let scrapeTimes = {};
 // Map issuer display names → scrape_log source keys
 const ISSUER_SRC = {
   'BetaShares': 'betashares', 'Vanguard': 'vanguard', 'iShares': 'ishares',
-  'VanEck': 'vaneck', 'Global X': 'globalx', 'SPDR': 'spdr',
-  'StateStreet': 'statestreet',
+  'VanEck': 'vaneck', 'Global X': 'globalx',
+  'State Street Investment Management': 'statestreet', 'SPDR': 'spdr', 'StateStreet': 'statestreet',
 };
 
 function fmtTs(ts) {

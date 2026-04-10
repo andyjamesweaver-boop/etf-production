@@ -86,6 +86,7 @@ const ISS_COLORS = {
   'Vanguard':                  '#c41230',
   'J.P. Morgan':               '#003087',
   'JPMorgan':                  '#003087',
+  'State Street Investment Management': '#1a9dd9',
   'State Street':              '#1a9dd9',
   'StateStreet':               '#1a9dd9',
   'SPDR':                      '#1a9dd9',
@@ -1247,8 +1248,8 @@ const ISSUER_PROFILES = {
     desc: "Part of Mirae Asset Global Investments. Global X pioneered thematic ETFs in Australia and manages Australia's largest physical gold ETF (GOLD, A$6.3B). Their range spans precious metals, energy transition, technology themes, and income-oriented covered-call strategies.",
     known: 'Physical gold (GOLD) · Thematic ETFs · Covered call income · Crypto',
   },
-  'SPDR': {
-    desc: "SPDR (State Street Global Advisors) created the world's first ETF — the S&P 500 SPDR (SPY) in 1993. STW was Australia's first ASX-listed ETF (2001). The Australian range is deliberately compact, focused on flagship index exposures for institutional and wholesale use.",
+  'State Street Investment Management': {
+    desc: "State Street Investment Management (SSIM), the asset management arm of State Street Corporation, manages Australia's SPDR-branded ETFs. STW was Australia's first ASX-listed ETF (2001). The local range is deliberately compact, focused on flagship index exposures for institutional and wholesale use.",
     known: "Australia's first ETF (STW) · Institutional-grade · ASX 200 · Global property",
   },
   'Magellan': {
@@ -1308,7 +1309,7 @@ async function init() {
         <div class="flex flex-col gap-1">${topEtfs.map(e => `
           <div class="flex items-center justify-between gap-2">
             <a href="/?code=${e.code}" class="font-bold text-blue-400 hover:underline text-xs">${e.code}</a>
-            <span class="text-xs text-slate-400 truncate flex-1 mx-2" title="${e.name || ''}">${(e.name||'').replace(/^(BETASHARES|VANGUARD|ISHARES|VANECK|GLOBAL X|STATE STREET SPDR|SPDR|DIMENSIONAL|MAGELLAN)\s+/i,'')}</span>
+            <span class="text-xs text-slate-400 truncate flex-1 mx-2" title="${e.name || ''}">${(e.name||'').replace(/^(BETASHARES|VANGUARD|ISHARES|VANECK|GLOBAL X|STATE STREET INVESTMENT MANAGEMENT|STATE STREET SPDR|STATE STREET|SPDR|DIMENSIONAL|MAGELLAN)\s+/i,'')}</span>
             <span class="text-xs tabular-nums text-slate-300 shrink-0">${fmtFum(e.fund_size_aud_millions)}</span>
           </div>`).join('')}
         </div>` : ''}
