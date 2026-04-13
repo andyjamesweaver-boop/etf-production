@@ -94,6 +94,18 @@ def _run_upcoming_listings_job():
         logger.error(f"[scheduler] Upcoming listings job failed: {e}", exc_info=True)
 
 
+def _run_look_through_job():
+    """Refresh layer-2 look-through holdings for feeder ETFs (weekly)."""
+    now_sydney = datetime.now(SYDNEY).strftime("%Y-%m-%d %H:%M %Z")
+    logger.info(f"[scheduler] Look-through holdings job starting — {now_sydney}")
+    try:
+        from scrapers.run_all import run_look_through
+        count = run_look_through()
+        logger.info(f"[scheduler] Look-through job complete — {count} ETFs updated")
+    except Exception as e:
+        logger.error(f"[scheduler] Look-through job failed: {e}", exc_info=True)
+
+
 def _run_price_history_job():
     """Update price history from Yahoo Finance (weekly, Sunday evenings)."""
     now_sydney = datetime.now(SYDNEY).strftime("%Y-%m-%d %H:%M %Z")
@@ -167,6 +179,12 @@ def _schedule_loop():
     _ph_utc = _ph_sydney.astimezone(_tz.utc).strftime("%H:%M")
     schedule.every().sunday.at(_ph_utc, "UTC").do(_run_price_history_job).tag("price-history")
     logger.info(f"[scheduler] Price history update scheduled weekly Sunday 18:00 Sydney = {_ph_utc} UTC")
+
+    # Look-through holdings: weekly Sunday 17:00 Sydney (before price history)
+    _lt_sydney = datetime(2000, 1, 2, 17, 0, tzinfo=SYDNEY)
+    _lt_utc = _lt_sydney.astimezone(_tz.utc).strftime("%H:%M")
+    schedule.every().sunday.at(_lt_utc, "UTC").do(_run_look_through_job).tag("look-through")
+    logger.info(f"[scheduler] Look-through holdings scheduled weekly Sunday 17:00 Sydney = {_lt_utc} UTC")
 
     while True:
         schedule.run_pending()

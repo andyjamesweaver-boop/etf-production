@@ -152,6 +152,11 @@ def run_cboe_quarterly():
     return scrape_cboe_quarterly_portfolios(DB_PATH)
 
 
+def run_look_through():
+    from scrapers.look_through_scraper import scrape_look_through_holdings
+    return scrape_look_through_holdings(DB_PATH)
+
+
 SOURCES = {
     'asx_report': ('ASX Monthly Report', run_asx_report),
     'cboe': ('Cboe Australia', run_cboe),
@@ -164,6 +169,7 @@ SOURCES = {
     'upcoming': ('Upcoming ETF Listings', run_upcoming),
     'cboe_quarterly': ('CBOE Quarterly Portfolio Disclosures', run_cboe_quarterly),
     'prices': ('Daily Price + FUM Refresh', run_prices_and_fum),
+    'look_through': ('Look-through Holdings (Feeder Funds)', run_look_through),
 }
 
 

@@ -63,18 +63,23 @@ def upsert_etfs(conn, rows: list[dict], *, commit: bool = True):
 
 
 # -------------------------------------------------------------- holdings
-def upsert_holdings(conn, etf_code: str, holdings: list[dict], *, commit: bool = True):
-    """Replace holdings for an ETF (delete + insert)."""
-    conn.execute("DELETE FROM etf_holdings WHERE etf_code = ?", (etf_code,))
+def upsert_holdings(conn, etf_code: str, holdings: list[dict], *, commit: bool = True, layer: int = 1):
+    """Replace holdings for an ETF (delete + insert). Only affects the specified layer."""
+    conn.execute("DELETE FROM etf_holdings WHERE etf_code = ? AND COALESCE(layer,1) = ?", (etf_code, layer))
     for h in holdings:
         conn.execute(
-            "INSERT INTO etf_holdings (etf_code, name, ticker, weight_pct, sector, country) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO etf_holdings (etf_code, name, ticker, weight_pct, sector, country, layer) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
             (etf_code, h.get('name'), h.get('ticker'), h.get('weight_pct'),
-             h.get('sector'), h.get('country'))
+             h.get('sector'), h.get('country'), layer)
         )
     if commit:
         conn.commit()
+
+
+def upsert_underlying_holdings(conn, etf_code: str, holdings: list[dict], *, commit: bool = True):
+    """Replace look-through (layer 2) holdings for a feeder ETF."""
+    upsert_holdings(conn, etf_code, holdings, commit=commit, layer=2)
 
 
 # --------------------------------------------------------------- sectors
