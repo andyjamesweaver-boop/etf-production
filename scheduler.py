@@ -82,6 +82,18 @@ def _run_nav_job():
         logger.error(f"[scheduler] NAV job failed: {e}", exc_info=True)
 
 
+def _run_upcoming_listings_job():
+    """Check ASXonline for new ETF admission notices and reconcile pending listings."""
+    now_sydney = datetime.now(SYDNEY).strftime("%Y-%m-%d %H:%M %Z")
+    logger.info(f"[scheduler] Upcoming listings job starting — Sydney time {now_sydney}")
+    try:
+        from scrapers.run_all import run_upcoming
+        count = run_upcoming()
+        logger.info(f"[scheduler] Upcoming listings job complete — {count} listings matched/updated")
+    except Exception as e:
+        logger.error(f"[scheduler] Upcoming listings job failed: {e}", exc_info=True)
+
+
 def _run_price_history_job():
     """Update price history from Yahoo Finance (weekly, Sunday evenings)."""
     now_sydney = datetime.now(SYDNEY).strftime("%Y-%m-%d %H:%M %Z")
@@ -113,6 +125,7 @@ def _schedule_loop():
         schedule.clear("prices")
         schedule.clear("pcf")
         schedule.clear("nav")
+        schedule.clear("upcoming")
         today = datetime.now(SYDNEY).date()
         from datetime import timezone as _tz
 
@@ -137,6 +150,12 @@ def _schedule_loop():
         nav_utc = nav_sydney.astimezone(_tz.utc).strftime("%H:%M")
         logger.info(f"[scheduler] Registering NAV job at 17:30 Sydney = {nav_utc} UTC")
         schedule.every().day.at(nav_utc, "UTC").do(_run_nav_job).tag("nav")
+
+        # Upcoming listings: daily at 09:00 Sydney — check ASXonline for new ETF admissions
+        upcoming_sydney = datetime(today.year, today.month, today.day, 9, 0, tzinfo=SYDNEY)
+        upcoming_utc = upcoming_sydney.astimezone(_tz.utc).strftime("%H:%M")
+        logger.info(f"[scheduler] Registering upcoming listings job at 09:00 Sydney = {upcoming_utc} UTC")
+        schedule.every().day.at(upcoming_utc, "UTC").do(_run_upcoming_listings_job).tag("upcoming")
 
     # Re-register at midnight UTC so any DST shift is absorbed automatically
     _register_today()

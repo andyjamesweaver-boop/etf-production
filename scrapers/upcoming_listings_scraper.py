@@ -297,8 +297,8 @@ def _scan_asxonline_notices(conn) -> int:
             # We've seen notices in this month before — start from where we left off
             start_num = month_last + 1
         elif year_high:
-            # Know approximately where we are this year — go back 150 to catch month start
-            start_num = max(1, year_high - 150)
+            # Notices are numbered sequentially year-wide — start right after last known
+            start_num = year_high + 1
         else:
             # Completely fresh — step-probe to skip the gap before this month's notices
             logger.info(f'    First scan of {y}/{m:02d}: probing for notice range…')
