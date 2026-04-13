@@ -400,14 +400,26 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
     def handle_etf_holdings(self, code):
         conn = get_db()
         try:
+            # Layer 1: direct holdings
             rows = conn.execute(
-                "SELECT name, ticker, weight_pct, sector, country, last_updated FROM etf_holdings "
-                "WHERE etf_code = ? ORDER BY weight_pct DESC", (code,)
+                "SELECT name, ticker, weight_pct, sector, country, last_updated, layer "
+                "FROM etf_holdings WHERE etf_code = ? AND COALESCE(layer,1) = 1 "
+                "ORDER BY weight_pct DESC", (code,)
+            ).fetchall()
+            # Layer 2: look-through / underlying holdings
+            underlying = conn.execute(
+                "SELECT name, ticker, weight_pct, sector, country, last_updated, layer "
+                "FROM etf_holdings WHERE etf_code = ? AND layer = 2 "
+                "ORDER BY weight_pct DESC", (code,)
             ).fetchall()
             meta = conn.execute(
                 "SELECT holdings_disclosure, holdings_as_of FROM etfs WHERE code = ?", (code,)
             ).fetchone()
-            resp = {'code': code, 'holdings': [dict(r) for r in rows]}
+            resp = {
+                'code': code,
+                'holdings': [dict(r) for r in rows],
+                'underlying': [dict(r) for r in underlying],
+            }
             if meta:
                 resp['holdings_disclosure'] = meta['holdings_disclosure']
                 resp['holdings_as_of'] = meta['holdings_as_of']
@@ -1294,7 +1306,7 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
             placeholders = ','.join('?' * len(codes))
             rows = conn.execute(
                 f"SELECT etf_code, ticker, name, weight_pct FROM etf_holdings "
-                f"WHERE etf_code IN ({placeholders}) AND weight_pct IS NOT NULL AND weight_pct > 0",
+                f"WHERE etf_code IN ({placeholders}) AND weight_pct IS NOT NULL AND weight_pct > 0 AND COALESCE(layer,1) = 1",
                 codes
             ).fetchall()
 
@@ -1394,10 +1406,10 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
 
             target_ac = target['asset_class']
 
-            # Load all holdings
+            # Load all holdings (layer 1 only — avoid double-counting feeder look-throughs)
             rows = conn.execute(
                 "SELECT etf_code, ticker, name, weight_pct FROM etf_holdings "
-                "WHERE weight_pct IS NOT NULL AND weight_pct > 0"
+                "WHERE weight_pct IS NOT NULL AND weight_pct > 0 AND COALESCE(layer,1) = 1"
             ).fetchall()
 
             # --- Step 1: Build name→ticker lookup from holdings that have tickers.
@@ -1532,15 +1544,14 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
             rows = conn.execute(
                 "SELECT h.etf_code, e.name AS etf_name, e.asset_class, e.issuer, "
                 "       h.name AS holding_name, h.ticker, h.weight_pct, h.sector, "
-                "       e.holdings_disclosure, e.holdings_as_of "
+                "       e.holdings_disclosure, e.holdings_as_of, COALESCE(h.layer,1) AS layer "
                 "FROM etf_holdings h JOIN etfs e ON e.code = h.etf_code "
                 "WHERE (LOWER(h.name) LIKE ? OR LOWER(h.ticker) LIKE ?) "
                 "  AND COALESCE(h.weight_pct, 0) >= ? "
-                "ORDER BY h.weight_pct DESC "
-                "LIMIT 100",
+                "ORDER BY COALESCE(h.layer,1) ASC, h.weight_pct DESC "
+                "LIMIT 150",
                 (pattern, pattern, min_weight)
             ).fetchall()
-            etf_codes = list(dict.fromkeys(r['etf_code'] for r in rows))
             # Build per-ETF disclosure metadata map
             disclosure_meta = {}
             for r in rows:
@@ -1550,13 +1561,23 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
                         'holdings_disclosure': r['holdings_disclosure'],
                         'holdings_as_of': r['holdings_as_of'],
                     }
+            # De-duplicate: if same ETF+holding appears as both layer 1 and layer 2, keep layer 1
+            seen = set()
+            deduped = []
+            for r in rows:
+                key = (r['etf_code'], (r['ticker'] or r['holding_name']).upper())
+                if r['layer'] == 2 and key in seen:
+                    continue
+                seen.add(key)
+                deduped.append(dict(r))
+            etf_codes = list(dict.fromkeys(r['etf_code'] for r in deduped))
             self.send_json({
                 'query': q,
-                'total': len(rows),
+                'total': len(deduped),
                 'etf_count': len(etf_codes),
                 'etfs': etf_codes,
                 'disclosure_meta': disclosure_meta,
-                'results': [dict(r) for r in rows],
+                'results': deduped,
             })
         except Exception as e:
             self.send_json({'error': str(e)}, 500)
@@ -1582,10 +1603,12 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
                         (SELECT COALESCE(SUM(w), 0) FROM (
                             SELECT weight_pct AS w FROM etf_holdings
                             WHERE etf_code = h.etf_code AND weight_pct IS NOT NULL
+                              AND COALESCE(layer,1) = 1
                             ORDER BY weight_pct DESC LIMIT 10
                         ) t) AS top10_conc
                     FROM etf_holdings h
                     JOIN etfs e ON e.code = h.etf_code
+                    WHERE COALESCE(h.layer,1) = 1
                     GROUP BY h.etf_code, e.name, e.asset_class, e.issuer
                 )
                 SELECT * FROM base WHERE holding_count >= 5
@@ -2175,6 +2198,7 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
                   AND h.country NOT LIKE '%NYSE%'
                   AND h.country NOT LIKE '%Ireland%'
                   AND e.fund_size_aud_millions > 0
+                  AND COALESCE(h.layer,1) = 1
                 GROUP BY country_norm
                 HAVING fum_weighted_m > 20
                 ORDER BY fum_weighted_m DESC
@@ -2207,6 +2231,7 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
                   AND h.country NOT LIKE '%Exchange%'
                   AND h.country NOT LIKE '%Market%'
                   AND e.fund_size_aud_millions > 50
+                  AND COALESCE(h.layer,1) = 1
                 GROUP BY country_norm, h.etf_code
                 HAVING total_weight_pct > 5
                 ORDER BY country_norm, total_weight_pct DESC
@@ -3886,6 +3911,8 @@ async function showTab(tab) {
     const isQuarterly = h.holdings_disclosure === 'quarterly';
     const mpiBasket = mpiResp.basket || [];
     const hasMpi = mpiBasket.length > 0;
+    const underlying = h.underlying || [];
+    const hasUnderlying = underlying.length > 0;
 
     if (!h.holdings || !h.holdings.length) {
       el.innerHTML = '<p class="text-gray-400 text-sm text-center py-10">No holdings data available for this ETF.</p>';
@@ -4062,7 +4089,66 @@ async function showTab(tab) {
         <div class="overflow-y-auto" style="max-height:500px">
           ${buildComparisonHtml()}
         </div>
-      </div>` : ''}`;
+      </div>` : ''}
+
+      <!-- Look-through (layer 2) underlying holdings -->
+      ${hasUnderlying ? (() => {
+        const uMaxW = Math.max(...underlying.map(x => x.weight_pct || 0));
+        const uTop10 = underlying.slice(0, 10).reduce((s, x) => s + (x.weight_pct || 0), 0);
+        const feederName = all.length === 1 ? all[0].name : 'underlying fund';
+        return `
+        <details class="mt-6 group" id="underlying-details">
+          <summary class="flex items-center gap-2 cursor-pointer list-none select-none">
+            <div class="flex-1 border-t border-dashed border-violet-200"></div>
+            <span class="flex items-center gap-1.5 text-xs font-semibold text-violet-700 bg-violet-50 border border-violet-200 px-3 py-1.5 rounded-full hover:bg-violet-100 transition-colors">
+              <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" class="group-open:rotate-90 transition-transform"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+              Look-through: ${underlying.length} underlying holdings
+            </span>
+            <div class="flex-1 border-t border-dashed border-violet-200"></div>
+          </summary>
+          <div class="mt-3 pt-3">
+            <div class="rounded-lg border border-violet-100 bg-violet-50 px-3 py-2.5 mb-3 text-xs text-violet-800 leading-relaxed">
+              This ETF is a <strong>feeder fund</strong> — it invests substantially in <strong>${feederName}</strong>.
+              The holdings shown below are the <strong>look-through holdings</strong> of that underlying fund.
+              Weights reflect the underlying fund's allocation.
+            </div>
+            <div class="flex flex-wrap items-center gap-2 mb-3">
+              <span class="bg-violet-100 text-violet-700 px-2.5 py-1 rounded-full text-xs font-semibold">${underlying.length} holdings</span>
+              <span class="text-xs text-gray-500">Top 10: <strong class="text-gray-700">${uTop10.toFixed(1)}%</strong></span>
+            </div>
+            <input id="underlying-filter" type="text" placeholder="Filter underlying holdings…"
+              class="w-full border border-violet-200 rounded-lg px-3 py-1.5 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-violet-200">
+            <div class="text-xs text-gray-400 grid gap-x-3 mb-1 pr-1"
+                 style="grid-template-columns:3.5rem 1fr 7rem 5rem">
+              <span class="text-right">Ticker</span><span>Name</span><span>Sector</span><span class="hidden sm:block">Country</span>
+            </div>
+            <div id="underlying-list" class="space-y-1 overflow-y-auto" style="max-height:440px">
+              ${underlying.map((r, i) => `
+                <div class="holding-row flex items-center gap-3 py-0.5 hover:bg-violet-50 rounded ${i >= 50 ? 'hidden extra-underlying' : ''}"
+                     data-uname="${(r.name || '').toLowerCase().replace(/"/g, '')}"
+                     data-uticker="${(r.ticker || '').toLowerCase()}">
+                  <div class="w-14 text-xs font-mono text-gray-400 shrink-0 text-right">${r.ticker || ''}</div>
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between mb-0.5">
+                      <span class="text-xs font-medium text-gray-700 truncate">${r.name || ''}</span>
+                      <span class="text-xs font-bold text-violet-700 ml-2 shrink-0">${r.weight_pct != null ? r.weight_pct.toFixed(2) + '%' : '—'}</span>
+                    </div>
+                    <div class="h-1.5 bg-violet-100 rounded-full overflow-hidden">
+                      <div class="h-full bg-violet-400 rounded-full" style="width:${uMaxW > 0 ? ((r.weight_pct || 0) / uMaxW * 100).toFixed(1) : 0}%"></div>
+                    </div>
+                  </div>
+                  <div class="text-xs text-gray-400 w-28 shrink-0 truncate">${r.sector || ''}</div>
+                  <div class="text-xs text-gray-300 w-20 shrink-0 truncate hidden sm:block">${r.country || ''}</div>
+                </div>`).join('')}
+            </div>
+            ${underlying.length > 50 ? `
+              <button id="show-all-underlying"
+                class="mt-2 w-full text-xs text-violet-600 hover:text-violet-800 hover:underline py-1.5 border-t border-violet-100">
+                Show all ${underlying.length} underlying holdings ↓
+              </button>` : ''}
+          </div>
+        </details>`;
+      })() : ''}`;
 
     document.getElementById('holding-filter')?.addEventListener('input', function () {
       const q = this.value.trim().toLowerCase();
@@ -4073,6 +4159,17 @@ async function showTab(tab) {
     });
     document.getElementById('show-all-holdings')?.addEventListener('click', function () {
       document.querySelectorAll('.extra-holding-port').forEach(r => r.classList.remove('hidden', 'extra-holding-port'));
+      this.remove();
+    });
+    document.getElementById('underlying-filter')?.addEventListener('input', function () {
+      const q = this.value.trim().toLowerCase();
+      document.querySelectorAll('#underlying-list .holding-row').forEach(row => {
+        const vis = !q || row.dataset.uname.includes(q) || row.dataset.uticker.includes(q);
+        row.classList.toggle('hidden', !vis);
+      });
+    });
+    document.getElementById('show-all-underlying')?.addEventListener('click', function () {
+      document.querySelectorAll('.extra-underlying').forEach(r => r.classList.remove('hidden', 'extra-underlying'));
       this.remove();
     });
     document.querySelectorAll('.htab-btn').forEach(btn => {
@@ -5193,19 +5290,23 @@ async function hsFetch() {
     </td></tr>` : '';
   document.getElementById('holdings-table').innerHTML = qBanner + d.results.map(r => {
     const isQ = discMeta[r.etf_code]?.holdings_disclosure === 'quarterly';
+    const isLookthrough = r.layer === 2;
     return `
-    <tr class="cursor-pointer" onclick="showDetail('${r.etf_code}');document.querySelector('.main-tab[data-view=screener]').click()">
+    <tr class="cursor-pointer${isLookthrough ? ' opacity-80' : ''}" onclick="showDetail('${r.etf_code}');document.querySelector('.main-tab[data-view=screener]').click()">
       <td class="px-3 py-2.5 font-bold text-blue-700">${r.etf_code}${isQ ? ' <span title="Quarterly portfolio disclosure" class="text-amber-500 text-xs">Q</span>' : ''}</td>
       <td class="px-3 py-2.5 text-gray-600 max-w-[160px] truncate text-xs">${r.etf_name || ''}</td>
-      <td class="px-3 py-2.5 font-medium text-gray-800 max-w-[180px] truncate">${r.holding_name || ''}</td>
+      <td class="px-3 py-2.5 font-medium text-gray-800 max-w-[180px] truncate">
+        ${r.holding_name || ''}
+        ${isLookthrough ? '<span class="ml-1.5 text-xs bg-violet-100 text-violet-600 px-1.5 py-0.5 rounded-full font-normal">look-through</span>' : ''}
+      </td>
       <td class="px-3 py-2.5 font-mono text-xs text-gray-500">${r.ticker || '—'}</td>
       <td class="px-3 py-2.5 text-right">
         <div class="flex items-center justify-end gap-2">
           <div class="w-16 bg-gray-100 rounded-full h-1.5 overflow-hidden">
-            <div class="h-full bg-blue-400 rounded-full"
+            <div class="h-full ${isLookthrough ? 'bg-violet-400' : 'bg-blue-400'} rounded-full"
                  style="width:${maxW > 0 ? (r.weight_pct / maxW * 100).toFixed(1) : 0}%"></div>
           </div>
-          <span class="font-bold text-blue-700 text-xs w-12 text-right">
+          <span class="font-bold ${isLookthrough ? 'text-violet-600' : 'text-blue-700'} text-xs w-12 text-right">
             ${r.weight_pct != null ? r.weight_pct.toFixed(2) + '%' : '—'}
           </span>
         </div>
