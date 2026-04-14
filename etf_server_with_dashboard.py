@@ -1138,15 +1138,15 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
                            WHEN l.smart_beta = 'yes'                             THEN 'Other Smart Beta'
                            WHEN l.investment_style IN ('Index','Index-Tracking')  THEN 'Passive Index'
                            ELSE 'Unclassified'
-                       END AS strategy,
+                       END AS strat_bucket,
                        SUM(m.market_cap)/1e9 AS aum_b
                 FROM etp_monthly m LEFT JOIN etp_list l ON l.ticker = m.code
                 WHERE m.market_cap > 0
-                GROUP BY m.date, strategy ORDER BY m.date ASC
+                GROUP BY m.date, strat_bucket ORDER BY m.date ASC
             """).fetchall()
             latest = max(r['date'] for r in all_rows)
             top = sorted(
-                [(r['strategy'], r['aum_b']) for r in all_rows if r['date'] == latest],
+                [(r['strat_bucket'], r['aum_b']) for r in all_rows if r['date'] == latest],
                 key=lambda x: -x[1]
             )
             top_names = [s for s, _ in top]
@@ -1155,7 +1155,7 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
             dates_seen = []
             seen_set = set()
             for r in all_rows:
-                nm = r['strategy'] if r['strategy'] in top_names else 'Other'
+                nm = r['strat_bucket'] if r['strat_bucket'] in top_names else 'Other'
                 pivot[r['date']][nm] = pivot[r['date']].get(nm, 0) + (r['aum_b'] or 0)
                 if r['date'] not in seen_set:
                     seen_set.add(r['date'])
