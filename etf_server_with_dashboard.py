@@ -107,6 +107,7 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
             '/api/v1/history/launches':      self.handle_history_launches,
             '/api/v1/history/geography':     self.handle_history_geography,
             '/api/v1/history/strategy':      self.handle_history_strategy,
+            '/api/v1/history/top-funds':     self.handle_history_top_funds,
             # Insights API
             '/api/v1/insights/fum':      self.handle_insights_fum,
             '/api/v1/insights/listings': self.handle_insights_listings,
@@ -1162,6 +1163,84 @@ class ETFAPIHandler(http.server.BaseHTTPRequestHandler):
             ordered = list(dict.fromkeys(top_names))
             series = [{'name': n, 'data': [round(pivot[d].get(n, 0), 2) for d in dates_seen]} for n in ordered]
             self.send_json({'dates': dates_seen, 'series': series})
+        except Exception as e:
+            self.send_json({'error': str(e)}, 500)
+        finally:
+            conn.close()
+
+    # ----- History: Top Funds -----
+    def handle_history_top_funds(self):
+        """Top 20 ETFs by current FUM with YoY comparison and historical series for top 10."""
+        conn = get_db()
+        try:
+            latest = conn.execute("SELECT MAX(date) FROM etp_monthly").fetchone()[0]
+            prior_1y = conn.execute(
+                "SELECT MAX(date) FROM etp_monthly WHERE date <= date(?, '-11 months')",
+                (latest,)
+            ).fetchone()[0]
+
+            top_rows = conn.execute("""
+                SELECT m.code, COALESCE(l.name, m.code) AS name,
+                       COALESCE(l.trim_issuer, l.issuer, 'Unknown') AS issuer,
+                       l.asset_class,
+                       ROUND(m.market_cap/1e6, 1) AS fum_m,
+                       ROUND(m.funds_flow/1e6, 1) AS flow_m
+                FROM etp_monthly m
+                LEFT JOIN etp_list l ON l.ticker=m.code
+                WHERE m.date=? AND m.market_cap > 0
+                ORDER BY m.market_cap DESC LIMIT 20
+            """, (latest,)).fetchall()
+
+            codes = [r['code'] for r in top_rows]
+            if not codes:
+                self.send_json({'funds': [], 'date': latest, 'prior_date': prior_1y,
+                                'history': {'dates': [], 'series': []}})
+                return
+
+            ph = ','.join('?' * len(codes))
+            prior_rows = conn.execute(
+                f"SELECT code, ROUND(market_cap/1e6, 1) AS fum_m FROM etp_monthly "
+                f"WHERE date=? AND code IN ({ph})",
+                [prior_1y] + codes
+            ).fetchall()
+            prior_map = {r['code']: r['fum_m'] for r in prior_rows}
+
+            funds = []
+            for r in top_rows:
+                d = dict(r)
+                prior = prior_map.get(d['code'])
+                d['fum_prior_m'] = prior
+                if prior and prior > 0:
+                    d['change_pct'] = round((d['fum_m'] - prior) / prior * 100, 1)
+                    d['change_abs'] = round(d['fum_m'] - prior, 0)
+                else:
+                    d['change_pct'] = None
+                    d['change_abs'] = None
+                funds.append(d)
+
+            # Historical series for the top 10 only
+            top10 = codes[:10]
+            ph10 = ','.join('?' * len(top10))
+            hist_rows = conn.execute(
+                f"SELECT code, date, ROUND(market_cap/1e6, 1) AS fum_m "
+                f"FROM etp_monthly WHERE code IN ({ph10}) AND market_cap > 0 ORDER BY date ASC",
+                top10
+            ).fetchall()
+
+            from collections import defaultdict
+            series_data = defaultdict(dict)
+            all_dates = sorted(set(r['date'] for r in hist_rows))
+            for r in hist_rows:
+                series_data[r['code']][r['date']] = r['fum_m']
+            names_map = {r['code']: r['name'] for r in top_rows}
+            series = [
+                {'code': c, 'name': names_map.get(c, c),
+                 'data': [series_data[c].get(d) for d in all_dates]}
+                for c in top10
+            ]
+
+            self.send_json({'funds': funds, 'date': latest, 'prior_date': prior_1y,
+                            'history': {'dates': all_dates, 'series': series}})
         except Exception as e:
             self.send_json({'error': str(e)}, 500)
         finally:
